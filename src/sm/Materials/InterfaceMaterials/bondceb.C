@@ -50,7 +50,7 @@ BondCEBMaterial :: BondCEBMaterial(int n, Domain *d) : StructuralInterfaceMateri
 
 
 FloatArrayF<3>
-BondCEBMaterial :: giveEngTraction_3d(const FloatArrayF<3> &jump, GaussPoint *gp, TimeStep *tStep) const
+BondCEBMaterial :: giveEngTraction_ntt(const FloatArrayF<3> &jump, GaussPoint *gp, TimeStep *tStep) const
 {
     BondCEBMaterialStatus *status = static_cast< BondCEBMaterialStatus * >( this->giveStatus(gp) );
 
@@ -96,7 +96,7 @@ BondCEBMaterial :: giveEngTraction_3d(const FloatArrayF<3> &jump, GaussPoint *gp
 
 
 FloatMatrixF<3,3>
-BondCEBMaterial :: give3dStiffnessMatrix_Eng(MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep) const
+BondCEBMaterial :: giveStiffnessMatrix_Eng_ntt(MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep) const
 {
     ///@todo Only elastic tangent supported
     return diag<3>({kn, ks, ks});
