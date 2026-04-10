@@ -126,6 +126,8 @@ public:
 
     FloatArrayF<3> giveEngTraction_ntt(const FloatArrayF<3> &jump, GaussPoint *gp, TimeStep *tStep) const override;
     FloatMatrixF<3,3> giveStiffnessMatrix_Eng_ntt(MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep) const override;
+    FloatArrayF<3> giveEngTraction_tnn(const FloatArrayF<3> &jump, GaussPoint *gp, TimeStep *tStep) const override;
+    FloatMatrixF<3,3> giveStiffnessMatrix_Eng_tnn(MatResponseMode rMode, GaussPoint *gp, TimeStep *tStep) const override;
 
     int giveIPValue(FloatArray &answer, GaussPoint *gp, InternalStateType type, TimeStep *tStep) override;
 
