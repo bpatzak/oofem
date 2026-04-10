@@ -93,7 +93,7 @@ public:
         if (nsd == 2) {
             answer = this->giveInterfaceCrossSection()->giveEngTraction_nt(jump, gp, tStep);
         } else {
-            answer = this->giveInterfaceCrossSection()->giveEngTraction_ntt(jump, gp, tStep);
+            answer = this->giveInterfaceCrossSection()->giveEngTraction_tnn(jump, gp, tStep);
         }
     }
 
@@ -103,7 +103,7 @@ public:
         if (nsd == 2) {
             answer = this->giveInterfaceCrossSection()->giveStiffnessMatrix_Eng_nt(rMode, ip, tStep);
         } else {
-            answer = this->giveInterfaceCrossSection()->giveStiffnessMatrix_Eng_ntt(rMode, ip, tStep);
+            answer = this->giveInterfaceCrossSection()->giveStiffnessMatrix_Eng_tnn(rMode, ip, tStep);
         }
     }
 
