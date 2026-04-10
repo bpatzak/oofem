@@ -262,6 +262,32 @@ StructuralInterfaceMaterial :: giveStiffnessMatrix_dTdj_Num_ntt(GaussPoint *gp, 
     return answer;
 }
 
+FloatMatrixF<3,3>
+StructuralInterfaceMaterial :: giveStiffnessMatrix_dTdj_Num_tnn(GaussPoint *gp, TimeStep *tStep) const
+{
+    // Default implementation for computation of the numerical tangent
+    // Computes the material stiffness using a central difference method
+    StructuralInterfaceMaterialStatus *status = static_cast< StructuralInterfaceMaterialStatus * >( this->giveStatus( gp ) );
+    double eps = 1.0e-9;
+    const auto &F = status->giveTempF();
+    const auto &jump = status->giveTempJump();
+
+    FloatMatrixF<3,3> answer;
+    for(int i = 1; i <= 3; i++) {
+        auto jumpPlus = jump;
+        auto jumpMinus = jump;
+        jumpPlus.at( i ) += eps;
+        jumpMinus.at( i ) -= eps;
+        auto TPlus = this->giveFirstPKTraction_tnn(jumpPlus, F, gp, tStep );
+        auto TMinus = this->giveFirstPKTraction_tnn(jumpMinus, F, gp, tStep );
+
+        auto Kcolumn = TPlus - TMinus;
+        answer.setColumn(Kcolumn, i);
+    }
+    answer *= 1.0 / ( 2 * eps );
+    this->giveFirstPKTraction_tnn(jump, F, gp, tStep); // reset temp values by recomputing the stress
+    return answer;
+}
 
 FloatMatrixF<1,1>
 StructuralInterfaceMaterial :: giveStiffnessMatrix_Eng_Num_n(GaussPoint *gp, TimeStep *tStep) const
@@ -330,6 +356,33 @@ StructuralInterfaceMaterial :: giveStiffnessMatrix_Eng_Num_ntt(GaussPoint *gp, T
     }
     answer *= 1.0 / ( 2 * eps );
     this->giveEngTraction_ntt(jump, gp, tStep ); // reset temp values by recomputing the stress
+    return answer;
+}
+
+FloatMatrixF<3,3>
+StructuralInterfaceMaterial :: giveStiffnessMatrix_Eng_Num_tnn(GaussPoint *gp, TimeStep *tStep) const
+{
+    // Default implementation for computation of the numerical tangent d(sig)/d(jump)
+    // Computes the material stiffness using a central difference method
+
+    StructuralInterfaceMaterialStatus *status = static_cast< StructuralInterfaceMaterialStatus * >( this->giveStatus( gp ) );
+    double eps = 1.0e-9;
+    const auto &jump = status->giveTempJump();
+
+    FloatMatrixF<3,3> answer;
+    for(int i = 1; i <= 3; i++) {
+        auto jumpPlus = jump;
+        auto jumpMinus = jump;
+        jumpPlus.at( i ) += eps;
+        jumpMinus.at( i ) -= eps;
+        auto tPlus = this->giveEngTraction_tnn(jumpPlus, gp, tStep);
+        auto tMinus = this->giveEngTraction_tnn(jumpMinus, gp, tStep);
+
+        auto Kcolumn = tPlus - tMinus;
+        answer.setColumn(Kcolumn, i);
+    }
+    answer *= 1.0 / ( 2 * eps );
+    this->giveEngTraction_tnn(jump, gp, tStep ); // reset temp values by recomputing the stress
     return answer;
 }
 
