@@ -69,7 +69,7 @@ public:
 
     FEInterpolation *giveInterpolation() const override;
 
-    int computeNumberOfDofs() override { return (domain->giveNumberOfSpatialDimensions() * 3); }
+    int computeNumberOfDofs() override { return (domain->giveNumberOfSpatialDimensions() * 4); }
     void giveDofManDofIDMask(int inode, IntArray &answer) const override;
 
     double computeAreaAround(GaussPoint *gp) override;
