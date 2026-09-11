@@ -54,6 +54,9 @@
 #include "gaussintegrationrule.h"
 #include "classfactory.h"
 #include "enum.h"
+#include "dofiditem.h"
+
+#include <map>
 
 
 namespace oofem {
@@ -493,7 +496,56 @@ class OOFEM_EXPORT MPElement : public Element {
         answer = FloatArray::fromVector(ans);
     }
 
-  virtual double computeSurfaceVolumeAround(GaussPoint* igp, int iSurf) 
+    /**
+     * @name Interpolation operators for a Variable at an integration point.
+     *
+     * These are the shared implementations of the operators the symbolic terms expose as Grad_s,
+     * Grad and N. They live here rather than in the symbolic layer so that both the symbolic
+     * functors and assembleStateVector use one definition.
+     */
+    //@{
+    /// Symmetric gradient (strain) operator of a vector field; shape depends on the material mode.
+    void computeGradSymMatrixAt(FloatMatrix &answer, const Variable *v, GaussPoint *gp) const;
+    /// Gradient operator of a scalar field; nsd rows.
+    void computeGradMatrixAt(FloatMatrix &answer, const Variable *v, GaussPoint *gp) const;
+    /// Interpolation (shape function) operator of a field.
+    void computeNMatrixAt(FloatMatrix &answer, const Variable *v, GaussPoint *gp) const;
+    //@}
+
+    /// Maps a state quantity (an InternalStateType value) onto the primary field supplying it.
+    typedef std::map<int, const Variable *> StateVariableMap;
+
+    /**
+     * Returns the dof id of the primary field that supplies the given state quantity, or Undef.
+     *
+     * DofIDItem is used rather than Variable::q (VariableQuantity) because in practice input decks
+     * declare every scalar field with the same quantity id, so it cannot tell temperature from
+     * pressure from concentration; the dof ids can, and already do.
+     */
+    static DofIDItem giveStateQuantityDofID(int istID);
+
+    /**
+     * Assembles the generalized state vector described by @p istIDs at the given point.
+     *
+     * This is the C++ counterpart of the packing the input decks currently do by hand, i.e. of
+     * expressions of the form "flux = vcat(eps, pw, pa)". Each entry of @p istIDs names both the
+     * quantity and the operator to apply (e.g. IST_Pressure versus IST_PressureGradient).
+     *
+     * @param istIDs Layout advertised by the material through giveStateVariableIDs.
+     * @param vars Resolved mapping from state quantity to the primary field supplying it.
+     */
+    void assembleStateVector(FloatArray &answer, const IntArray &istIDs, const StateVariableMap &vars,
+                             GaussPoint *gp, TimeStep *tStep);
+
+    /**
+     * Pushes the current state to the material at every integration point of the receiver.
+     *
+     * Materials advertising an empty layout are skipped -- they do not participate in the
+     * push/pull protocol and keep using their physics-specific entry points.
+     */
+    void updateTempState(const StateVariableMap &vars, TimeStep *tStep);
+
+  virtual double computeSurfaceVolumeAround(GaussPoint* igp, int iSurf)
   {return igp->giveWeight()*this->getGeometryInterpolation()->boundarySurfaceGiveTransformationJacobian(iSurf, igp->giveNaturalCoordinates(), FEIElementGeometryWrapper(this));}
   virtual double computeEdgeVolumeAround(GaussPoint* igp, int iEdge) 
   {return igp->giveWeight()*this->getGeometryInterpolation()->boundaryEdgeGiveTransformationJacobian(iEdge, igp->giveNaturalCoordinates(), FEIElementGeometryWrapper(this));}

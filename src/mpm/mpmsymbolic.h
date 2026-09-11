@@ -57,70 +57,6 @@
 
 namespace oofem {
 
-    void MPMhelper_Grad_s(FloatMatrix& answer, const Variable *v, GaussPoint* gp)  {
-    const FEInterpolation* interpol = v->interpolation;
-    const MPElement* cell = static_cast<const MPElement*>(gp->giveElement());
-    const MaterialMode mmode = gp->giveMaterialMode();
-
-    FloatMatrix dn, dndx, jacobianMatrix, inv;
-    int nnodes = interpol->giveNumberOfNodes(cell->giveGeometryType());
-    int ndofs = v->size;
-    interpol->evaldNdx(dndx, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(cell));
-
-    if ((mmode == _3dUP) || (mmode == _3dUPV) || (mmode==_3dMat)) {
-            // 3D mode only now
-            answer.resize(6, nnodes*ndofs);
-            for (int i = 0; i< nnodes; i++) {
-                answer(0, i*ndofs+0) = dndx(i, 0);
-                answer(1, i*ndofs+1) = dndx(i, 1);
-                answer(2, i*ndofs+2) = dndx(i, 2);
-
-                answer(3, i*ndofs+1) = dndx(i, 2);
-                answer(3, i*ndofs+2) = dndx(i, 1);
-
-                answer(4, i*ndofs+0) = dndx(i, 2);
-                answer(4, i*ndofs+2) = dndx(i, 0);
-
-                answer(5, i*ndofs+0) = dndx(i, 1);
-                answer(5, i*ndofs+1) = dndx(i, 0);
-            }   
-        } else if ((mmode == _2dUP) || (mmode == _2dUPV)) {
-            answer.resize(6, nnodes*ndofs);
-            for (int i = 0; i< nnodes; i++) {
-                answer(0, i*ndofs+0) = dndx(i, 0);
-                answer(1, i*ndofs+1) = dndx(i, 1);
-
-                answer(5, i*ndofs+0) = dndx(i, 1);
-                answer(5, i*ndofs+1) = dndx(i, 0);
-            }
-        } else if ((mmode == _PlaneStress)) {
-            answer.resize(3, nnodes*ndofs);
-            for (int i = 0; i< nnodes; i++) {
-                answer(0, i*ndofs+0) = dndx(i, 0);
-                answer(1, i*ndofs+1) = dndx(i, 1);
-
-                answer(2, i*ndofs+0) = dndx(i, 1);
-                answer(2, i*ndofs+1) = dndx(i, 0);
-            }
-        } else if (mmode == _PlaneStrain) {
-            answer.resize(4, nnodes*ndofs);
-            for (int i = 0; i< nnodes; i++) {
-                answer(0, i*ndofs+0) = dndx(i, 0);
-                answer(1, i*ndofs+1) = dndx(i, 1);
-
-                answer(3, i*ndofs+0) = dndx(i, 1);
-                answer(3, i*ndofs+1) = dndx(i, 0);
-            }
-        } else if (mmode == _1dMat) {
-            answer.resize(1, nnodes*ndofs);
-            for (int i = 0; i< nnodes; i++) {
-                answer(0, i*ndofs+0) = dndx(i, 0);
-            }
-        } else {
-            OOFEM_ERROR("Unsupported material mode %d", mmode);
-        }
-    }
-
     /* Define custom functors for evaluator */
     auto MPMfunctor_Grad_s = [](const std::vector<const VarSlot*>& args, VarSlot& out) {
         // Compute the symmetric gradient of the first argument (assumed to be a vector field) 
@@ -138,8 +74,9 @@ namespace oofem {
         const Variable* v = static_cast<const Variable*>(raw_ptr0);
         GaussPoint* gp = static_cast<GaussPoint*>(raw_ptr1);
         // functor logic
+        const MPElement* cell = static_cast<const MPElement*>(gp->giveElement());
         FloatMatrix answer;
-        MPMhelper_Grad_s(answer, v, gp);
+        cell->computeGradSymMatrixAt(answer, v, gp);
 
         out.value = answer;
         out.type = VarSlot::Type::MATRIX;
@@ -162,29 +99,10 @@ namespace oofem {
         const Variable* v = static_cast<const Variable*>(raw_ptr0);
         GaussPoint* gp = static_cast<GaussPoint*>(raw_ptr1);
         const MPElement* cell = static_cast<const MPElement*>(gp->giveElement());
-        const MaterialMode mmode = gp->giveMaterialMode();
-
 
         // functor logic
-        if (v->size != 1) {
-            OOFEM_ERROR("MPMfunctor_Grad functor expects a scalar field variable (size=1).");
-        }
         FloatMatrix answer;
-        const FEInterpolation* interpol = v->interpolation;
-
-        FloatMatrix dndx, answerT;
-        interpol->evaldNdx(dndx, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(cell));
-        if (mmodeIs1D(mmode)) {
-            answerT.beSubMatrixOf(dndx, 1, dndx.rows(), 1, 1);
-        } else if (mmodeIs2D(mmode)) {  
-            answerT.beSubMatrixOf(dndx, 1, dndx.rows(), 1, 2);
-        } else if (mmodeIs3D(mmode)) { 
-            answerT.beSubMatrixOf(dndx, 1, dndx.rows(), 1, 3);
-        } else {
-            OOFEM_ERROR("Unsupported material mode %d", mmode);
-        } 
-
-        answer.beTranspositionOf(answerT); // Gradient of scalar field is just dN/dx, size will be (nnodes x 1) -> (1 x nnodes) after transpose
+        cell->computeGradMatrixAt(answer, v, gp);
 
         out.value = answer;
         out.type = VarSlot::Type::MATRIX;
@@ -248,12 +166,7 @@ namespace oofem {
 
         // functor logic
         FloatMatrix N;
-        FloatArray nvec;
-
-        const FEInterpolation* interpol = v->interpolation;
-
-        interpol->evalN(nvec, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(cell));
-        N.beNMatrixOf(nvec, v->size);
+        cell->computeNMatrixAt(N, v, gp);
 
         out.value = N;
         out.type = VarSlot::Type::MATRIX;
@@ -388,7 +301,7 @@ auto MPMfunctor_MProp = [](const std::vector<const VarSlot*>& args, VarSlot& out
 
         FloatMatrix B, answer;
         FloatArray u, eps, sig;
-        MPMhelper_Grad_s(B, v, gp);
+        cell->computeGradSymMatrixAt(B, v, gp);
         cell->getUnknownVector(u, v, VM_TotalIntrinsic, tstep);
         eps.beProductOf(B,u);
         cs->giveMaterial(gp)->giveCharacteristicVector(sig, eps, MatResponseMode::Stress, gp, tstep);
@@ -421,7 +334,7 @@ auto MPMfunctor_MProp = [](const std::vector<const VarSlot*>& args, VarSlot& out
 
         FloatMatrix B, answer;
         FloatArray u, eps, sig;
-        MPMhelper_Grad_s(B, v, gp);
+        cell->computeGradSymMatrixAt(B, v, gp);
         cell->getUnknownVector(u, v, VM_TotalIntrinsic, tstep);
         eps.beProductOf(B,u);
         cs->giveMaterial(gp)->giveCharacteristicVector(sig, eps, MatResponseMode::DeviatoricStress, gp, tstep);
