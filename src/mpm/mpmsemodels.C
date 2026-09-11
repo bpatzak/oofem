@@ -184,6 +184,13 @@ void NonStationaryMPMSProblem :: solveYourselfAt(TimeStep *tStep)
         this->applyIC();
     }
 
+    // Reset the temporary (working) material state at every integration point from the last
+    // equilibrated one. Without this the begin-of-step half of the temp/equilibrated protocol is
+    // never executed for mpm elements: end-of-step commit happens via EngngModel::updateYourself,
+    // but nothing re-initializes the temp state, so MaterialStatus::initTempStatus was never
+    // reached from this solver.
+    this->initStepIncrements();
+
     field->advanceSolution(tStep);
     field->initialize(VM_Total, tStep, solution, EModelDefaultEquationNumbering());
 

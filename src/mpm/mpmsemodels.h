@@ -97,6 +97,10 @@ namespace oofem {
         }
 
         void solveYourselfAt(TimeStep *tStep) override {
+            // Reset the temporary (working) material state at every integration point from the last
+            // equilibrated one; see NonStationaryMPMSProblem::solveYourselfAt for the rationale.
+            this->initStepIncrements();
+
             unknownsField->advanceSolution(tStep);
 
             this->forceEquationNumbering();
