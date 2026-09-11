@@ -585,6 +585,11 @@ class SymbolicTerm : public GenericCellTerm {
             mutable std::vector<Instruction> program;
             mutable std::map<std::string, int> symbols;
             mutable std::map<int, VarData> constants;
+            /**
+             * Immutable execution environment for this expression, established at the end of
+             * initializeFrom and read-only thereafter; see buildEnvironment and _evaluateVM.
+             */
+            std::unique_ptr<MPMEnvironment> env;
         };
         mutable VMContext lhsExpressionContext, rhsExpressionContext;
         
@@ -640,49 +645,79 @@ class SymbolicTerm : public GenericCellTerm {
             OOFEM_ERROR("%s", msg.c_str());
         }
         this->problem = problem;
+
+        // Both expressions are compiled and the problem is known, so the invariant part of their
+        // execution environment can be established now, once, instead of at every evaluation.
+        this->buildEnvironment(lhsExpressionContext);
+        this->buildEnvironment(rhsExpressionContext);
+    }
+
+    /**
+     * Establishes the immutable execution environment of one compiled expression.
+     *
+     * Everything except the point being evaluated is invariant: the symbol table, the functor
+     * table, the compiled constants, the problem's variables and the response-mode literals.
+     * Setting all of that up per Gauss point, per term, per sweep dominated the cost of evaluating
+     * cheap expressions.
+     *
+     * Called at the end of initializeFrom rather than lazily on first evaluation, so that the
+     * environment is fully built before any assembly starts and evaluation needs no locking.
+     */
+    void buildEnvironment(VMContext& context) const {
+        context.env = std::make_unique<MPMEnvironment>();
+        MPMEnvironment& env = *context.env;
+
+        env.symbols = context.symbols;
+
+        env.functors["Grad_s"] = MPMfunctor_Grad_s;
+        env.functors["Grad"] = MPMfunctor_Grad;
+        env.functors["Div"] = MPMfunctor_Div;
+        env.functors["N"] = MPMfunctor_N;
+        env.functors["Sig"] = MPMfunctor_Sig;
+        env.functors["Sig_dev"] = MPMfunctor_Sig_dev;
+        env.functors["MDer"] = MPMfunctor_MDer;
+        env.functors["MVec"] = MPMfunctor_MVec;
+        env.functors["MProp"] = MPMfunctor_MProp;
+        env.functors["vcat"] = MPMfunctor_vcat;
+        env.functors["eval"] = MPMfunctor_Eval;
+        env.functors["LumpMatrix"] = MPMfunctor_LumpMatrix;
+        env.functors["print"] = MPMfunctor_print;
+        env.functors["ru"] = MPMfunctor_FieldNodalValues;
+        env.functors["rv"] = MPMfunctor_FieldNodalVelocities;
+
+        // Seed the template slot pool with the invariant bindings, by doing them once on a
+        // throwaway evaluator and keeping its pool.
+        MPMEvaluator seed(pool_ptr, context.symbols);
+        for (auto const& [idx, val] : context.constants) {
+            seed.init_slot(idx, val);
+        }
+        // all problem variables, as user pointers
+        for (auto &i : problem->giveVariables()) {
+            seed.set_variable(i.first, (void*)i.second.get());
+        }
+        // Every response mode by name, so that a deck can say
+        // MDer(gp, ts, MatResponseMode::Permeability) rather than MDer(gp, ts, 19) and stop
+        // encoding enum values. Driven off the {value, name} table that enum-impl.h already
+        // generates for its ToString helper, so new modes need no work here; set_variable ignores
+        // names the script does not use.
+        for (auto &item : EnumData<MatResponseMode>::value_to_name) {
+            seed.set_variable(std::string("MatResponseMode::") + item.name, (double)item.value);
+        }
+
+        env.pool = seed.givePool();
+        env.is_set = seed.giveIsSet();
     }
 
     void _evaluateVM (FloatMatrix& answer, MPElement& cell, GaussPoint* gp, TimeStep* tStep, VMContext& context) const {
-        try {   
-            MPMEvaluator vm(pool_ptr, context.symbols);
-            for(auto const& [idx, val] : context.constants) vm.init_slot(idx, val);
-            
-            // define variables accessible in the VM (as user pointers)
-            if (0) {
-                vm.set_variable(this->field->name.c_str(),  (void*)this->field);
-                vm.set_variable(this->testField->name.c_str(),  (void*)this->testField);
-            } else {
-                // experimental - register all problem variables
-                for (auto &i : problem->giveVariables()) {
-                    vm.set_variable(i.first.c_str(), (void*)i.second.get());
-                }
-            }
+        try {
+            // Private scratch over the shared, read-only environment: only the slot pool is
+            // copied, so concurrent evaluations of the same expression do not interfere.
+            MPMEvaluator vm(*context.env);
 
-            // define enum literals accessible in the VM (e.g., material response mode IDs)
-            vm.set_variable("MatResponseMode::TangentStiffness", (double)MatResponseMode::TangentStiffness);
-            vm.set_variable("MatResponseMode::DeviatoricStiffness", (double)MatResponseMode::DeviatoricStiffness);
-
+            // The only genuinely per-evaluation bindings.
             vm.set_variable("gp", (void*)gp);
             vm.set_variable("ts", (void*)tStep);
             vm.set_variable("cell", (void*)&cell);
-
-            // register functors
-            vm.register_functor("Grad_s", MPMfunctor_Grad_s);
-            vm.register_functor("Grad", MPMfunctor_Grad);
-            vm.register_functor("Div", MPMfunctor_Div);
-            vm.register_functor("N", MPMfunctor_N);          
-            vm.register_functor("Sig", MPMfunctor_Sig);
-            vm.register_functor("Sig_dev", MPMfunctor_Sig_dev);
-            vm.register_functor("MDer", MPMfunctor_MDer);
-            vm.register_functor("MVec", MPMfunctor_MVec);
-            vm.register_functor("MProp", MPMfunctor_MProp);
-            vm.register_functor("vcat", MPMfunctor_vcat);
-            vm.register_functor("eval", MPMfunctor_Eval);
-            vm.register_functor("LumpMatrix", MPMfunctor_LumpMatrix);
-            vm.register_functor("print", MPMfunctor_print);
-
-            vm.register_functor("ru", MPMfunctor_FieldNodalValues);
-            vm.register_functor("rv", MPMfunctor_FieldNodalVelocities);
 
             vm.execute(context.program);
             if (vm.get_result().type == VarSlot::Type::MATRIX) {
