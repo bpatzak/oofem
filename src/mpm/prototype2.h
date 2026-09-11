@@ -408,12 +408,12 @@ namespace oofem {
          * @param coords 
          */
         void evaluate (FloatArray& answer, MPElement& cell, GaussPoint* gp, TimeStep* tstep) const override {
-            FloatArray u, eps, sig;
+            FloatArray sig;
             FloatMatrix B;
-            cell.getUnknownVector(u, this->field, VM_TotalIntrinsic, tstep);
+            // The generalized state was pushed to the material before this sweep, so the response
+            // is a cache read; only the operator matrix is still needed here.
             this->grad(B, this->field, this->field->interpolation, cell, gp->giveNaturalCoordinates(), gp->giveMaterialMode());
-            eps.beProductOf(B, u);
-            cell.giveCrossSection()->giveMaterial(gp)->giveCharacteristicVector(sig, eps, this->rhsmatmode, gp, tstep);
+            cell.giveCrossSection()->giveMaterial(gp)->giveCharacteristicVector(sig, this->rhsmatmode, gp, tstep);
             answer.beTProductOf(B, sig);
         }
         void getDimensions(Element& cell) const override {}

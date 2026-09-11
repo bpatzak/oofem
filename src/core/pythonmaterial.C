@@ -158,16 +158,20 @@ void PythonMaterial::postInitialize()
         if (nb::hasattr(pyObject, "printOutputAt")) {
             pyPrintOutputAt = pyObject.attr("printOutputAt");
         }
-        // Push half of the interface; optional, so that python materials written against the
-        // older contract (state deposited inside giveCharacteristicVector) keep working.
-        if (nb::hasattr(pyObject, "updateTempState")) {
-            pyUpdateTempState = pyObject.attr("updateTempState");
-        } else {
-            OOFEM_WARNING("PythonMaterial: object '%s' has no updateTempState; falling back on the "
-                          "legacy contract where giveCharacteristicVector also updates the state. "
-                          "This is deprecated -- results depend on the order in which tangent and "
-                          "residual contributions are assembled.", objectName.c_str());
+        // Push half of the interface. Required: the state is no longer handed to
+        // giveCharacteristicVector, so a material that still expects it there would be called
+        // with the wrong arguments. Report it here, with what to do about it, rather than let it
+        // surface as a python TypeError deep in the assembly loop.
+        if (!nb::hasattr(pyObject, "updateTempState")) {
+            OOFEM_ERROR("PythonMaterial: object '%s' has no updateTempState. The material state is "
+                        "now pushed once per iteration instead of being deposited inside "
+                        "giveCharacteristicVector: move the state deposit into "
+                        "updateTempState(self, stateVector, gp, tStep, stateDict, tempStateDict) "
+                        "and drop the leading flux argument of "
+                        "giveCharacteristicVector(self, mode, gp, tStep, stateDict, tempStateDict).",
+                        objectName.c_str());
         }
+        pyUpdateTempState = pyObject.attr("updateTempState");
         if (nb::hasattr(pyObject, "giveStateVariableIDs")) {
             pyGiveStateVariableIDs = pyObject.attr("giveStateVariableIDs");
         }
@@ -197,16 +201,20 @@ void PythonMaterial::postInitialize()
         if (py::hasattr(pyObject, "printOutputAt")) {
             pyPrintOutputAt = pyObject.attr("printOutputAt");
         }
-        // Push half of the interface; optional, so that python materials written against the
-        // older contract (state deposited inside giveCharacteristicVector) keep working.
-        if (py::hasattr(pyObject, "updateTempState")) {
-            pyUpdateTempState = pyObject.attr("updateTempState");
-        } else {
-            OOFEM_WARNING("PythonMaterial: object '%s' has no updateTempState; falling back on the "
-                          "legacy contract where giveCharacteristicVector also updates the state. "
-                          "This is deprecated -- results depend on the order in which tangent and "
-                          "residual contributions are assembled.", objectName.c_str());
+        // Push half of the interface. Required: the state is no longer handed to
+        // giveCharacteristicVector, so a material that still expects it there would be called
+        // with the wrong arguments. Report it here, with what to do about it, rather than let it
+        // surface as a python TypeError deep in the assembly loop.
+        if (!py::hasattr(pyObject, "updateTempState")) {
+            OOFEM_ERROR("PythonMaterial: object '%s' has no updateTempState. The material state is "
+                        "now pushed once per iteration instead of being deposited inside "
+                        "giveCharacteristicVector: move the state deposit into "
+                        "updateTempState(self, stateVector, gp, tStep, stateDict, tempStateDict) "
+                        "and drop the leading flux argument of "
+                        "giveCharacteristicVector(self, mode, gp, tStep, stateDict, tempStateDict).",
+                        objectName.c_str());
         }
+        pyUpdateTempState = pyObject.attr("updateTempState");
         if (py::hasattr(pyObject, "giveStateVariableIDs")) {
             pyGiveStateVariableIDs = pyObject.attr("giveStateVariableIDs");
         }
@@ -306,7 +314,7 @@ void PythonMaterial::giveCharacteristicMatrix(FloatMatrix &answer, MatResponseMo
 #endif
 }
 
-void PythonMaterial::giveCharacteristicVector(FloatArray &answer, FloatArray& flux, MatResponseMode type, GaussPoint* gp, TimeStep *tStep) const
+void PythonMaterial::giveCharacteristicVector(FloatArray &answer, MatResponseMode type, GaussPoint* gp, TimeStep *tStep) const
 {
 #if defined(_USE_NANOBIND) || defined(_PYBIND_BINDINGS)
     auto ms = static_cast<PythonMaterialStatus *>(this->giveStatus(gp));
@@ -314,37 +322,26 @@ void PythonMaterial::giveCharacteristicVector(FloatArray &answer, FloatArray& fl
 
 #ifdef _USE_NANOBIND
     nb::gil_scoped_acquire gil;
-    nb::object result = pyGiveCharacteristicVector(nb::cast(flux), nb::cast(type), nb::cast(gp), nb::cast(tStep), ms->giveStateDictionary(), ms->giveTempStateDictionary());
+    nb::object result = pyGiveCharacteristicVector(nb::cast(type), nb::cast(gp), nb::cast(tStep), ms->giveStateDictionary(), ms->giveTempStateDictionary());
     answer = nb::cast<FloatArray>(result);
 #elif defined(_PYBIND_BINDINGS)
     py::gil_scoped_acquire gil;
-    py::object result = pyGiveCharacteristicVector(flux, type, gp, tStep, ms->giveStateDictionary(), ms->giveTempStateDictionary());
+    py::object result = pyGiveCharacteristicVector(type, gp, tStep, ms->giveStateDictionary(), ms->giveTempStateDictionary());
     answer = result.cast<FloatArray>();
 #else
     OOFEM_ERROR("Not compiled with python support.");
 #endif
 }
 
-bool PythonMaterial::hasTempStateUpdate() const
-{
-#if defined(_USE_NANOBIND) || defined(_PYBIND_BINDINGS)
-    return (bool) pyUpdateTempState;
-#else
-    return false;
-#endif
-}
-
 void PythonMaterial::updateTempState(const FloatArray &stateVector, GaussPoint *gp, TimeStep *tStep)
 {
 #if defined(_USE_NANOBIND) || defined(_PYBIND_BINDINGS)
-    if ( !this->hasTempStateUpdate() ) {
-        // Legacy python material: the state deposit happens inside giveCharacteristicVector.
-        // postInitialize has already warned about it; nothing to do here.
-        return;
-    }
     auto ms = static_cast<PythonMaterialStatus *>(this->giveStatus(gp));
 #endif
 
+    // The material decomposes the state itself, into whatever entries of the temporary state
+    // dictionary it uses -- that dictionary is a python material's state store, so there is
+    // nothing for this side to unpack or cache.
 #ifdef _USE_NANOBIND
     nb::gil_scoped_acquire gil;
     pyUpdateTempState(nb::cast(stateVector), nb::cast(gp), nb::cast(tStep), ms->giveStateDictionary(), ms->giveTempStateDictionary());

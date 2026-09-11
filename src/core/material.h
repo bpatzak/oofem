@@ -185,9 +185,10 @@ public:
      * @brief Returns characteristic vector of the receiver
      *
      * Part of the "pull" half of the interface, see updateTempState. Expected to return values
-     * cached by the preceding updateTempState call rather than recompute them.
+     * cached by the preceding updateTempState call rather than recompute them; it takes no state
+     * argument precisely so that it cannot be mistaken for a combined update-and-query.
      */
-    virtual void giveCharacteristicVector(FloatArray &answer, FloatArray& flux, MatResponseMode type, GaussPoint* gp, TimeStep *tStep) const {}
+    virtual void giveCharacteristicVector(FloatArray &answer, MatResponseMode type, GaussPoint* gp, TimeStep *tStep) const;
     /**
      * @brief Returns characteristic value of the receiver
      *

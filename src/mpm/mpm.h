@@ -538,6 +538,12 @@ class OOFEM_EXPORT MPElement : public Element {
      */
     void registerStateVariable(const Variable *v);
 
+    /// Returns the primary field registered as the source of the given state quantity, or nullptr.
+    const Variable *giveStateVariableSource(int istID) const {
+        auto it = this->stateVariables.find(istID);
+        return ( it == this->stateVariables.end() ) ? nullptr : it->second;
+    }
+
     /**
      * Assembles the generalized state vector described by @p istIDs at the given point, from the
      * fields registered on the receiver.

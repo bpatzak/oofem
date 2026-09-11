@@ -316,17 +316,29 @@ IsotropicLinearElasticMaterial::giveCharacteristicValue(MatResponseMode type, Ga
 }
 
 void
-IsotropicLinearElasticMaterial::giveCharacteristicVector(FloatArray &answer, FloatArray& flux, MatResponseMode type, GaussPoint* gp, TimeStep *tStep) const {
+IsotropicLinearElasticMaterial::giveCharacteristicVector(FloatArray &answer, MatResponseMode type, GaussPoint* gp, TimeStep *tStep) const {
+    auto status = static_cast< StructuralMaterialStatus * >( this->giveStatus(gp) );
     if (type == Stress) {
-        return LinearElasticMaterial::giveRealStressVector(answer, gp, flux, tStep);
+        // Cache read; see StructuralMaterial::giveCharacteristicVector.
+        answer = status->giveTempStressVector();
     } else if (type == DeviatoricStress) {
+        // Derived from the strain cached by the push, so that this query does not depend on a
+        // state vector being handed in. As with the stress, the status holds the full 6-component
+        // strain even in reduced modes, so reduce it to the mode the deviatoric operator expects.
+        FloatArray eps;
+        MaterialMode mmode = gp->giveMaterialMode();
+        const FloatArray &cached = status->giveTempStrainVector();
+        if ( cached.giveSize() == 6 && StructuralMaterial::giveSizeOfVoigtSymVector(mmode) != 6 ) {
+            StructuralMaterial::giveReducedSymVectorForm(eps, cached, mmode);
+        } else {
+            eps = cached;
+        }
         FloatMatrix d;
         this->giveDeviatoricConstitutiveMatrix(d, TangentStiffness, gp, tStep);
-        answer.beProductOf(d, flux);
-        return; 
+        answer.beProductOf(d, eps);
     } else {
-        OOFEM_ERROR("Not implemented");
-    } 
+        this->StructuralMaterial::giveCharacteristicVector(answer, type, gp, tStep);
+    }
 }
 
 void 

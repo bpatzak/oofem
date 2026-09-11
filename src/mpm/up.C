@@ -65,8 +65,22 @@ namespace oofem {
 class UPElement : public MPElement {
         
     public:
-    UPElement(int n, Domain* d): 
+    UPElement(int n, Domain* d):
         MPElement(n,d) { }
+
+    /**
+     * Registers the primary fields of the receiver as the sources of its state quantities.
+     *
+     * The symbolic problems get this from Integral::initialize, which walks each term's set. The
+     * classic up formulation has no Variable/Integral records in the input -- its terms are
+     * hardwired -- so the fields are registered here instead, from the same getU()/getP() the
+     * terms are built with.
+     */
+    void postInitialize() override {
+        MPElement::postInitialize();
+        this->registerStateVariable(this->getU());
+        this->registerStateVariable(this->getP());
+    }
 
     // Note: performance can be probably improved once it will be possible 
     // to directly assemble multiple term contributions to the system matrix.
@@ -600,37 +614,70 @@ REGISTER_Element(UPLine11)
 class UPMaterialStatus : public MaterialStatus
 {
 protected:
-    /// Equilibrated strain vector in reduced form
-    FloatArray strainVector;
+    /**
+     * Equilibrated generalized state as pushed by updateTempState: strain(6), pressure
+     * gradient(nsd), pressure. The strain is the leading block of this vector rather than a
+     * separate member, so that the state is held exactly once.
+     */
+    FloatArray stateVector;
+    /// Temporary generalized state (to find balanced state)
+    FloatArray tempStateVector;
     /// Equilibrated stress vector in reduced form
     FloatArray stressVector;
     /// Temporary stress vector in reduced form (increments are used mainly in nonlinear analysis)
     FloatArray tempStressVector;
-    /// Temporary strain vector in reduced form (to find balanced state)
-    FloatArray tempStrainVector;
+    /// Equilibrated Darcy flux, i.e. the fluid mass balance pressure contribution
+    FloatArray darcyFluxVector;
+    /// Temporary Darcy flux
+    FloatArray tempDarcyFluxVector;
 public:
+    /// Number of leading components of the generalized state that hold the strain.
+    static constexpr int strainSize = 6;
+
     /// Constructor. Creates new StructuralMaterialStatus with IntegrationPoint g.
-    UPMaterialStatus (GaussPoint * g) : MaterialStatus(g), strainVector(), stressVector(),
-    tempStressVector(), tempStrainVector() 
+    UPMaterialStatus (GaussPoint * g) : MaterialStatus(g), stateVector(), tempStateVector(),
+    stressVector(), tempStressVector(), darcyFluxVector(), tempDarcyFluxVector()
     {}
 
-/// Returns the const pointer to receiver's strain vector.
-    const FloatArray &giveStrainVector() const { return strainVector; }
+    /// Returns the const pointer to receiver's generalized state vector.
+    const FloatArray &giveStateVector() const { return stateVector; }
+    /// Returns the const pointer to receiver's temporary generalized state vector.
+    const FloatArray &giveTempStateVector() const { return tempStateVector; }
+    /// Assigns tempStateVector to given vector v.
+    void letTempStateVectorBe(const FloatArray &v) { tempStateVector = v; }
+
+    /// Strain is the leading block of the generalized state; it is not stored separately.
+    static FloatArray giveStrainPartOf(const FloatArray &state) {
+        FloatArray e;
+        if ( state.giveSize() >= strainSize ) {
+            e.resize(strainSize);
+            for ( int i = 1; i <= strainSize; i++ ) {
+                e.at(i) = state.at(i);
+            }
+        }
+        return e;
+    }
+    /// Returns receiver's equilibrated strain vector.
+    FloatArray giveStrainVector() const { return giveStrainPartOf(stateVector); }
+    /// Returns receiver's temporary strain vector.
+    FloatArray giveTempStrainVector() const { return giveStrainPartOf(tempStateVector); }
+
     /// Returns the const pointer to receiver's stress vector.
     const FloatArray &giveStressVector() const { return stressVector; }
-    /// Returns the const pointer to receiver's temporary strain vector.
-    const FloatArray &giveTempStrainVector() const { return tempStrainVector; }
     /// Returns the const pointer to receiver's temporary stress vector.
     const FloatArray &giveTempStressVector() const { return tempStressVector; }
     /// Assigns tempStressVector to given vector v.
     void letTempStressVectorBe(const FloatArray &v) { tempStressVector = v; }
-    /// Assigns tempStrainVector to given vector v
-    void letTempStrainVectorBe(const FloatArray &v) { tempStrainVector = v; }
+
+    /// Returns the const pointer to receiver's temporary Darcy flux.
+    const FloatArray &giveTempDarcyFluxVector() const { return tempDarcyFluxVector; }
+    /// Assigns tempDarcyFluxVector to given vector v
+    void letTempDarcyFluxVectorBe(const FloatArray &v) { tempDarcyFluxVector = v; }
 
     void printOutputAt(FILE *file, TimeStep *tStep) const override {
         MaterialStatus :: printOutputAt(file, tStep);
         fprintf(file, "  strains ");
-        for ( auto &var : strainVector ) {
+        for ( auto &var : this->giveStrainVector() ) {
             fprintf( file, " %+.4e", var );
         }
       
@@ -643,13 +690,15 @@ public:
 
     void initTempStatus() override {
         MaterialStatus :: initTempStatus();
+        tempStateVector = stateVector;
         tempStressVector = stressVector;
-        tempStrainVector = strainVector;
+        tempDarcyFluxVector = darcyFluxVector;
     }
     void updateYourself(TimeStep *tStep) override {
         MaterialStatus :: updateYourself(tStep);
+        stateVector = tempStateVector;
         stressVector = tempStressVector;
-        strainVector = tempStrainVector;
+        darcyFluxVector = tempDarcyFluxVector;
     }
     const char *giveClassName() const override {return "UPMaterialStatus";}
 
@@ -709,21 +758,58 @@ class UPSimpleMaterial : public Material {
         }
     }
 
-    void giveCharacteristicVector(FloatArray &answer, FloatArray& flux, MatResponseMode type, GaussPoint* gp, TimeStep *tStep) const override {
+    /**
+     * Generalized state is [ strain(6), pressure gradient(nsd), pressure ]. The strain block is
+     * always 6 components -- TangentStiffness is 6x6 in every UP mode -- and nsd follows from the
+     * material mode.
+     */
+    IntArray giveStateVariableIDs(MaterialMode mmode) const override {
+        if ((mmode == _1dUP) || (mmode == _2dUP) || (mmode == _3dUP)) {
+            return IntArray{ IST_StrainTensor, IST_PressureGradient, IST_Pressure };
+        }
+        return IntArray();
+    }
+
+    void updateTempState(const FloatArray &stateVector, GaussPoint *gp, TimeStep *tStep) override {
+        MaterialMode mmode = gp->giveMaterialMode();
+        int nsd = (mmode == _3dUP) ? 3 : ((mmode == _2dUP) ? 2 : 1);
+        int expected = UPMaterialStatus::strainSize + nsd + 1;
+        if (stateVector.giveSize() != expected) {
+            OOFEM_ERROR("state vector size %d does not match the declared layout "
+                        "(%d strain + %d pressure gradient + pressure = %d)",
+                        stateVector.giveSize(), UPMaterialStatus::strainSize, nsd, expected);
+        }
+
+        UPMaterialStatus *status = static_cast< UPMaterialStatus * >( this->giveStatus(gp) );
+        // The state is stored once, whole; strain is read back as its leading block.
+        status->letTempStateVectorBe(stateVector);
+
+        FloatArray gradp(nsd);
+        for (int i = 1; i <= nsd; i++) {
+            gradp.at(i) = stateVector.at(UPMaterialStatus::strainSize + i);
+        }
+
+        // All the constitutive work happens here, once; the queries below are reads.
+        FloatMatrix d, _k;
+        FloatArray sig, w;
+
+        this->giveCharacteristicMatrix(d, TangentStiffness, gp, tStep);
+        sig.beProductOf( d, UPMaterialStatus::giveStrainPartOf(stateVector) );
+        status->letTempStressVectorBe(sig);
+
+        this->giveCharacteristicMatrix(_k, Permeability, gp, tStep);
+        w.beProductOf(_k, gradp);
+        status->letTempDarcyFluxVectorBe(w);
+    }
+
+    void giveCharacteristicVector(FloatArray &answer, MatResponseMode type, GaussPoint* gp, TimeStep *tStep) const override {
+        UPMaterialStatus *status = static_cast< UPMaterialStatus * >( this->giveStatus(gp) );
         if (type == Stress) {
-            FloatMatrix d;
-            UPMaterialStatus *status = static_cast< UPMaterialStatus * >( this->giveStatus(gp) );
-
-            this->giveCharacteristicMatrix(d, TangentStiffness, gp, tStep);
-            answer.beProductOf(d, flux);
-            // update gp status
-            status->letTempStrainVectorBe(flux);
-            status->letTempStressVectorBe(answer);
-
-        }else if (type == FluidMassBalancePressureContribution) {
-            FloatMatrix _k;
-            this->giveCharacteristicMatrix(_k, Permeability, gp, tStep);
-            answer.beProductOf(_k, flux);
+            answer = status->giveTempStressVector();
+        } else if (type == FluidMassBalancePressureContribution) {
+            answer = status->giveTempDarcyFluxVector();
+        } else {
+            this->Material::giveCharacteristicVector(answer, type, gp, tStep);
         }
     }
 

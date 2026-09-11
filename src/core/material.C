@@ -71,6 +71,12 @@ Material :: giveCharacteristicValue(MatResponseMode type, GaussPoint* gp, TimeSt
 }
 
 void
+Material :: giveCharacteristicVector(FloatArray &answer, MatResponseMode type, GaussPoint* gp, TimeStep *tStep) const
+{
+    OOFEM_ERROR( "Characteristic vector %s(%d) on element %d and GP %d not defined", __MatResponseModeToString(type), type, gp->giveElement()->giveNumber(), gp->giveNumber() );
+}
+
+void
 Material :: giveCharacteristicMatrix(FloatMatrix &answer, MatResponseMode type, GaussPoint* gp, TimeStep *tStep) const
 {
     // Reaching this means the response mode is not implemented by the receiver. Report it rather

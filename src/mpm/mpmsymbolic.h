@@ -211,23 +211,21 @@ auto MPMfunctor_MProp = [](const std::vector<const VarSlot*>& args, VarSlot& out
         // ARGS: args[0] - pointer to GaussPoint (as a user pointer)
         //       args[1] - pointer to TimeStep (as a user pointer)
         //       args[2] - property ID (as a double, to be casted to MaterialResponseMode enum)
-        //       args[3] - generalized flux (vector)
         // OUTPUT: out - VarSlot to store the resulting characteristic vector (e.g. stress, etc depending on property ID)
+        // The generalized state is no longer passed in: it is pushed to the material once per
+        // iteration before any term is evaluated, so this is a cache read.
         OOFEM_LOG_DEBUG("    [C++ Callback] Called MVec functor with %ld arguments\n", args.size());
-        if (args.size() != 4) {
-            OOFEM_ERROR("MPMfunctor_MVec functor expects exactly 4 arguments: GaussPoint, TimeStep, PropertyID and GeneralizedFlux.");
+        if (args.size() != 3) {
+            OOFEM_ERROR("MPMfunctor_MVec functor expects exactly 3 arguments: GaussPoint, TimeStep and PropertyID.");
         }
         // 1. Retrieve the generic pointers to arguments
         void* raw_ptr0 = std::get<void*>(args[0]->value);
         void* raw_ptr1 = std::get<void*>(args[1]->value);
         double raw_val2 = std::get<double>(args[2]->value);
-        const FloatMatrix& fluxMat = std::get<FloatMatrix>(args[3]->value);
         // 2. Cast back to your specific application type (Variable class)
         GaussPoint* gp = static_cast<GaussPoint*>(raw_ptr0);
         TimeStep* tstep = static_cast<TimeStep*>(raw_ptr1);
         MatResponseMode propertyID = static_cast<MatResponseMode>(raw_val2);
-        FloatArray fluxVec;
-        fluxMat.copyColumn(fluxVec, 1);
 
         // functor logic
         MPElement* cell = static_cast<MPElement*>(gp->giveElement());
@@ -235,7 +233,7 @@ auto MPMfunctor_MProp = [](const std::vector<const VarSlot*>& args, VarSlot& out
 
         FloatArray charVec;
 
-        cs->giveMaterial(gp)->giveCharacteristicVector(charVec, fluxVec, propertyID, gp, tstep);
+        cs->giveMaterial(gp)->giveCharacteristicVector(charVec, propertyID, gp, tstep);
         
         out.value = FloatMatrix::fromArray(charVec);
         out.type = VarSlot::Type::MATRIX;
@@ -299,12 +297,20 @@ auto MPMfunctor_MProp = [](const std::vector<const VarSlot*>& args, VarSlot& out
         MPElement* cell = static_cast<MPElement*>(gp->giveElement());
         StructuralCrossSection* cs = static_cast<StructuralCrossSection*>(cell->giveCrossSection());
 
-        FloatMatrix B, answer;
-        FloatArray u, eps, sig;
-        cell->computeGradSymMatrixAt(B, v, gp);
-        cell->getUnknownVector(u, v, VM_TotalIntrinsic, tstep);
-        eps.beProductOf(B,u);
-        cs->giveMaterial(gp)->giveCharacteristicVector(sig, eps, MatResponseMode::Stress, gp, tstep);
+        // The strain is no longer derived here: it was pushed to the material as part of the
+        // generalized state once per iteration, so this is a cache read. The field argument is
+        // kept for backward compatibility of the input syntax and is validated against the field
+        // that actually supplies the strain on this cell, so that a deck naming the wrong one
+        // fails instead of silently reading another field's state.
+        const Variable* strainSource = cell->giveStateVariableSource(IST_StrainTensor);
+        if (strainSource != nullptr && strainSource != v) {
+            OOFEM_ERROR("Sig(%s, ...) does not match the field supplying the strain on element %d ('%s')",
+                        v->name.c_str(), cell->giveNumber(), strainSource->name.c_str());
+        }
+
+        FloatMatrix answer;
+        FloatArray sig;
+        cs->giveMaterial(gp)->giveCharacteristicVector(sig, MatResponseMode::Stress, gp, tstep);
         answer = FloatMatrix::fromArray(sig);
         out.value = answer;
         out.type = VarSlot::Type::MATRIX;
@@ -332,12 +338,20 @@ auto MPMfunctor_MProp = [](const std::vector<const VarSlot*>& args, VarSlot& out
         MPElement* cell = static_cast<MPElement*>(gp->giveElement());
         StructuralCrossSection* cs = static_cast<StructuralCrossSection*>(cell->giveCrossSection());
 
-        FloatMatrix B, answer;
-        FloatArray u, eps, sig;
-        cell->computeGradSymMatrixAt(B, v, gp);
-        cell->getUnknownVector(u, v, VM_TotalIntrinsic, tstep);
-        eps.beProductOf(B,u);
-        cs->giveMaterial(gp)->giveCharacteristicVector(sig, eps, MatResponseMode::DeviatoricStress, gp, tstep);
+        // The strain is no longer derived here: it was pushed to the material as part of the
+        // generalized state once per iteration, so this is a cache read. The field argument is
+        // kept for backward compatibility of the input syntax and is validated against the field
+        // that actually supplies the strain on this cell, so that a deck naming the wrong one
+        // fails instead of silently reading another field's state.
+        const Variable* strainSource = cell->giveStateVariableSource(IST_StrainTensor);
+        if (strainSource != nullptr && strainSource != v) {
+            OOFEM_ERROR("Sig_dev(%s, ...) does not match the field supplying the strain on element %d ('%s')",
+                        v->name.c_str(), cell->giveNumber(), strainSource->name.c_str());
+        }
+
+        FloatMatrix answer;
+        FloatArray sig;
+        cs->giveMaterial(gp)->giveCharacteristicVector(sig, MatResponseMode::DeviatoricStress, gp, tstep);
         answer = FloatMatrix::fromArray(sig);
         out.value = answer;
         out.type = VarSlot::Type::MATRIX;

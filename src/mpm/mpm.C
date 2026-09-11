@@ -310,19 +310,23 @@ MPElement::updateTempState(TimeStep *tStep)
                 continue;
             }
 
-            // How much of the declared layout this cell can actually supply. None means the
-            // material is not being driven here at all -- a material record may be present on a
-            // cell whose terms never query it, or query only scalar properties that need no state
-            // (the mpm heat decks do exactly that with a structural material). Some, but not all,
-            // is a genuine misconfiguration and assembleStateVector reports it, because pushing a
-            // partially assembled state would silently corrupt the cache.
-            int available = 0;
+            // The declared layout is what the material can consume; this cell supplies whatever
+            // fields act on it. If it cannot supply all of them the material is not being driven
+            // in that role here -- a thermo-mechanical material used for the thermal sub-problem
+            // alone has no displacement field, and a material record may sit on a cell whose terms
+            // only ever ask for hardwired constants. Skip rather than push a partial state, which
+            // would be positionally ambiguous and corrupt the cache.
+            //
+            // This is not silent: a query that does need the cached value finds it unset and says
+            // so (see e.g. StructuralMaterial::giveCharacteristicVector).
+            bool complete = true;
             for ( int istID : istIDs ) {
-                if ( this->stateVariables.find(istID) != this->stateVariables.end() ) {
-                    available++;
+                if ( this->stateVariables.find(istID) == this->stateVariables.end() ) {
+                    complete = false;
+                    break;
                 }
             }
-            if ( available == 0 ) {
+            if ( !complete ) {
                 continue;
             }
 

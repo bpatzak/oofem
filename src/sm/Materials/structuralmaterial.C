@@ -95,11 +95,29 @@ StructuralMaterial::giveCharacteristicMatrix(FloatMatrix &answer, MatResponseMod
 }
 
 void
-StructuralMaterial::giveCharacteristicVector(FloatArray &answer, FloatArray& flux, MatResponseMode type, GaussPoint* gp, TimeStep *tStep) const {
+StructuralMaterial::giveCharacteristicVector(FloatArray &answer, MatResponseMode type, GaussPoint* gp, TimeStep *tStep) const {
     if (type == Stress) {
-        return this->giveRealStressVector(answer, gp, flux, tStep);
+        // Cache read: updateTempState ran giveRealStressVector, which stored the resulting stress
+        // as the temporary value in the status.
+        //
+        // The reduced-mode routines expand to the 3d form and delegate to
+        // giveRealStressVector_3d (see giveRealStressVector_PlaneStrain), so what the status holds
+        // is the full 6-component vector regardless of mode. Reduce it back to the mode the point
+        // is in, which is what the caller's operator matrix is sized for.
+        const FloatArray &cached = static_cast< StructuralMaterialStatus * >( this->giveStatus(gp) )->giveTempStressVector();
+        if ( cached.isEmpty() ) {
+            OOFEM_ERROR("stress queried on element %d GP %d before any updateTempState established it; "
+                        "the integration point supplies no strain field to push",
+                        gp->giveElement()->giveNumber(), gp->giveNumber());
+        }
+        MaterialMode mmode = gp->giveMaterialMode();
+        if ( cached.giveSize() == 6 && StructuralMaterial::giveSizeOfVoigtSymVector(mmode) != 6 ) {
+            StructuralMaterial::giveReducedSymVectorForm(answer, cached, mmode);
+        } else {
+            answer = cached;
+        }
     } else {
-        OOFEM_ERROR("Not implemented");
+        this->Material::giveCharacteristicVector(answer, type, gp, tStep);
     }
 }
 
