@@ -525,17 +525,30 @@ class OOFEM_EXPORT MPElement : public Element {
     static DofIDItem giveStateQuantityDofID(int istID);
 
     /**
-     * Assembles the generalized state vector described by @p istIDs at the given point.
+     * Records that the given primary field is the source, on the receiver, of every state quantity
+     * it can supply.
+     *
+     * Called from Integral::initialize for the unknown field of each term acting on the receiver,
+     * alongside the creation of the dofs and integration rules that term needs. Resolution is
+     * therefore per cell, which is what lets a domain carry several materials with different state
+     * layouts, each fed by its own fields.
+     *
+     * Test (weighting) fields must not be registered: input decks declare them with the same dof
+     * ids as their primary field, so they would be indistinguishable from it.
+     */
+    void registerStateVariable(const Variable *v);
+
+    /**
+     * Assembles the generalized state vector described by @p istIDs at the given point, from the
+     * fields registered on the receiver.
      *
      * This is the C++ counterpart of the packing the input decks currently do by hand, i.e. of
      * expressions of the form "flux = vcat(eps, pw, pa)". Each entry of @p istIDs names both the
      * quantity and the operator to apply (e.g. IST_Pressure versus IST_PressureGradient).
      *
      * @param istIDs Layout advertised by the material through giveStateVariableIDs.
-     * @param vars Resolved mapping from state quantity to the primary field supplying it.
      */
-    void assembleStateVector(FloatArray &answer, const IntArray &istIDs, const StateVariableMap &vars,
-                             GaussPoint *gp, TimeStep *tStep);
+    void assembleStateVector(FloatArray &answer, const IntArray &istIDs, GaussPoint *gp, TimeStep *tStep);
 
     /**
      * Pushes the current state to the material at every integration point of the receiver.
@@ -543,7 +556,13 @@ class OOFEM_EXPORT MPElement : public Element {
      * Materials advertising an empty layout are skipped -- they do not participate in the
      * push/pull protocol and keep using their physics-specific entry points.
      */
-    void updateTempState(const StateVariableMap &vars, TimeStep *tStep);
+    void updateTempState(TimeStep *tStep);
+
+protected:
+    /// Which primary field supplies each state quantity on the receiver; see registerStateVariable.
+    StateVariableMap stateVariables;
+
+public:
 
   virtual double computeSurfaceVolumeAround(GaussPoint* igp, int iSurf)
   {return igp->giveWeight()*this->getGeometryInterpolation()->boundarySurfaceGiveTransformationJacobian(iSurf, igp->giveNaturalCoordinates(), FEIElementGeometryWrapper(this));}

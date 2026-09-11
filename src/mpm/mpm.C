@@ -215,15 +215,50 @@ MPElement::giveStateQuantityDofID(int istID)
 
 
 void
-MPElement::assembleStateVector(FloatArray &answer, const IntArray &istIDs, const StateVariableMap &vars,
-                               GaussPoint *gp, TimeStep *tStep)
+MPElement::registerStateVariable(const Variable *v)
+{
+    if ( v == nullptr ) {
+        return;
+    }
+
+    // The state quantities that can be supplied by a primary field; keep in sync with
+    // giveStateQuantityDofID.
+    static const InternalStateType supported [] = {
+        IST_StrainTensor, IST_DisplacementVector,
+        IST_Temperature, IST_TemperatureGradient,
+        IST_Pressure, IST_PressureGradient, IST_Pressure_2,
+        IST_MassConcentration_1, IST_MassConcentration_2
+    };
+
+    for ( InternalStateType ist : supported ) {
+        DofIDItem id = MPElement::giveStateQuantityDofID(ist);
+        if ( id == Undef || !v->dofIDs.contains( (int) id ) ) {
+            continue;
+        }
+        auto existing = this->stateVariables.find( (int) ist );
+        if ( existing != this->stateVariables.end() && existing->second != v ) {
+            // Two distinct primary fields claim the same state quantity on this one cell, so there
+            // is no single answer to where that quantity comes from here. (Different cells having
+            // different sources is fine and expected -- that is the multi-material case.)
+            OOFEM_ERROR( "on element %d the state quantity %s is supplied by more than one primary "
+                         "field ('%s' and '%s'); cannot resolve the source unambiguously",
+                         this->giveNumber(), __InternalStateTypeToString(ist),
+                         existing->second->name.c_str(), v->name.c_str() );
+        }
+        this->stateVariables [ (int) ist ] = v;
+    }
+}
+
+
+void
+MPElement::assembleStateVector(FloatArray &answer, const IntArray &istIDs, GaussPoint *gp, TimeStep *tStep)
 {
     answer.clear();
     int offset = 1;
 
     for ( int istID : istIDs ) {
-        auto it = vars.find(istID);
-        if ( it == vars.end() ) {
+        auto it = this->stateVariables.find(istID);
+        if ( it == this->stateVariables.end() ) {
             OOFEM_ERROR( "no primary field supplies state quantity %s(%d) required by the material on "
                          "element %d; expected an unknown variable carrying dof id %d",
                          __InternalStateTypeToString( (InternalStateType) istID ), istID,
@@ -256,8 +291,14 @@ MPElement::assembleStateVector(FloatArray &answer, const IntArray &istIDs, const
 
 
 void
-MPElement::updateTempState(const StateVariableMap &vars, TimeStep *tStep)
+MPElement::updateTempState(TimeStep *tStep)
 {
+    if ( this->stateVariables.empty() ) {
+        // No term registered a primary field here, so nothing participates in the push/pull
+        // protocol on this cell.
+        return;
+    }
+
     FloatArray state;
 
     for ( auto &iRule : this->integrationRulesArray ) {
@@ -265,9 +306,27 @@ MPElement::updateTempState(const StateVariableMap &vars, TimeStep *tStep)
             Material *mat = this->giveCrossSection()->giveMaterial(gp);
             IntArray istIDs = mat->giveStateVariableIDs( gp->giveMaterialMode() );
             if ( istIDs.isEmpty() ) {
+                // material does not participate in the push/pull protocol
                 continue;
             }
-            this->assembleStateVector(state, istIDs, vars, gp, tStep);
+
+            // How much of the declared layout this cell can actually supply. None means the
+            // material is not being driven here at all -- a material record may be present on a
+            // cell whose terms never query it, or query only scalar properties that need no state
+            // (the mpm heat decks do exactly that with a structural material). Some, but not all,
+            // is a genuine misconfiguration and assembleStateVector reports it, because pushing a
+            // partially assembled state would silently corrupt the cache.
+            int available = 0;
+            for ( int istID : istIDs ) {
+                if ( this->stateVariables.find(istID) != this->stateVariables.end() ) {
+                    available++;
+                }
+            }
+            if ( available == 0 ) {
+                continue;
+            }
+
+            this->assembleStateVector(state, istIDs, gp, tStep);
             mat->updateTempState(state, gp, tStep);
         }
     }

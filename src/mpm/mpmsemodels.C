@@ -199,6 +199,10 @@ void NonStationaryMPMSProblem :: solveYourselfAt(TimeStep *tStep)
         effectiveMatrix->buildInternalStructure( this, 1, EModelDefaultEquationNumbering() );
     }
 
+    // Push the state before the external-force assembly: rhs terms may query material properties
+    // too (permeability and density in a gravity-driven Darcy term, say).
+    mpmUpdateMaterialTempState(this, tStep);
+
     OOFEM_LOG_INFO("Assembling external forces\n");
     FloatArray externalForces(neq);
     externalForces.zero();
@@ -258,6 +262,17 @@ NonStationaryMPMSProblem :: updateSolution(FloatArray &solutionVector, TimeStep 
 
 
 void
+mpmUpdateMaterialTempState(EngngModel *problem, TimeStep *tStep)
+{
+    for ( auto &elem : problem->giveDomain(1)->giveElements() ) {
+        if ( auto *cell = dynamic_cast< MPElement * >( elem.get() ) ) {
+            cell->updateTempState(tStep);
+        }
+    }
+}
+
+
+void
 NonStationaryMPMSProblem :: updateInternalRHS(FloatArray &answer, TimeStep *tStep, Domain *d, FloatArray *eNorm)
 {
     if ( eNorm ) {
@@ -281,11 +296,11 @@ NonStationaryMPMSProblem :: updateInternalRHS(FloatArray &answer, TimeStep *tSte
     } else if (this->problemType == "symbolic") {
         for (auto i: lhsIntegrals) {
             Integral* integral = this->integralList[i-1].get();
-            integral->assemble_rhs (answer, EModelDefaultEquationNumbering(), tStep); 
+            integral->assemble_rhs (answer, EModelDefaultEquationNumbering(), tStep);
         }
         for (auto i: lhsdotIntegrals) {
             Integral* integral = this->integralList[i-1].get();
-            integral->assemble_rhs (answer, EModelDefaultEquationNumbering(), tStep, eNorm); 
+            integral->assemble_rhs (answer, EModelDefaultEquationNumbering(), tStep, eNorm);
         }
     } else {
       OOFEM_ERROR ("unsupported problemType");
@@ -313,11 +328,11 @@ NonStationaryMPMSProblem :: updateMatrix(SparseMtrx &mat, TimeStep *tStep, Domai
         } else if (this->problemType == "symbolic") {
             for (auto i: lhsIntegrals) {
                 Integral* integral = this->integralList[i-1].get();
-                integral->assemble_lhs (mat, EModelDefaultEquationNumbering(), tStep, this->alpha); 
+                integral->assemble_lhs (mat, EModelDefaultEquationNumbering(), tStep, this->alpha);
             }
             for (auto i: lhsdotIntegrals) {
                 Integral* integral = this->integralList[i-1].get();
-                integral->assemble_lhs (mat, EModelDefaultEquationNumbering(), tStep, 1.0/tStep->giveTimeIncrement()); 
+                integral->assemble_lhs (mat, EModelDefaultEquationNumbering(), tStep, 1.0/tStep->giveTimeIncrement());
             }
         } else {
           OOFEM_ERROR ("unsupported problemType");
