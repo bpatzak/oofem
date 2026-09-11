@@ -158,6 +158,19 @@ void PythonMaterial::postInitialize()
         if (nb::hasattr(pyObject, "printOutputAt")) {
             pyPrintOutputAt = pyObject.attr("printOutputAt");
         }
+        // Push half of the interface; optional, so that python materials written against the
+        // older contract (state deposited inside giveCharacteristicVector) keep working.
+        if (nb::hasattr(pyObject, "updateTempState")) {
+            pyUpdateTempState = pyObject.attr("updateTempState");
+        } else {
+            OOFEM_WARNING("PythonMaterial: object '%s' has no updateTempState; falling back on the "
+                          "legacy contract where giveCharacteristicVector also updates the state. "
+                          "This is deprecated -- results depend on the order in which tangent and "
+                          "residual contributions are assembled.", objectName.c_str());
+        }
+        if (nb::hasattr(pyObject, "giveStateVariableIDs")) {
+            pyGiveStateVariableIDs = pyObject.attr("giveStateVariableIDs");
+        }
     } catch (const std::exception &e) {
         OOFEM_ERROR("PythonMaterial: initialization failed: %s", e.what());
     }
@@ -183,6 +196,19 @@ void PythonMaterial::postInitialize()
         pyGiveCharacteristicValue = pyObject.attr("giveCharacteristicValue");
         if (py::hasattr(pyObject, "printOutputAt")) {
             pyPrintOutputAt = pyObject.attr("printOutputAt");
+        }
+        // Push half of the interface; optional, so that python materials written against the
+        // older contract (state deposited inside giveCharacteristicVector) keep working.
+        if (py::hasattr(pyObject, "updateTempState")) {
+            pyUpdateTempState = pyObject.attr("updateTempState");
+        } else {
+            OOFEM_WARNING("PythonMaterial: object '%s' has no updateTempState; falling back on the "
+                          "legacy contract where giveCharacteristicVector also updates the state. "
+                          "This is deprecated -- results depend on the order in which tangent and "
+                          "residual contributions are assembled.", objectName.c_str());
+        }
+        if (py::hasattr(pyObject, "giveStateVariableIDs")) {
+            pyGiveStateVariableIDs = pyObject.attr("giveStateVariableIDs");
         }
     } catch (const std::exception &e) {
         OOFEM_ERROR("PythonMaterial: initialization failed: %s", e.what());
@@ -297,6 +323,55 @@ void PythonMaterial::giveCharacteristicVector(FloatArray &answer, FloatArray& fl
 #else
     OOFEM_ERROR("Not compiled with python support.");
 #endif
+}
+
+bool PythonMaterial::hasTempStateUpdate() const
+{
+#if defined(_USE_NANOBIND) || defined(_PYBIND_BINDINGS)
+    return (bool) pyUpdateTempState;
+#else
+    return false;
+#endif
+}
+
+void PythonMaterial::updateTempState(const FloatArray &stateVector, GaussPoint *gp, TimeStep *tStep)
+{
+#if defined(_USE_NANOBIND) || defined(_PYBIND_BINDINGS)
+    if ( !this->hasTempStateUpdate() ) {
+        // Legacy python material: the state deposit happens inside giveCharacteristicVector.
+        // postInitialize has already warned about it; nothing to do here.
+        return;
+    }
+    auto ms = static_cast<PythonMaterialStatus *>(this->giveStatus(gp));
+#endif
+
+#ifdef _USE_NANOBIND
+    nb::gil_scoped_acquire gil;
+    pyUpdateTempState(nb::cast(stateVector), nb::cast(gp), nb::cast(tStep), ms->giveStateDictionary(), ms->giveTempStateDictionary());
+#elif defined(_PYBIND_BINDINGS)
+    py::gil_scoped_acquire gil;
+    pyUpdateTempState(stateVector, gp, tStep, ms->giveStateDictionary(), ms->giveTempStateDictionary());
+#else
+    OOFEM_ERROR("Not compiled with python support.");
+#endif
+}
+
+IntArray PythonMaterial::giveStateVariableIDs(MaterialMode mmode) const
+{
+#ifdef _USE_NANOBIND
+    if ( pyGiveStateVariableIDs ) {
+        nb::gil_scoped_acquire gil;
+        nb::object result = pyGiveStateVariableIDs(nb::cast(mmode));
+        return nb::cast<IntArray>(result);
+    }
+#elif defined(_PYBIND_BINDINGS)
+    if ( pyGiveStateVariableIDs ) {
+        py::gil_scoped_acquire gil;
+        py::object result = pyGiveStateVariableIDs(mmode);
+        return result.cast<IntArray>();
+    }
+#endif
+    return IntArray();
 }
 
 double PythonMaterial::giveCharacteristicValue(MatResponseMode type, GaussPoint* gp, TimeStep *tStep) const

@@ -157,6 +157,17 @@ public:
     void giveCharacteristicVector(FloatArray &answer, FloatArray& flux, MatResponseMode type, GaussPoint* gp, TimeStep *tStep) const override;
 
     /**
+     * The generalized state of a structural material is the reduced total strain; its size follows
+     * from the material mode of the point.
+     */
+    IntArray giveStateVariableIDs(MaterialMode mmode) const override;
+    /**
+     * Bridges the push half of the generic interface onto giveRealStressVector, which already
+     * performs the constitutive integration and caches strain and stress in the status.
+     */
+    void updateTempState(const FloatArray &stateVector, GaussPoint *gp, TimeStep *tStep) override;
+
+    /**
      * Returns the Young modulus obtained by linearizing the material response
      * about its undeformed initial state.  It is intended for scale estimates,
      * such as automatic contact-penalty selection.

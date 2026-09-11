@@ -62,6 +62,8 @@ protected:
     nb::object pyGiveCharacteristicVector;
     nb::object pyGiveCharacteristicValue;
     nb::object pyPrintOutputAt;
+    nb::object pyUpdateTempState;
+    nb::object pyGiveStateVariableIDs;
 #elif defined(_PYBIND_BINDINGS)
     py::object pyObject;
     py::object pyHasMaterialModeCapability;
@@ -69,6 +71,8 @@ protected:
     py::object pyGiveCharacteristicVector;
     py::object pyGiveCharacteristicValue;
     py::object pyPrintOutputAt;
+    py::object pyUpdateTempState;
+    py::object pyGiveStateVariableIDs;
 #endif
 
 public:
@@ -89,6 +93,24 @@ public:
     void giveCharacteristicMatrix(FloatMatrix &answer, MatResponseMode type, GaussPoint* gp, TimeStep *tStep) const override;
     void giveCharacteristicVector(FloatArray &answer, FloatArray& flux, MatResponseMode type, GaussPoint* gp, TimeStep *tStep) const override;
     double giveCharacteristicValue(MatResponseMode type, GaussPoint* gp, TimeStep *tStep) const override;
+
+    /**
+     * Forwards the state push to the python object's updateTempState, if it defines one.
+     *
+     * Python materials written against the older contract do their state deposit inside
+     * giveCharacteristicVector instead and have no updateTempState; for those this is a no-op, so
+     * they keep working unchanged (see postInitialize, which warns once).
+     */
+    void updateTempState(const FloatArray &stateVector, GaussPoint *gp, TimeStep *tStep) override;
+
+    /**
+     * Forwards to the python object's giveStateVariableIDs, if it defines one; returns an empty
+     * array otherwise, meaning the material does not advertise a layout.
+     */
+    IntArray giveStateVariableIDs(MaterialMode mmode) const override;
+
+    /// True if the python object implements the push half of the interface.
+    bool hasTempStateUpdate() const;
 
     void printOutputAt(FILE *file, TimeStep *tStep, const PythonMaterialStatus *status) const;
 };

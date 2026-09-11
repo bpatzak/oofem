@@ -256,6 +256,63 @@ TransportMaterial :: updateInternalState(const FloatArray &stateVec, GaussPoint 
 }
 
 
+IntArray
+TransportMaterial :: giveStateVariableIDs(MaterialMode mmode) const
+{
+    if ( mmode == _3dHeat || mmode == _3dMTLattice ||
+         mmode == _2dHeat || mmode == _2dMTLattice ||
+         mmode == _1dHeat ) {
+        // Single primary field. The number of gradient components follows from the mode, so the
+        // state vector is [ grad(1..nsd), field ]; cf. the giveFluxVector argument order.
+        return IntArray{ IST_TemperatureGradient, IST_Temperature };
+    }
+
+    // Coupled heat+mass modes carry two gradients and two field values. Expressing that layout
+    // needs a humidity-gradient quantity that InternalStateType does not have yet; since no caller
+    // pushes state into a HeMo material at this point, advertise "not participating" rather than
+    // add an enum entry speculatively. Such materials keep using giveFluxVector directly.
+    return IntArray();
+}
+
+
+void
+TransportMaterial :: updateTempState(const FloatArray &stateVector, GaussPoint *gp, TimeStep *tStep)
+{
+    MaterialMode mmode = gp->giveMaterialMode();
+    int nsd;
+    if ( mmode == _3dHeat || mmode == _3dMTLattice ) {
+        nsd = 3;
+    } else if ( mmode == _2dHeat || mmode == _2dMTLattice ) {
+        nsd = 2;
+    } else if ( mmode == _1dHeat ) {
+        nsd = 1;
+    } else {
+        OOFEM_ERROR( "updateTempState not supported for material mode %s", __MaterialModeToString(mmode) );
+    }
+
+    if ( stateVector.giveSize() != nsd + 1 ) {
+        OOFEM_ERROR( "state vector size %d does not match the declared layout (%d gradient components + field)",
+                     stateVector.giveSize(), nsd );
+    }
+
+    FloatArray grad(nsd), field(1);
+    for ( int i = 1; i <= nsd; i++ ) {
+        grad.at(i) = stateVector.at(i);
+    }
+    field.at(1) = stateVector.at(nsd + 1);
+
+    // Deposit the field value first. This is also the hook the hydration models override
+    // (HydratingIsoHeatMaterial, HydratingHeMoMaterial, HydrationModelInterface) to advance their
+    // submodel, so it has to run before the constitutive evaluation that may consult it.
+    this->updateInternalState(field, gp, tStep);
+
+    // The constitutive evaluation proper; concrete computeFlux* implementations cache field,
+    // gradient and flux in the status, which the giveCharacteristic* queries then read back.
+    FloatArray flux;
+    this->giveFluxVector(flux, gp, grad, field, tStep);
+}
+
+
 void
 TransportMaterial :: giveFluxVector(FloatArray &answer, GaussPoint *gp, const FloatArray &grad, const FloatArray &field, TimeStep *tStep) const
 {

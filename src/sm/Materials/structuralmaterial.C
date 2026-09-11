@@ -94,13 +94,30 @@ StructuralMaterial::giveCharacteristicMatrix(FloatMatrix &answer, MatResponseMod
     }
 }
 
-void 
+void
 StructuralMaterial::giveCharacteristicVector(FloatArray &answer, FloatArray& flux, MatResponseMode type, GaussPoint* gp, TimeStep *tStep) const {
     if (type == Stress) {
         return this->giveRealStressVector(answer, gp, flux, tStep);
     } else {
         OOFEM_ERROR("Not implemented");
-    } 
+    }
+}
+
+IntArray
+StructuralMaterial::giveStateVariableIDs(MaterialMode mmode) const
+{
+    return IntArray{ IST_StrainTensor };
+}
+
+void
+StructuralMaterial::updateTempState(const FloatArray &stateVector, GaussPoint *gp, TimeStep *tStep)
+{
+    // giveRealStressVector dispatches on the material mode, runs the constitutive integration and
+    // stores both the strain and the resulting stress as temporary values in the status. The
+    // returned stress is therefore redundant here -- the point of this call is the caching, which
+    // the subsequent giveCharacteristicVector(Stress, ...) query reads back.
+    FloatArray stress;
+    this->giveRealStressVector(stress, gp, stateVector, tStep);
 }
 
 void
