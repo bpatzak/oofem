@@ -95,8 +95,21 @@ class OOFEM_EXPORT Variable {
     typedef oofem::VariableQuantity VariableQuantity;
 
     std::string name;
-    const FEInterpolation* interpolation;  
-    Variable* dualVar; //? or just bool?
+    const FEInterpolation* interpolation;
+    /**
+     * When the receiver is a test (weighting) function, the unknown field it weights; null when
+     * the receiver is itself an unknown.
+     *
+     * Declared in the input as `dualto "<name>"` on the test variable and resolved by
+     * EngngModel::instanciateMPM. This is the only thing that distinguishes the two roles: a deck
+     * declares them as two Variable records that differ just by name, and may give them different
+     * interpolations (a non-symmetric, Petrov-Galerkin formulation). Assembly needs the
+     * distinction because nodal unknowns have to be read through the unknown field's
+     * interpolation, not its weighting function's.
+     */
+    Variable* dualVar;
+    /// Name given by `dualto`, resolved into @ref dualVar after all variables have been read.
+    std::string dualVarName;
     VariableType type;
     VariableQuantity q;
     int size;
@@ -121,6 +134,19 @@ class OOFEM_EXPORT Variable {
         this->size = size;
     }
 
+
+    /**
+     * Completes the set-up of the receiver once every variable of the problem has been read.
+     *
+     * Resolves the `dualto` name into @ref dualVar, so the declaration order of the Variable
+     * records does not matter. Only relevant to variables built from an input record; those
+     * constructed directly (from python, or the hardwired fields of the classic up/tm elements)
+     * pass their dual to the constructor.
+     */
+    void postInitialize(EngngModel *problem);
+
+    /// True if the receiver is a test (weighting) function of some unknown field.
+    bool isTestField() const { return this->dualVar != nullptr; }
 
     /// Returns DodIF mask in node; need generalization (which dofMan)
     const IntArray& getDofManDofIDs () const {return this->dofIDs;}

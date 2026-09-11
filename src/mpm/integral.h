@@ -71,12 +71,19 @@ namespace oofem {
                 Element *e = domain->giveElement(i);
                 // introduce necessary dofs and set-up integration rules
                 this->term->initializeCell(*e);
-                // record this term's unknown field as a source of state quantities on the cell, so
+                // Record this term's unknown field as a source of state quantities on the cell, so
                 // that the cell can later assemble the generalized state vector its material asks
                 // for. Done per cell, so cells carrying different materials (and therefore
                 // different state layouts, fed by different fields) each get their own resolution.
-                if (MPElement *cell = dynamic_cast<MPElement*>(e)) {
-                    cell->registerStateVariable(this->term->field);
+                //
+                // Only genuine unknowns qualify. A deck may name a test function as a term's
+                // variable -- pure source terms, with a zero lexpression, have no unknown to
+                // depend on and something has to go there -- and reading nodal unknowns through a
+                // weighting function's interpolation would be wrong wherever the two differ.
+                if (this->term->field && !this->term->field->isTestField()) {
+                    if (MPElement *cell = dynamic_cast<MPElement*>(e)) {
+                        cell->registerStateVariable(this->term->field);
+                    }
                 }
             }
         }

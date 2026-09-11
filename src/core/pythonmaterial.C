@@ -365,7 +365,14 @@ IntArray PythonMaterial::giveStateVariableIDs(MaterialMode mmode) const
     if ( pyGiveStateVariableIDs ) {
         py::gil_scoped_acquire gil;
         py::object result = pyGiveStateVariableIDs(mmode);
-        return result.cast<IntArray>();
+        // Converted element by element: casting the sequence straight to IntArray would need
+        // pybind to materialize a temporary, which it refuses outside a bound function.
+        IntArray answer( (int) py::len(result) );
+        int i = 1;
+        for ( auto item : result ) {
+            answer.at(i++) = item.template cast<int>();
+        }
+        return answer;
     }
 #endif
     return IntArray();

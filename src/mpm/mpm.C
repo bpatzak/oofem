@@ -59,10 +59,33 @@ Variable::initializeFrom(const std::shared_ptr<InputRecord> &ir)
     ir->giveField(this->q,"quantity");
     // read variable size
     IR_GIVE_FIELD(ir, this->size, "size");
-    // read dofs 
+    // read dofs
     // IR_GIVE_FIELD(ir, this->dofIDs, "dofs");
     IR_GIVE_ENUM_ARRAY_FIELD(ir, this->dofIDs, "dofs", DofIDItem);
-}    
+    // Optionally, the unknown field this one is the test (weighting) function of. A deck declares
+    // each unknown together with its weighting function and the two records differ only by name --
+    // they may even carry different interpolations, which is what a non-symmetric
+    // (Petrov-Galerkin) formulation looks like. Saying so here is what lets the assembly tell them
+    // apart, which matters because nodal unknowns must be read through the unknown field's
+    // interpolation rather than its weighting function's. Resolved to dualVar once all variables
+    // are known, see EngngModel::instanciateMPM.
+    IR_GIVE_OPTIONAL_FIELD(ir, this->dualVarName, "dualto");
+}
+
+
+void
+Variable::postInitialize(EngngModel *problem)
+{
+    if ( this->dualVarName.empty() ) {
+        return;
+    }
+    const Variable *dual = problem->giveVariableByName(this->dualVarName);
+    if ( dual == this ) {
+        OOFEM_ERROR("MPM variable '%s' is declared dual to itself", this->name.c_str());
+    }
+    // dualVar is non-const by declaration; the lookup hands out a const pointer.
+    this->dualVar = const_cast< Variable * >( dual );
+}
 
 void
 Term::initializeFrom(const std::shared_ptr<InputRecord> &ir, EngngModel* problem)
@@ -237,10 +260,11 @@ MPElement::registerStateVariable(const Variable *v)
         }
         auto existing = this->stateVariables.find( (int) ist );
         if ( existing != this->stateVariables.end() && existing->second != v ) {
-            // Two distinct primary fields claim the same state quantity on this one cell, so there
-            // is no single answer to where that quantity comes from here. (Different cells having
-            // different sources is fine and expected -- that is the multi-material case.)
-            OOFEM_ERROR( "on element %d the state quantity %s is supplied by more than one primary "
+            // Two distinct unknown fields claim the same state quantity on this one cell, so there
+            // is no single answer to where it comes from here. (Different cells having different
+            // sources is fine and expected -- that is the multi-material case, and test functions
+            // never get here.)
+            OOFEM_ERROR( "on element %d the state quantity %s is supplied by more than one unknown "
                          "field ('%s' and '%s'); cannot resolve the source unambiguously",
                          this->giveNumber(), __InternalStateTypeToString(ist),
                          existing->second->name.c_str(), v->name.c_str() );
