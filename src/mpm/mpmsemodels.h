@@ -142,8 +142,11 @@ void mpmUpdateMaterialTempState(EngngModel *problem, TimeStep *tStep);
                     // loop over lhs integrals
                     for (auto i: lhsIntegrals) {
                         Integral* integral = this->integralList[i-1].get();
-                        integral->assemble_lhs (*effectiveMatrix, EModelDefaultEquationNumbering(), tStep); 
+                        integral->assemble_lhs (*effectiveMatrix, EModelDefaultEquationNumbering(), tStep);
                     }
+                    // see updateComponent below
+                    this->effectiveMatrix->assembleBegin();
+                    this->effectiveMatrix->assembleEnd();
                 }
             }
             // Push the state before the external-force assembly: rhs terms may query material
@@ -205,6 +208,12 @@ void mpmUpdateMaterialTempState(EngngModel *problem, TimeStep *tStep);
                         Integral* integral = this->integralList[i-1].get();
                         integral->assemble_lhs (*effectiveMatrix, EModelDefaultEquationNumbering(), tStep);
                     }
+                    // Finalize the matrix. Assembling through the integrals bypasses
+                    // EngngModel::assemble, which is the only other caller of these; without them
+                    // a storage format that defers assembly -- PETSc, whose assembleEnd is
+                    // MatAssemblyEnd -- reaches the solver unassembled.
+                    this->effectiveMatrix->assembleBegin();
+                    this->effectiveMatrix->assembleEnd();
                 }
                 return;
             } else {

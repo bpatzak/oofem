@@ -334,6 +334,12 @@ NonStationaryMPMSProblem :: updateMatrix(SparseMtrx &mat, TimeStep *tStep, Domai
                 Integral* integral = this->integralList[i-1].get();
                 integral->assemble_lhs (mat, EModelDefaultEquationNumbering(), tStep, 1.0/tStep->giveTimeIncrement());
             }
+            // Finalize the matrix. Assembling through the integrals bypasses EngngModel::assemble,
+            // which is the only other place these are called; without them a storage format that
+            // defers its assembly -- PETSc, whose assembleEnd is MatAssemblyEnd -- is handed to the
+            // solver unassembled.
+            mat.assembleBegin();
+            mat.assembleEnd();
         } else {
           OOFEM_ERROR ("unsupported problemType");
         }
