@@ -162,7 +162,19 @@ if (USE_SM AND USE_PYTHON_EXTENSION)
 endif()
 
 if (USE_MPM)
-    oofem_regression_ctest(mpm "mpm")
+    # mpms_err_* are negative tests: they are expected to fail, and to say why. Registered
+    # separately so the ordinary discovery does not treat them as runs that should succeed.
+    oofem_regression_ctest(mpm "mpm" EXCLUDE mpms_err_dualto.in)
+
+    # Run through a pipe: the solver reports the error by throwing, which reaches ctest as a
+    # crashed subprocess and would be judged a failure before PASS_REGULAR_EXPRESSION is consulted.
+    # Piping makes the test's exit status that of the grep, i.e. "did it say the right thing".
+    if (UNIX)
+        add_test(NAME "tests/regression/mpm/mpms_err_dualto.in"
+                 WORKING_DIRECTORY "${oofem_SOURCE_DIR}/tests/regression/mpm"
+                 COMMAND bash -c "$<TARGET_FILE:oofem> -f mpms_err_dualto.in 2>&1 | grep -q 'supplied by more than one unknown field'")
+        set_tests_properties("tests/regression/mpm/mpms_err_dualto.in" PROPERTIES LABELS mpm)
+    endif()
 endif()
 
 if (USE_TM AND USE_SM AND USE_DSS AND USE_IML)
