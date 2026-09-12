@@ -55,6 +55,8 @@
 #include "classfactory.h"
 #include "enum.h"
 #include "dofiditem.h"
+#include "stateoperator.h"
+#include "stateoperator.h"
 
 #include <map>
 
@@ -83,16 +85,9 @@ class EngngModel;
 #define ENUM_CLASS
 #include "enum-impl.h"
 
-#define ENUM_TYPE VariableQuantity
-#define ENUM_DEF ENUM_ITEM(Displacement) ENUM_ITEM(Velocity) ENUM_ITEM(Temperature) ENUM_ITEM(Pressure) ENUM_ITEM(VolumeFraction)
-#define ENUM_CLASS
-#include "enum-impl.h"
-
-
 class OOFEM_EXPORT Variable {
     public:
     typedef oofem::VariableType VariableType;
-    typedef oofem::VariableQuantity VariableQuantity;
 
     std::string name;
     const FEInterpolation* interpolation;
@@ -111,12 +106,13 @@ class OOFEM_EXPORT Variable {
     /// Name given by `dualto`, resolved into @ref dualVar after all variables have been read.
     std::string dualVarName;
     VariableType type;
-    VariableQuantity q;
+    /// What the field physically is. Core-level, so a material can name it in its state layout.
+    FieldType q;
     int size;
     IntArray dofIDs;
 
-    Variable () : name(), interpolation(nullptr), dualVar(NULL), type(VariableType::scalar), q(VariableQuantity::Displacement), size(0) {}
-    Variable (const FEInterpolation* i, Variable::VariableQuantity q, Variable::VariableType t, int size, Variable* dual = NULL, std :: initializer_list< int > dofIDs={}, std::string name="") : 
+    Variable () : name(), interpolation(nullptr), dualVar(NULL), type(VariableType::scalar), q(FT_Displacements), size(0) {}
+    Variable (const FEInterpolation* i, FieldType q, Variable::VariableType t, int size, Variable* dual = NULL, std :: initializer_list< int > dofIDs={}, std::string name="") : 
         interpolation(i), 
         dualVar(dual), 
         q(q), 
@@ -124,7 +120,7 @@ class OOFEM_EXPORT Variable {
         this->type = t;
         this->size = size;
     }
-    Variable (const FEInterpolation* i, Variable::VariableQuantity q, Variable::VariableType t, int size, IntArray& dofIDs, Variable* dual = NULL, std::string name="") : 
+    Variable (const FEInterpolation* i, FieldType q, Variable::VariableType t, int size, IntArray& dofIDs, Variable* dual = NULL, std::string name="") : 
         name(name),
         interpolation(i), 
         dualVar(dual), 
@@ -403,9 +399,9 @@ class OOFEM_EXPORT MPElement : public Element {
      * @param answer code numbers corrresponding to given variable
      * @param q variable type 
      */
-  virtual void getDofManLocalCodeNumbers(IntArray& answer, const Variable::VariableQuantity q, int n) const = 0;
-  virtual void getInternalDofManLocalCodeNumbers(IntArray& answer, const Variable::VariableQuantity q, int n) const = 0;
-  virtual void getLocalCodeNumbers (IntArray& answer, const Variable::VariableQuantity q ) const {
+  virtual void getDofManLocalCodeNumbers(IntArray& answer, const FieldType q, int n) const = 0;
+  virtual void getInternalDofManLocalCodeNumbers(IntArray& answer, const FieldType q, int n) const = 0;
+  virtual void getLocalCodeNumbers (IntArray& answer, const FieldType q ) const {
     IntArray dl;
     answer.resize(0);
     
@@ -426,14 +422,14 @@ class OOFEM_EXPORT MPElement : public Element {
   /**
      Returns mapping from quantity dofs to local surface dofs
   */
-  virtual void getSurfaceLocalCodeNumbers (IntArray& answer, const Variable::VariableQuantity q) const =0;
-  virtual void getEdgeLocalCodeNumbers (IntArray& answer, const Variable::VariableQuantity q) const =0;
+  virtual void getSurfaceLocalCodeNumbers (IntArray& answer, const FieldType q) const =0;
+  virtual void getEdgeLocalCodeNumbers (IntArray& answer, const FieldType q) const =0;
   /** @brief Returns element code numbers of the unknowns associated with given boundary entity. 
    * @param answer 
    * @param q 
    * @param isurf
    */ 
-  virtual void getSurfaceElementCodeNumbers (IntArray& answer, const Variable::VariableQuantity q, int isurf ) const {
+  virtual void getSurfaceElementCodeNumbers (IntArray& answer, const FieldType q, int isurf ) const {
     IntArray dl, sn = this->getGeometryInterpolation()->boundarySurfaceGiveNodes(isurf, this->giveGeometryType());
     answer.resize(0);
     for (int i : sn) {
@@ -441,7 +437,7 @@ class OOFEM_EXPORT MPElement : public Element {
       answer.followedBy(dl);
     }
   }
-  virtual void getEdgeElementCodeNumbers (IntArray& answer, const Variable::VariableQuantity q, int isurf ) const {
+  virtual void getEdgeElementCodeNumbers (IntArray& answer, const FieldType q, int isurf ) const {
     IntArray dl, sn = this->getGeometryInterpolation()->boundaryEdgeGiveNodes(isurf, this->giveGeometryType());
     answer.resize(0);
     for (int i : sn) {
@@ -536,51 +532,47 @@ class OOFEM_EXPORT MPElement : public Element {
     void computeGradMatrixAt(FloatMatrix &answer, const Variable *v, GaussPoint *gp) const;
     /// Interpolation (shape function) operator of a field.
     void computeNMatrixAt(FloatMatrix &answer, const Variable *v, GaussPoint *gp) const;
+    /// Divergence operator of a vector field.
+    void computeDivMatrixAt(FloatMatrix &answer, const Variable *v, GaussPoint *gp) const;
+    /// Dispatches to the operator named by @p op.
+    void computeStateOperatorAt(FloatMatrix &answer, StateOperator op, const Variable *v, GaussPoint *gp) const;
     //@}
 
-    /// Maps a state quantity (an InternalStateType value) onto the primary field supplying it.
+    /// Maps a field, by what it physically is, onto the Variable supplying it.
     typedef std::map<int, const Variable *> StateVariableMap;
 
     /**
-     * Returns the dof id of the primary field that supplies the given state quantity, or Undef.
-     *
-     * DofIDItem is used rather than Variable::q (VariableQuantity) because in practice input decks
-     * declare every scalar field with the same quantity id, so it cannot tell temperature from
-     * pressure from concentration; the dof ids can, and already do.
-     */
-    static DofIDItem giveStateQuantityDofID(int istID);
-
-    /**
-     * Records that the given primary field is the source, on the receiver, of every state quantity
-     * it can supply.
+     * Records the given primary field as a source of state on the receiver, under what it
+     * physically is (Variable::q).
      *
      * Called from Integral::initialize for the unknown field of each term acting on the receiver,
      * alongside the creation of the dofs and integration rules that term needs. Resolution is
      * therefore per cell, which is what lets a domain carry several materials with different state
      * layouts, each fed by its own fields.
      *
-     * Test (weighting) fields must not be registered: input decks declare them with the same dof
-     * ids as their primary field, so they would be indistinguishable from it.
+     * Test (weighting) fields must not be registered: they are declared with the same dof ids as
+     * the field they weight, and may carry a different interpolation. Variable::isTestField says
+     * which is which.
      */
     void registerStateVariable(const Variable *v);
 
-    /// Returns the primary field registered as the source of the given state quantity, or nullptr.
-    const Variable *giveStateVariableSource(int istID) const {
-        auto it = this->stateVariables.find(istID);
+    /// Returns the primary field registered for the given physical field, or nullptr.
+    const Variable *giveStateVariableSource(FieldType field) const {
+        auto it = this->stateVariables.find( (int) field );
         return ( it == this->stateVariables.end() ) ? nullptr : it->second;
     }
 
     /**
-     * Assembles the generalized state vector described by @p istIDs at the given point, from the
+     * Assembles the generalized state vector described by @p layout at the given point, from the
      * fields registered on the receiver.
      *
-     * This is the C++ counterpart of the packing the input decks currently do by hand, i.e. of
-     * expressions of the form "flux = vcat(eps, pw, pa)". Each entry of @p istIDs names both the
-     * quantity and the operator to apply (e.g. IST_Pressure versus IST_PressureGradient).
+     * This is the C++ counterpart of the packing input decks used to do by hand, in expressions of
+     * the form "flux = vcat(eps, pw, pa)". Each entry names a field and the operator to apply to
+     * it.
      *
-     * @param istIDs Layout advertised by the material through giveStateVariableIDs.
+     * @param layout Layout advertised by the material through giveStateVariableIDs.
      */
-    void assembleStateVector(FloatArray &answer, const IntArray &istIDs, GaussPoint *gp, TimeStep *tStep);
+    void assembleStateVector(FloatArray &answer, const StateVariableLayout &layout, GaussPoint *gp, TimeStep *tStep);
 
     /**
      * Pushes the current state to the material at every integration point of the receiver.
@@ -618,7 +610,7 @@ public:
      * @return Nonzero if transformation matrix is not empty matrix, zero otherwise.
      * 
      */
-    virtual int computeFluxLBToLRotationMatrix(FloatMatrix &answer, int iSurf, const FloatArray& lc, const Variable::VariableQuantity q, char btype) {
+    virtual int computeFluxLBToLRotationMatrix(FloatMatrix &answer, int iSurf, const FloatArray& lc, const FieldType q, char btype) {
         answer.clear(); 
         return 0;
     }

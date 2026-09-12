@@ -34,9 +34,16 @@ A `Variable` record that is a test (weighting) function should say so, with `dua
 naming the unknown it weights:
 
 ```oofem
-Variable name "pw"  interpolation "feilin" type 0 quantity 3 size 1 dofs 1 11
-Variable name "dpw" interpolation "feilin" type 0 quantity 3 size 1 dofs 1 11 dualto "pw"
+Variable name "pw"  interpolation "feilin" type 0 quantity "Pressure" size 1 dofs 1 11
+Variable name "dpw" interpolation "feilin" type 0 quantity "Pressure" size 1 dofs 1 11 dualto "pw"
 ```
+
+`quantity` names the physical field the variable represents — a `FieldType`, written as a name with
+the `FT_` prefix dropped (`"Displacements"`, `"Pressure"`, `"Pressure2"`, `"Temperature"`,
+`"Concentration1"`). It is what the assembly matches against the material's declared state layout,
+so it must say what the field *is*; `dofs` says only where that field's unknowns are numbered, and
+the two are checked for agreement at initialization (a mismatch warns rather than errors, since a
+deck may legitimately place a field on an unconventional dof).
 
 Otherwise the two records are indistinguishable — they may even carry different interpolations,
 which is what a non-symmetric (Petrov-Galerkin) formulation looks like — and the assembly cannot

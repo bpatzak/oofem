@@ -302,7 +302,7 @@ auto MPMfunctor_MProp = [](const std::vector<const VarSlot*>& args, VarSlot& out
         // kept for backward compatibility of the input syntax and is validated against the field
         // that actually supplies the strain on this cell, so that a deck naming the wrong one
         // fails instead of silently reading another field's state.
-        const Variable* strainSource = cell->giveStateVariableSource(IST_StrainTensor);
+        const Variable* strainSource = cell->giveStateVariableSource(FT_Displacements);
         if (strainSource != nullptr && strainSource != v) {
             OOFEM_ERROR("Sig(%s, ...) does not match the field supplying the strain on element %d ('%s')",
                         v->name.c_str(), cell->giveNumber(), strainSource->name.c_str());
@@ -343,7 +343,7 @@ auto MPMfunctor_MProp = [](const std::vector<const VarSlot*>& args, VarSlot& out
         // kept for backward compatibility of the input syntax and is validated against the field
         // that actually supplies the strain on this cell, so that a deck naming the wrong one
         // fails instead of silently reading another field's state.
-        const Variable* strainSource = cell->giveStateVariableSource(IST_StrainTensor);
+        const Variable* strainSource = cell->giveStateVariableSource(FT_Displacements);
         if (strainSource != nullptr && strainSource != v) {
             OOFEM_ERROR("Sig_dev(%s, ...) does not match the field supplying the strain on element %d ('%s')",
                         v->name.c_str(), cell->giveNumber(), strainSource->name.c_str());

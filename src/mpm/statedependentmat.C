@@ -107,8 +107,8 @@ protected:
 public:
     StateDependentTangentMaterial(int n, Domain *d) : Material(n, d) {}
 
-    IntArray giveStateVariableIDs(MaterialMode mmode) const override {
-        return IntArray{ IST_StrainTensor };
+    StateVariableLayout giveStateVariableIDs(MaterialMode mmode) const override {
+        return { { FT_Displacements, SO_SymmetricGradient } };
     }
 
     void updateTempState(const FloatArray &stateVector, GaussPoint *gp, TimeStep *tStep) override {

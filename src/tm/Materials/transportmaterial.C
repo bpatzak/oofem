@@ -256,7 +256,7 @@ TransportMaterial :: updateInternalState(const FloatArray &stateVec, GaussPoint 
 }
 
 
-IntArray
+StateVariableLayout
 TransportMaterial :: giveStateVariableIDs(MaterialMode mmode) const
 {
     if ( mmode == _3dHeat || mmode == _3dMTLattice ||
@@ -264,14 +264,14 @@ TransportMaterial :: giveStateVariableIDs(MaterialMode mmode) const
          mmode == _1dHeat ) {
         // Single primary field. The number of gradient components follows from the mode, so the
         // state vector is [ grad(1..nsd), field ]; cf. the giveFluxVector argument order.
-        return IntArray{ IST_TemperatureGradient, IST_Temperature };
+        return { { FT_Temperature, SO_Gradient }, { FT_Temperature, SO_Value } };
     }
 
-    // Coupled heat+mass modes carry two gradients and two field values. Expressing that layout
-    // needs a humidity-gradient quantity that InternalStateType does not have yet; since no caller
-    // pushes state into a HeMo material at this point, advertise "not participating" rather than
-    // add an enum entry speculatively. Such materials keep using giveFluxVector directly.
-    return IntArray();
+    // Coupled heat+mass modes carry two gradients and two field values. The layout is now
+    // expressible -- { T_f, Gradient }, { C_1, Gradient }, { T_f, Value }, { C_1, Value } -- but
+    // giveFluxVector's HeMo branch packs them in its own order and nothing pushes state into such
+    // a material yet, so advertise "not participating" until that is done deliberately.
+    return StateVariableLayout();
 }
 
 

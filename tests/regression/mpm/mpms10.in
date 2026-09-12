@@ -8,8 +8,8 @@ Order invariance of the material state push, ordering B: the same problem with l
 #
 mpmsymbolicstationaryproblem nsteps 1 nvariables 2 nterms 2 nintegrals 2 lhsterms 2 2 1 rhsterms 0 nmodules 1
 errorcheck
-Variable name "u" interpolation "feilin" type 1 quantity 0 size 1 dofs 1 1 # displacement
-Variable name "w" interpolation "feilin" type 1 quantity 0 size 1 dofs 1 1 dualto "u" # test function
+Variable name "u" interpolation "feilin" type 1 quantity "Displacements" size 1 dofs 1 1 # displacement
+Variable name "w" interpolation "feilin" type 1 quantity "Displacements" size 1 dofs 1 1 dualto "u" # test function
 SymbolicTerm 1 variable "u"  testvariable "w" mmode 10 lexpression "Grad_s(w,gp).T*MDer(gp,ts,MatResponseMode::TangentStiffness)*Grad_s(u,gp)" rexpression "Grad_s(w,gp).T*MVec(gp,ts,MatResponseMode::Stress)"
 SymbolicTerm 2 variable "u"  testvariable "w" mmode 10 lexpression "0.1*Grad_s(w,gp).T*MDer(gp,ts,MatResponseMode::TangentStiffness)*Grad_s(u,gp)" rexpression "0.1*Grad_s(w,gp).T*MDer(gp,ts,MatResponseMode::TangentStiffness)*Grad_s(u,gp)*ru(u, cell, ts)"
 Integral 1 domain 1 set 1 term 1

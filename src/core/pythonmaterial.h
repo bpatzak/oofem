@@ -105,9 +105,10 @@ public:
 
     /**
      * Forwards to the python object's giveStateVariableIDs, if it defines one; returns an empty
-     * array otherwise, meaning the material does not advertise a layout.
+     * layout otherwise, meaning the material does not advertise one. The python side returns a
+     * sequence of (DofIDItem, StateOperator) pairs.
      */
-    IntArray giveStateVariableIDs(MaterialMode mmode) const override;
+    StateVariableLayout giveStateVariableIDs(MaterialMode mmode) const override;
 
     void printOutputAt(FILE *file, TimeStep *tStep, const PythonMaterialStatus *status) const;
 };

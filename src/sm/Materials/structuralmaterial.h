@@ -157,10 +157,10 @@ public:
     void giveCharacteristicVector(FloatArray &answer, MatResponseMode type, GaussPoint* gp, TimeStep *tStep) const override;
 
     /**
-     * The generalized state of a structural material is the reduced total strain; its size follows
-     * from the material mode of the point.
+     * The generalized state of a structural material is the total strain, i.e. the symmetric
+     * gradient of the displacement field; its size follows from the material mode of the point.
      */
-    IntArray giveStateVariableIDs(MaterialMode mmode) const override;
+    StateVariableLayout giveStateVariableIDs(MaterialMode mmode) const override;
     /**
      * Bridges the push half of the generic interface onto giveRealStressVector, which already
      * performs the constitutive integration and caches strain and stress in the status.

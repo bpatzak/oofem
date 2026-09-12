@@ -121,10 +121,10 @@ StructuralMaterial::giveCharacteristicVector(FloatArray &answer, MatResponseMode
     }
 }
 
-IntArray
+StateVariableLayout
 StructuralMaterial::giveStateVariableIDs(MaterialMode mmode) const
 {
-    return IntArray{ IST_StrainTensor };
+    return { { FT_Displacements, SO_SymmetricGradient } };
 }
 
 void

@@ -98,47 +98,63 @@ hand in the input deck — and every caller had to know the offsets. Instead eac
 its layout:
 
 ```cpp
-virtual IntArray giveStateVariableIDs(MaterialMode mmode) const;
+virtual StateVariableLayout giveStateVariableIDs(MaterialMode mmode) const;
 ```
 
-The entries are `InternalStateType` values, in packing order. No new enum was introduced:
-`InternalStateType` is already the vocabulary for "a named quantity at an integration point" —
-what `giveIPValue`/`setIPValue` speak — and already contained `IST_Pressure_2`,
-`IST_PressureGradient`, `IST_FirstPKStressTensor`, `IST_InterfaceTraction` and the rest. Only two
-entries were missing (`IST_TemperatureGradient`, `IST_MassConcentration_2`).
+Each entry is a `{FieldType field, StateOperator op}` pair, in packing order: *which* primary field,
+and *what is taken of it*. The two axes are named separately rather than fused into one id, because
+fusing them multiplies: a fused vocabulary needs one name per (field, operator) combination, so every
+new field costs one new name per operator. Split, adding humidity costs one `FieldType` and no
+operator work, and adding an operator serves every field at once. The four operators —
+`SO_Value`, `SO_Gradient`, `SO_SymmetricGradient`, `SO_Divergence` — are exactly the four
+`MPElement::compute{N,Grad,GradSym,Div}MatrixAt` already had.
 
-`IST_*` is the right choice over a field-only vocabulary because it names the quantity *and* the
-operator applied to it — `IST_Pressure` versus `IST_PressureGradient` — which a u-p material needs,
-since it consumes both.
+`FieldType` is the field axis because it is core-level (a material in `core` cannot depend on an
+mpm-local type), it already names what these decks need, and it says what a field *is* rather than
+where its dofs happen to be numbered — so a material never obliges a deck to renumber. Three entries
+had to be added, all for coupled problems that carry a field twice: `FT_Pressure2` for the second
+phase of a multiphase problem, and `FT_Concentration1` / `FT_Concentration2` for the two species of
+the `Task_5.3` reactive-transport decks. The existing `FT_HumidityConcentration` was deliberately not
+reused for the species: in `b3mat`, `mps` and the transport problems it means humidity, and
+overloading it further is what made it useless as an identity in the first place.
 
 Declared layouts:
 
 | material | layout |
 |---|---|
-| `StructuralMaterial` | `{IST_StrainTensor}` |
-| `TransportMaterial` | `{IST_TemperatureGradient, IST_Temperature}` |
-| `UPSimpleMaterial` | `{IST_StrainTensor, IST_PressureGradient, IST_Pressure}` |
-| `TMSimpleMaterial` | `{IST_StrainTensor, IST_TemperatureGradient, IST_Temperature}` |
-| Liakopoulos (python) | `{IST_StrainTensor, IST_Pressure, IST_Pressure_2}` |
+| `StructuralMaterial` | `{FT_Displacements, SymGrad}` |
+| `TransportMaterial` | `{FT_Temperature, Grad}, {FT_Temperature, Value}` |
+| `UPSimpleMaterial` | `{FT_Displacements, SymGrad}, {FT_Pressure, Grad}, {FT_Pressure, Value}` |
+| `TMSimpleMaterial` | `{FT_Displacements, SymGrad}, {FT_Temperature, Grad}, {FT_Temperature, Value}` |
+| Liakopoulos (python) | `{FT_Displacements, SymGrad}, {FT_Pressure, Value}, {FT_Pressure2, Value}` |
 
-**Known wart, worth fixing before the interface spreads.** Fusing quantity and operator into one id
-combines badly: every new field needs a new entry per operator, which already cost two additions and
-left the coupled heat+mass layout unimplemented for want of a humidity-gradient entry. Reporting the
-field and the operator *separately* — `{DofIDItem, operator}` pairs, the operator being one of
-value / gradient / symmetric gradient / divergence — would make the sizes computable generically and
-delete both the encode and the decode: `MPElement::giveStateQuantityDofID` maps the fused id back to
-a `DofIDItem` immediately after it was encoded.
+`InternalStateType` was the first choice and was rejected on exactly this ground. It is the
+vocabulary for "a named quantity at an integration point" — what `giveIPValue`/`setIPValue` speak —
+and it already had `IST_Pressure_2`, `IST_PressureGradient` and the rest, so it looked free. But its
+entries are fused, and it showed immediately: the layout work needed `IST_TemperatureGradient` added,
+and left the coupled heat+mass layout unimplemented for want of a humidity-gradient entry that would
+have had to be added too. Under the split both additions became unnecessary and were reverted.
 
-### Resolving where a quantity comes from
+### Resolving where a field comes from
 
 Per cell, from the integrals whose set contains it, recorded during `Integral::initialize` next to
 the DOFs and integration rules that same walk already creates. Per cell rather than per problem
 because it is a property of the region: a domain may carry several materials with different layouts,
 each fed by its own fields.
 
-Resolution is by `DofIDItem` (`D_u`, `T_f`, `P_f`, `P_f2`, `C_1`, `C_2`), which `Variable` already
-stores — **not** by `Variable::q`, which is a degenerate placeholder in practice: every scalar field
-in every `CMT/` deck is declared `quantity 3`, including temperature and both concentrations.
+Resolution is by `Variable::q`, the field the variable represents, declared in the deck by name
+(`quantity "Pressure2"`). It used to be `VariableQuantity`, an mpm-local placeholder with five
+entries that every scalar field in every `CMT/` deck declared as `quantity 3` — so it disambiguated
+nothing and resolution went by dof id instead. Retyping it to `FieldType` made it carry real
+information, and dof ids went back to being addresses rather than identities.
+
+That separation has a cost worth stating: the field and the dofs it occupies are now independent
+declarations, so they can disagree, and a deck that stores temperature on `D_w` is doing something
+legitimate (the `Non-isothermal-Liakopoulos` decks do). `Variable::postInitialize` therefore *warns*
+rather than errors when the declared field contradicts the conventional meaning of its first dof.
+The hazard is real: during this work `mpms08`'s stale numeric `quantity 2` silently changed meaning
+from Temperature to Displacements, and surfaced far away as *"Unsupported material mode"* inside the
+symmetric-gradient operator. This is also why decks name the field instead of numbering it.
 
 Only genuine unknowns qualify, because nodal unknowns must be read through the unknown field's own
 interpolation and a deck may give an unknown and its weighting function different interpolations (a

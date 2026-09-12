@@ -154,8 +154,8 @@ class UPElement : public MPElement {
 
         IntArray locu, locp;
         FloatArray contrib, contrib2;
-        getSurfaceLocalCodeNumbers (locu, Variable::VariableQuantity::Displacement) ;
-        getSurfaceLocalCodeNumbers (locp, Variable::VariableQuantity::Pressure) ;
+        getSurfaceLocalCodeNumbers (locu, FT_Displacements) ;
+        getSurfaceLocalCodeNumbers (locp, FT_Pressure) ;
 
         // integrate traction contribution (momentum balance)
         int o = getU()->interpolation->giveInterpolationOrder()+load->giveApproxOrder();
@@ -182,8 +182,8 @@ class UPElement : public MPElement {
 
         IntArray locu, locp;
         FloatArray contrib, contrib2;
-        getEdgeLocalCodeNumbers (locu, Variable::VariableQuantity::Displacement) ;
-        getEdgeLocalCodeNumbers (locp, Variable::VariableQuantity::Pressure) ;
+        getEdgeLocalCodeNumbers (locu, FT_Displacements) ;
+        getEdgeLocalCodeNumbers (locp, FT_Pressure) ;
 
         // integrate traction contribution (momentum balance)
         int o = getU()->interpolation->giveInterpolationOrder()+load->giveApproxOrder();
@@ -202,8 +202,8 @@ class UPElement : public MPElement {
     }
 
 
-    int computeFluxLBToLRotationMatrix(FloatMatrix &answer, int iSurf, const FloatArray& lc, const Variable::VariableQuantity q, char btype) override {
-        if (q == Variable::VariableQuantity::Displacement) {
+    int computeFluxLBToLRotationMatrix(FloatMatrix &answer, int iSurf, const FloatArray& lc, const FieldType q, char btype) override {
+        if (q == FT_Displacements) {
             // better to integrate this into FEInterpolation class 
             FloatArray nn, h1(3), h2(3);
             answer.resize(3,3);
@@ -241,7 +241,7 @@ class UPElement : public MPElement {
             return 0;
         }
     }
-  //virtual void getLocalCodeNumbers (IntArray& answer, const Variable::VariableQuantity q ) const = 0; 
+  //virtual void getLocalCodeNumbers (IntArray& answer, const FieldType q ) const = 0; 
     //virtual void giveDofManDofIDMask(int inode, IntArray &answer) const =0;
     private:
         virtual int  giveNumberOfUDofs() const = 0;
@@ -273,13 +273,13 @@ class UPTetra21 : public UPElement {
         this->computeGaussPoints();
     }
 
-  void getDofManLocalCodeNumbers (IntArray& answer, const Variable::VariableQuantity q, int num ) const  override {
+  void getDofManLocalCodeNumbers (IntArray& answer, const FieldType q, int num ) const  override {
         /* dof ordering: u1 v1 w1 p1  u2 v2 w2 p2  u3 v3 w3 p3  u4 v4 w4   u5 v5 w5  u6 v6 w6*/
-        if (q == Variable::VariableQuantity::Displacement) {
+        if (q == FT_Displacements) {
           //answer={1,2,3, 5,6,7, 9,10,11, 13,14,15, 17,18,19, 20,21,22, 23,24,25, 26,27,28, 29,30,31, 32,33,34 };
           int o = (num-1)*4+1-(num>4)*(num-5);
           answer = {o, o+1, o+2};
-        } else if (q == Variable::VariableQuantity::Pressure) {
+        } else if (q == FT_Pressure) {
           if (num<=4) {
             //answer = {4, 8, 12, 16};
             answer={num*4};
@@ -288,7 +288,7 @@ class UPTetra21 : public UPElement {
           }
         }
     }
-    void getInternalDofManLocalCodeNumbers (IntArray& answer, const Variable::VariableQuantity q, int num ) const  override {
+    void getInternalDofManLocalCodeNumbers (IntArray& answer, const FieldType q, int num ) const  override {
         answer={};
     }
 
@@ -308,14 +308,14 @@ class UPTetra21 : public UPElement {
     }
     int getNumberOfSurfaceDOFs() const override {return 21;}
     int getNumberOfEdgeDOFs() const override {return 0;}
-    void getSurfaceLocalCodeNumbers(IntArray& answer, const Variable::VariableQuantity q) const override {
-        if (q == Variable::VariableQuantity::Displacement) {
+    void getSurfaceLocalCodeNumbers(IntArray& answer, const FieldType q) const override {
+        if (q == FT_Displacements) {
         answer={1,2,3, 5,6,7, 9,10,11, 13,14,15, 16,17,18, 19,20,21};
         } else {
         answer ={4, 8, 12};
         }
     }
-  void getEdgeLocalCodeNumbers(IntArray& answer, const Variable::VariableQuantity q) const override {}
+  void getEdgeLocalCodeNumbers(IntArray& answer, const FieldType q) const override {}
 
     private:
         virtual int  giveNumberOfUDofs() const override {return 30;} 
@@ -333,8 +333,8 @@ class UPTetra21 : public UPElement {
 
 const FEI3dTetQuad UPTetra21::uInterpol;
 const FEI3dTetLin  UPTetra21::pInterpol;
-const Variable UPTetra21::p(&UPTetra21::pInterpol, Variable::VariableQuantity::Pressure, Variable::VariableType::scalar, 1, NULL, {11});
-const Variable UPTetra21::u(&UPTetra21::uInterpol, Variable::VariableQuantity::Displacement, Variable::VariableType::vector, 3, NULL, {1,2,3});
+const Variable UPTetra21::p(&UPTetra21::pInterpol, FT_Pressure, Variable::VariableType::scalar, 1, NULL, {11});
+const Variable UPTetra21::u(&UPTetra21::uInterpol, FT_Displacements, Variable::VariableType::vector, 3, NULL, {1,2,3});
 
 #define _IFT_UPTetra21_Name "uptetra21"
 REGISTER_Element(UPTetra21)
@@ -361,18 +361,18 @@ class UPBrick11 : public UPElement, public ZZNodalRecoveryModelInterface {
         this->computeGaussPoints();
     }
 
-  void getDofManLocalCodeNumbers (IntArray& answer, const Variable::VariableQuantity q, int num ) const  override {
+  void getDofManLocalCodeNumbers (IntArray& answer, const FieldType q, int num ) const  override {
         /* dof ordering: u1 v1 w1 p1  u2 v2 w2 p2  u3 v3 w3 p3  u4 v4 w4   u5 v5 w5  u6 v6 w6*/
-        if (q == Variable::VariableQuantity::Displacement) {
+        if (q == FT_Displacements) {
           //answer={1,2,3, 5,6,7, 9,10,11, 13,14,15, 17,18,19, 21,22,23, 25,26,27, 29,30,31 };
           int o = (num-1)*4+1;
           answer={o, o+1, o+2};
-        } else if (q == Variable::VariableQuantity::Pressure) {
+        } else if (q == FT_Pressure) {
           //answer = {4, 8, 12, 16, 20, 24, 28, 32};
           answer={num*4};
         }
     }
-    void getInternalDofManLocalCodeNumbers (IntArray& answer, const Variable::VariableQuantity q, int num ) const  override {
+    void getInternalDofManLocalCodeNumbers (IntArray& answer, const FieldType q, int num ) const  override {
         answer={};
     }
 
@@ -391,14 +391,14 @@ class UPBrick11 : public UPElement, public ZZNodalRecoveryModelInterface {
     }
     int getNumberOfSurfaceDOFs() const override {return 16;}
     int getNumberOfEdgeDOFs() const override {return 0;}
-    void getSurfaceLocalCodeNumbers(IntArray& answer, const Variable::VariableQuantity q) const override {
-        if (q == Variable::VariableQuantity::Displacement) {
+    void getSurfaceLocalCodeNumbers(IntArray& answer, const FieldType q) const override {
+        if (q == FT_Displacements) {
         answer={1,2,3, 5,6,7, 9,10,11, 13,14,15};
         } else {
         answer ={4, 8, 12, 16};
         }
     }
-    void getEdgeLocalCodeNumbers(IntArray& answer, const Variable::VariableQuantity q) const override {}
+    void getEdgeLocalCodeNumbers(IntArray& answer, const FieldType q) const override {}
     Interface *giveInterface(InterfaceType it) override {
         if (it == ZZNodalRecoveryModelInterfaceType) {
             return this;
@@ -425,8 +425,8 @@ private:
 
 const FEI3dHexaLin  UPBrick11::uInterpol;
 const FEI3dHexaLin  UPBrick11::pInterpol;
-const Variable UPBrick11::p(&UPBrick11::pInterpol, Variable::VariableQuantity::Pressure, Variable::VariableType::scalar, 1, NULL, {11});
-const Variable UPBrick11::u(&UPBrick11::uInterpol, Variable::VariableQuantity::Displacement, Variable::VariableType::vector, 3, NULL, {1,2,3});
+const Variable UPBrick11::p(&UPBrick11::pInterpol, FT_Pressure, Variable::VariableType::scalar, 1, NULL, {11});
+const Variable UPBrick11::u(&UPBrick11::uInterpol, FT_Displacements, Variable::VariableType::vector, 3, NULL, {1,2,3});
 
 #define _IFT_UPBrick11_Name "upbrick11"
 REGISTER_Element(UPBrick11)
@@ -453,18 +453,18 @@ class UPQuad11 : public UPElement {
         this->computeGaussPoints();
     }
 
-  void getDofManLocalCodeNumbers (IntArray& answer, const Variable::VariableQuantity q, int num ) const  override {
+  void getDofManLocalCodeNumbers (IntArray& answer, const FieldType q, int num ) const  override {
         /* dof ordering: u1 v1 w1 p1  u2 v2 w2 p2  u3 v3 w3 p3  u4 v4 w4 p4*/
-        if (q == Variable::VariableQuantity::Displacement) {
+        if (q == FT_Displacements) {
           //answer={1,2,3, 5,6,7, 9,10,11, 13,14,15 };
           int o = (num-1)*3+1;
           answer={o, o+1};
-        } else if (q == Variable::VariableQuantity::Pressure) {
+        } else if (q == FT_Pressure) {
           //answer = {4, 8, 12, 16};
           answer={num*3};
         }
     }
-    void getInternalDofManLocalCodeNumbers (IntArray& answer, const Variable::VariableQuantity q, int num ) const  override {
+    void getInternalDofManLocalCodeNumbers (IntArray& answer, const FieldType q, int num ) const  override {
         answer={};
     }
 
@@ -480,13 +480,13 @@ class UPQuad11 : public UPElement {
         return EGT_quad_1;
     }
     int getNumberOfSurfaceDOFs() const override {return 0;}
-    void getSurfaceLocalCodeNumbers(IntArray& answer, const Variable::VariableQuantity q) const override {
+    void getSurfaceLocalCodeNumbers(IntArray& answer, const FieldType q) const override {
         answer={};
     }
 
     int getNumberOfEdgeDOFs() const override  {return 6;}
-    void getEdgeLocalCodeNumbers(IntArray& answer, const Variable::VariableQuantity q) const override  {
-        if (q == Variable::VariableQuantity::Displacement) {
+    void getEdgeLocalCodeNumbers(IntArray& answer, const FieldType q) const override  {
+        if (q == FT_Displacements) {
             answer={1,2, 4,5};
         } else {
             answer ={3, 6};
@@ -511,8 +511,8 @@ private:
 
 const FEI2dQuadLin  UPQuad11::uInterpol(1,2);
 const FEI2dQuadLin  UPQuad11::pInterpol(1,2);
-const Variable UPQuad11::p(&UPQuad11::pInterpol, Variable::VariableQuantity::Pressure, Variable::VariableType::scalar, 1, NULL, {11});
-const Variable UPQuad11::u(&UPQuad11::uInterpol, Variable::VariableQuantity::Displacement, Variable::VariableType::vector, 2, NULL, {1,2});
+const Variable UPQuad11::p(&UPQuad11::pInterpol, FT_Pressure, Variable::VariableType::scalar, 1, NULL, {11});
+const Variable UPQuad11::u(&UPQuad11::uInterpol, FT_Displacements, Variable::VariableType::vector, 2, NULL, {1,2});
 
 #define _IFT_UPQuad11_Name "upquad11"
 REGISTER_Element(UPQuad11)
@@ -539,18 +539,18 @@ class UPLine11 : public UPElement {
         this->computeGaussPoints();
     }
 
-  void getDofManLocalCodeNumbers (IntArray& answer, const Variable::VariableQuantity q, int num ) const  override {
+  void getDofManLocalCodeNumbers (IntArray& answer, const FieldType q, int num ) const  override {
         /* dof ordering: u1 v1 w1 p1  u2 v2 w2 p2  u3 v3 w3 p3  u4 v4 w4 p4*/
-        if (q == Variable::VariableQuantity::Displacement) {
+        if (q == FT_Displacements) {
           //answer={1,2,3, 5,6,7, 9,10,11, 13,14,15 };
           //int o = (num-1)*2+1;
           answer={num*2-1};
-        } else if (q == Variable::VariableQuantity::Pressure) {
+        } else if (q == FT_Pressure) {
           //answer = {4, 8, 12, 16};
           answer={num*2};
         }
     }
-    void getInternalDofManLocalCodeNumbers (IntArray& answer, const Variable::VariableQuantity q, int num ) const  override {
+    void getInternalDofManLocalCodeNumbers (IntArray& answer, const FieldType q, int num ) const  override {
         answer={};
     }
 
@@ -566,13 +566,13 @@ class UPLine11 : public UPElement {
         return EGT_line_1;
     }
     int getNumberOfSurfaceDOFs() const override {return 0;}
-    void getSurfaceLocalCodeNumbers(IntArray& answer, const Variable::VariableQuantity q) const override {
+    void getSurfaceLocalCodeNumbers(IntArray& answer, const FieldType q) const override {
         answer={};
     }
 
     int getNumberOfEdgeDOFs() const override  {return 4;}
-    void getEdgeLocalCodeNumbers(IntArray& answer, const Variable::VariableQuantity q) const override  {
-        if (q == Variable::VariableQuantity::Displacement) {
+    void getEdgeLocalCodeNumbers(IntArray& answer, const FieldType q) const override  {
+        if (q == FT_Displacements) {
             answer={1, 3};
         } else {
             answer ={2, 4};
@@ -597,8 +597,8 @@ private:
 
 const FEI1dLin  UPLine11::uInterpol(1);
 const FEI1dLin  UPLine11::pInterpol(1);
-const Variable UPLine11::p(&UPLine11::pInterpol, Variable::VariableQuantity::Pressure, Variable::VariableType::scalar, 1, NULL, {11});
-const Variable UPLine11::u(&UPLine11::uInterpol, Variable::VariableQuantity::Displacement, Variable::VariableType::vector, 1, NULL, {1});
+const Variable UPLine11::p(&UPLine11::pInterpol, FT_Pressure, Variable::VariableType::scalar, 1, NULL, {11});
+const Variable UPLine11::u(&UPLine11::uInterpol, FT_Displacements, Variable::VariableType::vector, 1, NULL, {1});
 
 #define _IFT_UPLine11_Name "upline11"
 REGISTER_Element(UPLine11)
@@ -763,11 +763,11 @@ class UPSimpleMaterial : public Material {
      * always 6 components -- TangentStiffness is 6x6 in every UP mode -- and nsd follows from the
      * material mode.
      */
-    IntArray giveStateVariableIDs(MaterialMode mmode) const override {
+    StateVariableLayout giveStateVariableIDs(MaterialMode mmode) const override {
         if ((mmode == _1dUP) || (mmode == _2dUP) || (mmode == _3dUP)) {
-            return IntArray{ IST_StrainTensor, IST_PressureGradient, IST_Pressure };
+            return { { FT_Displacements, SO_SymmetricGradient }, { FT_Pressure, SO_Gradient }, { FT_Pressure, SO_Value } };
         }
-        return IntArray();
+        return StateVariableLayout();
     }
 
     void updateTempState(const FloatArray &stateVector, GaussPoint *gp, TimeStep *tStep) override {

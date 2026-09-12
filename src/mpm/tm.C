@@ -203,8 +203,8 @@ class TMElement : public MPElement {
         
             IntArray locu, loct;
             FloatArray contrib, contrib2;
-            getSurfaceLocalCodeNumbers (locu, Variable::VariableQuantity::Displacement) ;
-            getSurfaceLocalCodeNumbers (loct, Variable::VariableQuantity::Temperature) ;
+            getSurfaceLocalCodeNumbers (locu, FT_Displacements) ;
+            getSurfaceLocalCodeNumbers (loct, FT_Temperature) ;
 
             // integrate traction contribution (momentum balance)
             int o = getU()->interpolation->giveInterpolationOrder()+load->giveApproxOrder();
@@ -238,8 +238,8 @@ class TMElement : public MPElement {
         if (bct == TransmissionBC ) {
             IntArray locu, loct;
             FloatArray contrib, contrib2;
-            getEdgeLocalCodeNumbers (locu, Variable::VariableQuantity::Displacement) ;
-            getEdgeLocalCodeNumbers (loct, Variable::VariableQuantity::Pressure) ;
+            getEdgeLocalCodeNumbers (locu, FT_Displacements) ;
+            getEdgeLocalCodeNumbers (loct, FT_Pressure) ;
 
             // integrate traction contribution (momentum balance)
             int o = getU()->interpolation->giveInterpolationOrder()+load->giveApproxOrder();
@@ -267,8 +267,8 @@ class TMElement : public MPElement {
             if (load->giveBCValType() == ForceLoadBVT) {
                 FloatArray contribu, contribt;
                 IntArray locu, loct;
-                getLocalCodeNumbers (locu, Variable::VariableQuantity::Displacement) ;
-                getLocalCodeNumbers (loct, Variable::VariableQuantity::Temperature) ;
+                getLocalCodeNumbers (locu, FT_Displacements) ;
+                getLocalCodeNumbers (loct, FT_Temperature) ;
                 this->integrateTerm_c(contribu, NTf_Body(getU(), BodyFluxFunctor(load, getU()->dofIDs)), this->giveDefaultIntegrationRulePtr(), tStep);
                 this->integrateTerm_c(contribt, NTf_Body(getT(), BodyFluxFunctor(load, getT()->dofIDs)), this->giveDefaultIntegrationRulePtr(), tStep);
                 answer.assemble(contribu, locu);
@@ -282,8 +282,8 @@ class TMElement : public MPElement {
     }
 
 
-    int computeFluxLBToLRotationMatrix(FloatMatrix &answer, int iSurf, const FloatArray& lc, const Variable::VariableQuantity q, char btype) override {
-        if (q == Variable::VariableQuantity::Displacement) {
+    int computeFluxLBToLRotationMatrix(FloatMatrix &answer, int iSurf, const FloatArray& lc, const FieldType q, char btype) override {
+        if (q == FT_Displacements) {
             // better to integrate this into FEInterpolation class 
             FloatArray nn, h1(3), h2(3);
             answer.resize(3,3);
@@ -321,7 +321,7 @@ class TMElement : public MPElement {
             return 0;
         }
     }
-  //virtual void getLocalCodeNumbers (IntArray& answer, const Variable::VariableQuantity q ) const = 0; 
+  //virtual void getLocalCodeNumbers (IntArray& answer, const FieldType q ) const = 0; 
     //virtual void giveDofManDofIDMask(int inode, IntArray &answer) const =0;
 
 };
@@ -350,18 +350,18 @@ class TMBrick11 : public TMElement, public ZZNodalRecoveryModelInterface {
         this->computeGaussPoints();
     }
 
-  void getDofManLocalCodeNumbers (IntArray& answer, const Variable::VariableQuantity q, int num ) const  override {
+  void getDofManLocalCodeNumbers (IntArray& answer, const FieldType q, int num ) const  override {
         /* dof ordering: u1 v1 w1 p1  u2 v2 w2 p2  u3 v3 w3 p3  u4 v4 w4   u5 v5 w5  u6 v6 w6*/
-        if (q == Variable::VariableQuantity::Displacement) {
+        if (q == FT_Displacements) {
           //answer={1,2,3, 5,6,7, 9,10,11, 13,14,15, 17,18,19, 21,22,23, 25,26,27, 29,30,31 };
           int o = (num-1)*4+1;
           answer={o, o+1, o+2};
-        } else if (q == Variable::VariableQuantity::Temperature) {
+        } else if (q == FT_Temperature) {
           //answer = {4, 8, 12, 16, 20, 24, 28, 32};
           answer={num*4};
         }
     }
-    void getInternalDofManLocalCodeNumbers (IntArray& answer, const Variable::VariableQuantity q, int num ) const  override {
+    void getInternalDofManLocalCodeNumbers (IntArray& answer, const FieldType q, int num ) const  override {
         answer={};
     }
 
@@ -380,14 +380,14 @@ class TMBrick11 : public TMElement, public ZZNodalRecoveryModelInterface {
     }
     int getNumberOfSurfaceDOFs() const override {return 16;}
     int getNumberOfEdgeDOFs() const override {return 0;}
-    void getSurfaceLocalCodeNumbers(IntArray& answer, const Variable::VariableQuantity q) const override {
-        if (q == Variable::VariableQuantity::Displacement) {
+    void getSurfaceLocalCodeNumbers(IntArray& answer, const FieldType q) const override {
+        if (q == FT_Displacements) {
         answer={1,2,3, 5,6,7, 9,10,11, 13,14,15};
         } else {
         answer ={4, 8, 12, 16};
         }
     }
-    void getEdgeLocalCodeNumbers(IntArray& answer, const Variable::VariableQuantity q) const override {}
+    void getEdgeLocalCodeNumbers(IntArray& answer, const FieldType q) const override {}
     Interface *giveInterface(InterfaceType it) override {
         if (it == ZZNodalRecoveryModelInterfaceType) {
             return this;
@@ -414,8 +414,8 @@ private:
 
 const FEI3dHexaLin TMBrick11::uInterpol;
 const FEI3dHexaLin TMBrick11::tInterpol;
-const Variable TMBrick11::t(&TMBrick11::tInterpol, Variable::VariableQuantity::Temperature, Variable::VariableType::scalar, 1, NULL, {10});
-const Variable TMBrick11::u(&TMBrick11::uInterpol, Variable::VariableQuantity::Displacement, Variable::VariableType::vector, 3, NULL, {1,2,3});
+const Variable TMBrick11::t(&TMBrick11::tInterpol, FT_Temperature, Variable::VariableType::scalar, 1, NULL, {10});
+const Variable TMBrick11::u(&TMBrick11::uInterpol, FT_Displacements, Variable::VariableType::vector, 3, NULL, {1,2,3});
 
 #define _IFT_TMBrick11_Name "tmbrick11"
 REGISTER_Element(TMBrick11)
@@ -443,18 +443,18 @@ class TMTetra11 : public TMElement, public ZZNodalRecoveryModelInterface {
         this->computeGaussPoints();
     }
 
-  void getDofManLocalCodeNumbers (IntArray& answer, const Variable::VariableQuantity q, int num ) const  override {
+  void getDofManLocalCodeNumbers (IntArray& answer, const FieldType q, int num ) const  override {
         /* dof ordering: u1 v1 w1 p1  u2 v2 w2 p2  u3 v3 w3 p3  u4 v4 w4   u5 v5 w5  u6 v6 w6*/
-        if (q == Variable::VariableQuantity::Displacement) {
+        if (q == FT_Displacements) {
           //answer={1,2,3, 5,6,7, 9,10,11, 13,14,15};
           int o = (num-1)*4+1;
           answer={o, o+1, o+2};
-        } else if (q == Variable::VariableQuantity::Temperature) {
+        } else if (q == FT_Temperature) {
           //answer = {4, 8, 12, 16};
           answer={num*4};
         }
     }
-    void getInternalDofManLocalCodeNumbers (IntArray& answer, const Variable::VariableQuantity q, int num ) const  override {
+    void getInternalDofManLocalCodeNumbers (IntArray& answer, const FieldType q, int num ) const  override {
         answer={};
     }
 
@@ -473,14 +473,14 @@ class TMTetra11 : public TMElement, public ZZNodalRecoveryModelInterface {
     }
     int getNumberOfSurfaceDOFs() const override {return 12;}
     int getNumberOfEdgeDOFs() const override {return 0;}
-    void getSurfaceLocalCodeNumbers(IntArray& answer, const Variable::VariableQuantity q) const override {
-        if (q == Variable::VariableQuantity::Displacement) {
+    void getSurfaceLocalCodeNumbers(IntArray& answer, const FieldType q) const override {
+        if (q == FT_Displacements) {
         answer={1,2,3, 5,6,7, 9,10,11};
         } else {
         answer ={4, 8, 12};
         }
     }
-    void getEdgeLocalCodeNumbers(IntArray& answer, const Variable::VariableQuantity q) const override {}
+    void getEdgeLocalCodeNumbers(IntArray& answer, const FieldType q) const override {}
     Interface *giveInterface(InterfaceType it) override {
         if (it == ZZNodalRecoveryModelInterfaceType) {
             return this;
@@ -507,8 +507,8 @@ private:
 
 const FEI3dTetLin TMTetra11::uInterpol;
 const FEI3dTetLin TMTetra11::tInterpol;
-const Variable TMTetra11::t(&TMTetra11::tInterpol, Variable::VariableQuantity::Temperature, Variable::VariableType::scalar, 1, NULL, {10});
-const Variable TMTetra11::u(&TMTetra11::uInterpol, Variable::VariableQuantity::Displacement, Variable::VariableType::vector, 3, NULL, {1,2,3});
+const Variable TMTetra11::t(&TMTetra11::tInterpol, FT_Temperature, Variable::VariableType::scalar, 1, NULL, {10});
+const Variable TMTetra11::u(&TMTetra11::uInterpol, FT_Displacements, Variable::VariableType::vector, 3, NULL, {1,2,3});
 
 #define _IFT_TMTetra11_Name "tmtetra11"
 REGISTER_Element(TMTetra11)
@@ -670,8 +670,8 @@ class TMSimpleMaterial : public Material {
      * Generalized state is [ strain(6), temperature gradient(3), temperature ], the packing that
      * was previously documented on giveCharacteristicVector and assumed by its callers.
      */
-    IntArray giveStateVariableIDs(MaterialMode mmode) const override {
-        return IntArray{ IST_StrainTensor, IST_TemperatureGradient, IST_Temperature };
+    StateVariableLayout giveStateVariableIDs(MaterialMode mmode) const override {
+        return { { FT_Displacements, SO_SymmetricGradient }, { FT_Temperature, SO_Gradient }, { FT_Temperature, SO_Value } };
     }
 
     void updateTempState(const FloatArray &stateVector, GaussPoint *gp, TimeStep *tStep) override {

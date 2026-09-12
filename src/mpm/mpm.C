@@ -73,9 +73,44 @@ Variable::initializeFrom(const std::shared_ptr<InputRecord> &ir)
 }
 
 
+/**
+ * What a dof id conventionally denotes. Used only to sanity-check a Variable's declaration: the
+ * field a variable represents and the dof ids it occupies are independent declarations now, and
+ * nothing else would notice them contradicting each other.
+ */
+static FieldType __conventionalFieldOfDof(DofIDItem id)
+{
+    switch ( id ) {
+    case D_u: case D_v: case D_w:   return FT_Displacements;
+    case V_u: case V_v: case V_w:   return FT_Velocity;
+    case T_f:                       return FT_Temperature;
+    case P_f:                       return FT_Pressure;
+    case P_f2:                      return FT_Pressure2;
+    case C_1:                       return FT_Concentration1;
+    case C_2:                       return FT_Concentration2;
+    default:                        return FT_Unknown;
+    }
+}
+
+
 void
 Variable::postInitialize(EngngModel *problem)
 {
+    // The field a variable represents and the dofs it lives on are declared separately, so they
+    // can disagree. A deck is free to store a field on an unconventional dof -- that freedom is
+    // why the field is named rather than inferred -- but a disagreement is far more often a
+    // mistake, and one that otherwise surfaces much later and much less clearly.
+    if ( !this->dofIDs.isEmpty() ) {
+        FieldType conventional = __conventionalFieldOfDof( (DofIDItem) this->dofIDs.at(1) );
+        if ( conventional != FT_Unknown && conventional != this->q ) {
+            OOFEM_WARNING( "MPM variable '%s' is declared as the %s field but occupies dof %s, which "
+                           "conventionally carries %s; check the 'quantity' attribute",
+                           this->name.c_str(), __FieldTypeToString(this->q),
+                           __DofIDItemToString( (DofIDItem) this->dofIDs.at(1) ),
+                           __FieldTypeToString(conventional) );
+        }
+    }
+
     if ( this->dualVarName.empty() ) {
         return;
     }
@@ -212,27 +247,37 @@ MPElement::computeNMatrixAt(FloatMatrix &answer, const Variable *v, GaussPoint *
 }
 
 
-DofIDItem
-MPElement::giveStateQuantityDofID(int istID)
+void
+MPElement::computeDivMatrixAt(FloatMatrix &answer, const Variable *v, GaussPoint *gp) const
 {
-    switch ( (InternalStateType) istID ) {
-    case IST_StrainTensor:
-    case IST_DisplacementVector:
-        return D_u;
-    case IST_Temperature:
-    case IST_TemperatureGradient:
-        return T_f;
-    case IST_Pressure:
-    case IST_PressureGradient:
-        return P_f;
-    case IST_Pressure_2:
-        return P_f2;
-    case IST_MassConcentration_1:
-        return C_1;
-    case IST_MassConcentration_2:
-        return C_2;
+    const FEInterpolation *interpol = v->interpolation;
+    const MaterialMode mmode = gp->giveMaterialMode();
+
+    FloatMatrix dndx;
+    interpol->evaldNdx( dndx, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(this) );
+    const int nnodes = interpol->giveNumberOfNodes( this->giveGeometryType() );
+    const int nsd = 1 * mmodeIs1D(mmode) + 2 * mmodeIs2D(mmode) + 3 * mmodeIs3D(mmode);
+
+    answer.resize(1, nnodes * v->size);
+    answer.zero();
+    for ( int i = 0; i < nnodes; i++ ) {
+        for ( int j = 0; j < nsd; j++ ) {
+            answer(0, i * v->size + j) = dndx(i, j);
+        }
+    }
+}
+
+
+void
+MPElement::computeStateOperatorAt(FloatMatrix &answer, StateOperator op, const Variable *v, GaussPoint *gp) const
+{
+    switch ( op ) {
+    case SO_Value:             this->computeNMatrixAt(answer, v, gp); break;
+    case SO_Gradient:          this->computeGradMatrixAt(answer, v, gp); break;
+    case SO_SymmetricGradient: this->computeGradSymMatrixAt(answer, v, gp); break;
+    case SO_Divergence:        this->computeDivMatrixAt(answer, v, gp); break;
     default:
-        return Undef;
+        OOFEM_ERROR( "unsupported state operator %s", __StateOperatorToString(op) );
     }
 }
 
@@ -244,68 +289,38 @@ MPElement::registerStateVariable(const Variable *v)
         return;
     }
 
-    // The state quantities that can be supplied by a primary field; keep in sync with
-    // giveStateQuantityDofID.
-    static const InternalStateType supported [] = {
-        IST_StrainTensor, IST_DisplacementVector,
-        IST_Temperature, IST_TemperatureGradient,
-        IST_Pressure, IST_PressureGradient, IST_Pressure_2,
-        IST_MassConcentration_1, IST_MassConcentration_2
-    };
-
-    for ( InternalStateType ist : supported ) {
-        DofIDItem id = MPElement::giveStateQuantityDofID(ist);
-        if ( id == Undef || !v->dofIDs.contains( (int) id ) ) {
-            continue;
-        }
-        auto existing = this->stateVariables.find( (int) ist );
-        if ( existing != this->stateVariables.end() && existing->second != v ) {
-            // Two distinct unknown fields claim the same state quantity on this one cell, so there
-            // is no single answer to where it comes from here. (Different cells having different
-            // sources is fine and expected -- that is the multi-material case, and test functions
-            // never get here.)
-            OOFEM_ERROR( "on element %d the state quantity %s is supplied by more than one unknown "
-                         "field ('%s' and '%s'); cannot resolve the source unambiguously",
-                         this->giveNumber(), __InternalStateTypeToString(ist),
-                         existing->second->name.c_str(), v->name.c_str() );
-        }
-        this->stateVariables [ (int) ist ] = v;
+    auto existing = this->stateVariables.find( (int) v->q );
+    if ( existing != this->stateVariables.end() && existing->second != v ) {
+        // Two distinct unknown fields claim to be the same physical field on this one cell, so
+        // there is no single answer to where that field's state comes from here. (Different cells
+        // having different sources is fine and expected -- that is the multi-material case, and
+        // test functions never get here.)
+        OOFEM_ERROR( "on element %d the field %s is supplied by more than one unknown variable "
+                     "('%s' and '%s'); cannot resolve the source unambiguously",
+                     this->giveNumber(), __FieldTypeToString(v->q),
+                     existing->second->name.c_str(), v->name.c_str() );
     }
+    this->stateVariables [ (int) v->q ] = v;
 }
 
 
 void
-MPElement::assembleStateVector(FloatArray &answer, const IntArray &istIDs, GaussPoint *gp, TimeStep *tStep)
+MPElement::assembleStateVector(FloatArray &answer, const StateVariableLayout &layout, GaussPoint *gp, TimeStep *tStep)
 {
     answer.clear();
     int offset = 1;
 
-    for ( int istID : istIDs ) {
-        auto it = this->stateVariables.find(istID);
-        if ( it == this->stateVariables.end() ) {
-            OOFEM_ERROR( "no primary field supplies state quantity %s(%d) required by the material on "
-                         "element %d; expected an unknown variable carrying dof id %d",
-                         __InternalStateTypeToString( (InternalStateType) istID ), istID,
-                         this->giveNumber(), (int) MPElement::giveStateQuantityDofID(istID) );
+    for ( const StateVariableSpec &spec : layout ) {
+        const Variable *v = this->giveStateVariableSource(spec.field);
+        if ( v == nullptr ) {
+            OOFEM_ERROR( "no unknown variable supplies the %s field that the material requires on "
+                         "element %d", __FieldTypeToString(spec.field), this->giveNumber() );
         }
-        const Variable *v = it->second;
 
         FloatArray u, contribution;
         FloatMatrix op;
         this->getUnknownVector(u, v, VM_TotalIntrinsic, tStep);
-
-        switch ( (InternalStateType) istID ) {
-        case IST_StrainTensor:
-            this->computeGradSymMatrixAt(op, v, gp);
-            break;
-        case IST_TemperatureGradient:
-        case IST_PressureGradient:
-            this->computeGradMatrixAt(op, v, gp);
-            break;
-        default:
-            this->computeNMatrixAt(op, v, gp);
-            break;
-        }
+        this->computeStateOperatorAt(op, spec.op, v, gp);
 
         contribution.beProductOf(op, u);
         answer.copySubVector(contribution, offset);
@@ -328,8 +343,8 @@ MPElement::updateTempState(TimeStep *tStep)
     for ( auto &iRule : this->integrationRulesArray ) {
         for ( GaussPoint *gp : *iRule ) {
             Material *mat = this->giveCrossSection()->giveMaterial(gp);
-            IntArray istIDs = mat->giveStateVariableIDs( gp->giveMaterialMode() );
-            if ( istIDs.isEmpty() ) {
+            StateVariableLayout layout = mat->giveStateVariableIDs( gp->giveMaterialMode() );
+            if ( layout.empty() ) {
                 // material does not participate in the push/pull protocol
                 continue;
             }
@@ -344,8 +359,8 @@ MPElement::updateTempState(TimeStep *tStep)
             // This is not silent: a query that does need the cached value finds it unset and says
             // so (see e.g. StructuralMaterial::giveCharacteristicVector).
             bool complete = true;
-            for ( int istID : istIDs ) {
-                if ( this->stateVariables.find(istID) == this->stateVariables.end() ) {
+            for ( const StateVariableSpec &spec : layout ) {
+                if ( this->giveStateVariableSource(spec.field) == nullptr ) {
                     complete = false;
                     break;
                 }
@@ -354,7 +369,7 @@ MPElement::updateTempState(TimeStep *tStep)
                 continue;
             }
 
-            this->assembleStateVector(state, istIDs, gp, tStep);
+            this->assembleStateVector(state, layout, gp, tStep);
             mat->updateTempState(state, gp, tStep);
         }
     }

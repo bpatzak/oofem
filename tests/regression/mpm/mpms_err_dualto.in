@@ -6,8 +6,8 @@ Negative test: two unknown fields claim the same state quantity.
 # 
 mpmsymbolicstationaryproblem nsteps 1 nvariables 2 nterms 2 nintegrals 2 lhsterms 2 1 2 rhsterms 0 nmodules 0
 #errorcheck
-Variable name "u" interpolation "feilin" type 1 quantity 0 size 1 dofs 1 1 # displacement 
-Variable name "w" interpolation "feilin" type 1 quantity 0 size 1 dofs 1 1 # test function
+Variable name "u" interpolation "feilin" type 1 quantity "Displacements" size 1 dofs 1 1 # displacement 
+Variable name "w" interpolation "feilin" type 1 quantity "Displacements" size 1 dofs 1 1 # test function
 SymbolicTerm 1 variable "u"  testvariable "w" mmode 10 lexpression "Grad_s(w,gp).T*MDer(gp,ts,MatResponseMode::TangentStiffness)*Grad_s(u,gp)" rexpression "Grad_s(w,gp).T*Sig(u,gp,ts)"
 #NTfTerm 2 variable "u" testvariable "w" mmode 6 flux 2 1. 0.
 SymbolicTerm 2 variable "w"  testvariable "w" mmode 10 lexpression "0.0" rexpression "Grad_s(w,gp).T*Sig(w,gp,ts)"

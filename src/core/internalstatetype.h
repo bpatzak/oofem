@@ -209,9 +209,7 @@ namespace oofem {
     ENUM_ITEM_WITH_VALUE(IST_ShearDissWork, 161) \
     ENUM_ITEM_WITH_VALUE(IST_ShearDeltaDissWork, 162) \
     ENUM_ITEM_WITH_VALUE(IST_CompressionDissWork, 163) \
-    ENUM_ITEM_WITH_VALUE(IST_CompressionDeltaDissWork, 164) \
-    ENUM_ITEM_WITH_VALUE(IST_TemperatureGradient, 165) /* Gradient of the temperature field (not the flux, cf. IST_TemperatureFlow) */ \
-    ENUM_ITEM_WITH_VALUE(IST_MassConcentration_2, 166) /* Mass concentration of the second constituent */
+    ENUM_ITEM_WITH_VALUE(IST_CompressionDeltaDissWork, 164)
 
 
 /**

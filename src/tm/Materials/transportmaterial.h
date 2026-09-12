@@ -265,7 +265,7 @@ public:
      * by the field value itself; HeMo models take both fields. Mirrors the argument order of
      * giveFluxVector.
      */
-    IntArray giveStateVariableIDs(MaterialMode mmode) const override;
+    StateVariableLayout giveStateVariableIDs(MaterialMode mmode) const override;
 
     /**
      * Bridges the push half of the generic interface onto giveFluxVector, which is the transport

@@ -353,29 +353,30 @@ void PythonMaterial::updateTempState(const FloatArray &stateVector, GaussPoint *
 #endif
 }
 
-IntArray PythonMaterial::giveStateVariableIDs(MaterialMode mmode) const
+StateVariableLayout PythonMaterial::giveStateVariableIDs(MaterialMode mmode) const
 {
-#ifdef _USE_NANOBIND
+#if defined(_USE_NANOBIND) || defined(_PYBIND_BINDINGS)
     if ( pyGiveStateVariableIDs ) {
+#ifdef _USE_NANOBIND
         nb::gil_scoped_acquire gil;
         nb::object result = pyGiveStateVariableIDs(nb::cast(mmode));
-        return nb::cast<IntArray>(result);
-    }
-#elif defined(_PYBIND_BINDINGS)
-    if ( pyGiveStateVariableIDs ) {
+#else
         py::gil_scoped_acquire gil;
         py::object result = pyGiveStateVariableIDs(mmode);
-        // Converted element by element: casting the sequence straight to IntArray would need
-        // pybind to materialize a temporary, which it refuses outside a bound function.
-        IntArray answer( (int) py::len(result) );
-        int i = 1;
+#endif
+        // The python side returns a sequence of (field, operator) pairs. Converted element by
+        // element: handing the sequence straight to a caster would ask pybind to materialize a
+        // temporary, which it refuses outside a bound function.
+        StateVariableLayout layout;
         for ( auto item : result ) {
-            answer.at(i++) = item.template cast<int>();
+            auto pair = item;
+            layout.push_back( { (FieldType) pair[ py::int_(0) ].template cast<int>(),
+                                (StateOperator) pair[ py::int_(1) ].template cast<int>() } );
         }
-        return answer;
+        return layout;
     }
 #endif
-    return IntArray();
+    return StateVariableLayout();
 }
 
 double PythonMaterial::giveCharacteristicValue(MatResponseMode type, GaussPoint* gp, TimeStep *tStep) const
