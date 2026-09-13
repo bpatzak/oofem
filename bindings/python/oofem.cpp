@@ -1207,8 +1207,12 @@ PYBIND11_MODULE(oofempy, m) {
         .def("giveMetaStep", &oofem::EngngModel::giveMetaStep, py::return_value_policy::reference)
         .def("terminateAnalysis", &oofem::EngngModel::terminateAnalysis)
         .def("terminate", &oofem::EngngModel::terminate)
-        .def("solveYourself", &oofem::EngngModel::solveYourself)
-        .def("solveYourselfAt", &oofem::EngngModel::solveYourselfAt)
+        // The solution enters OpenMP parallel regions whose worker threads may call back
+        // into Python (PythonField, PythonMaterial, classes derived in Python). Holding the
+        // GIL here would block them while this thread waits on the parallel barrier, so it
+        // is released for the duration; every callback re-acquires it for its own thread.
+        .def("solveYourself", &oofem::EngngModel::solveYourself, py::call_guard<py::gil_scoped_release>())
+        .def("solveYourselfAt", &oofem::EngngModel::solveYourselfAt, py::call_guard<py::gil_scoped_release>())
         .def("terminate",&oofem::EngngModel::terminate)
         .def("giveField", (FieldPtr (oofem::EngngModel::*)(oofem::FieldType, oofem::TimeStep*)) &oofem::EngngModel::giveField)
         .def("giveField", (FieldPtr (oofem::EngngModel::*)(oofem::InternalStateType, oofem::TimeStep*)) &oofem::EngngModel::giveField)
