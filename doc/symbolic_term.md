@@ -123,6 +123,98 @@ Two consequences for writing terms:
 The `var` argument of `Sig` and `Sig_dev` is retained for compatibility and is checked against the
 field that actually supplies the strain on the cell; it no longer selects what is read.
 
+### Declaring the state layout: `giveStateVariableIDs`
+
+A material declares what it wants pushed, and in what order, by overriding
+
+```cpp
+virtual StateVariableLayout giveStateVariableIDs(MaterialMode mmode) const;
+```
+
+`StateVariableLayout` is a `std::vector<StateVariableSpec>`, and each `StateVariableSpec` is a
+`{FieldType field, StateOperator op}` pair (see `src/core/stateoperator.h`): *which*
+primary field, and *what is taken of it*. The entries appear in the order in which their blocks are
+packed into the state vector handed to `updateTempState`, so the layout is both the declaration and
+the documentation of that vector's contents.
+
+For each entry the assembly finds the unknown `Variable` whose `quantity` is `field`, reads its
+nodal unknowns on the cell (`VM_TotalIntrinsic`, i.e. total values), applies the operator matrix at
+the integration point, and appends the resulting block. The field axis is matched against the deck's
+`quantity` keyword — not against dof ids — so a material never obliges a deck to renumber its dofs.
+
+**Supported operators.** Exactly four, the ones `MPElement` can build an operator matrix for. Anything
+else is rejected at push time with *"unsupported state operator"*.
+
+| `StateOperator` | Meaning | Block size contributed | Requires |
+| :--- | :--- | :--- | :--- |
+| `SO_Value` | the field itself, `N*u` | `Variable::size` (1 for a scalar field, `nsd` for a vector one) | — |
+| `SO_Gradient` | gradient of a **scalar** field, one row per spatial direction | `nsd` (1/2/3 from the material mode) | `size == 1`; errors otherwise |
+| `SO_SymmetricGradient` | symmetric gradient of a **vector** field, i.e. engineering strain in Voigt form | mode-dependent: 6 for `_3dMat`, `_3dUP`, `_2dUP`, `_1dUP`; 4 for `_PlaneStrain`; 3 for `_PlaneStress`; 1 for `_1dMat` | a mode the operator knows; errors otherwise |
+| `SO_Divergence` | divergence of a vector field | 1 | — |
+
+**Supported fields.** Any `FieldType` (`src/core/field.h`), written in the deck as the name with the
+`FT_` prefix dropped. The ones these decks use are `FT_Displacements`, `FT_Pressure`,
+`FT_Pressure2` (second phase of a multiphase problem), `FT_Temperature`, `FT_Concentration1` and
+`FT_Concentration2`. Naming the same field twice with different operators is normal and is how a
+material asks for both a quantity and its gradient.
+
+**Example (C++).** A poromechanical material consuming strain, pressure gradient and pressure — the
+layout of `UPSimpleMaterial`, matching the `[ strain(6), grad p(nsd), p ]` vector its
+`updateTempState` unpacks:
+
+```cpp
+StateVariableLayout giveStateVariableIDs(MaterialMode mmode) const override {
+    if ( ( mmode == _1dUP ) || ( mmode == _2dUP ) || ( mmode == _3dUP ) ) {
+        return { { FT_Displacements, SO_SymmetricGradient },
+                 { FT_Pressure,      SO_Gradient },
+                 { FT_Pressure,      SO_Value } };
+    }
+    return StateVariableLayout();   // not participating in this mode
+}
+```
+
+**Example (python material).** `PythonMaterial` forwards to a `giveStateVariableIDs(mmode)` on the
+python object, if it defines one; it must return a sequence of `(FieldType, StateOperator)` pairs,
+with both enums exported by the `oofem` module:
+
+```python
+import oofem
+
+class MyMaterial:
+    def giveStateVariableIDs(self, mmode):
+        return [(oofem.FieldType.FT_Displacements, oofem.StateOperator.SO_SymmetricGradient),
+                (oofem.FieldType.FT_Pressure,      oofem.StateOperator.SO_Value),
+                (oofem.FieldType.FT_Pressure2,     oofem.StateOperator.SO_Value)]
+
+    def updateTempState(self, stateVector, gp, tStep, stateDict, tempStateDict):
+        eps = stateVector[0:6]
+        pw, pa = stateVector[6], stateVector[7]
+        ...   # all constitutive work here, results into tempStateDict
+```
+
+A python material that defines `updateTempState` but no `giveStateVariableIDs` advertises an empty
+layout and is therefore never pushed to; one that defines neither is reported at initialization,
+naming what to change.
+
+**Three rules worth knowing.**
+
+* *The layout may depend on the material mode.* It is queried per integration point with that
+  point's mode, so a material can advertise one layout in `_3dUP` and decline in modes it does not
+  implement.
+* *An empty layout means "not participating".* The material keeps its physics-specific entry points
+  and no state is pushed to it. This is the default in `Material`, so existing materials are
+  unaffected.
+* *A cell that cannot supply the whole layout is skipped, not rejected.* A thermo-mechanical
+  material driven for the thermal sub-problem alone has no displacement field to push, and a
+  material record may sit on a cell whose terms only ask for constants. Partial states are never
+  pushed, since they would be positionally ambiguous. A later query that does need the missing
+  value reports that it is unset rather than returning stale data.
+
+For a field to be available at all, some term on the cell must name it as its **unknown**
+`variable`; test functions are excluded via `dualto` (section 3). The design rationale for the
+(field, operator) split and the push/pull contract is in
+[unified_material_interface.md](unified_material_interface.md).
+
 ## 7. Examples
 
 ### Example 1: Deviatoric Stress Term (Solid Mechanics)

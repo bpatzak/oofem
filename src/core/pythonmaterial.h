@@ -106,7 +106,7 @@ public:
     /**
      * Forwards to the python object's giveStateVariableIDs, if it defines one; returns an empty
      * layout otherwise, meaning the material does not advertise one. The python side returns a
-     * sequence of (DofIDItem, StateOperator) pairs.
+     * sequence of (FieldType, StateOperator) pairs.
      */
     StateVariableLayout giveStateVariableIDs(MaterialMode mmode) const override;
 
