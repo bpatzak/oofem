@@ -52,8 +52,10 @@ Describes a variable, that is a field appearing in the weak form.
 :param:`quantity{et}`
     What the variable physically is, as a ``FieldType`` value.  Either the name
     or the number may be written, and the ``FT_`` prefix may be dropped — so
-    ``quantity "Temperature"`` and ``quantity 5`` are the same thing.  The
-    values are defined in ``src/core/field.h``:
+    ``quantity "Temperature"`` and ``quantity 5`` are the same thing.  A name
+    has to be **quoted**: names are matched case-sensitively and the parser
+    lower-cases everything outside double quotes.  The values are defined in
+    ``src/core/field.h``:
 
     .. list-table::
        :header-rows: 1
@@ -222,8 +224,7 @@ Supported term types
 
     The expression language — its functions ``Grad_s``, ``Grad``, ``Div``,
     ``N``, ``Sig``, ``Sig_dev``, ``MDer``, ``MVec``, ``MProp`` and the rest, and
-    the full list of attributes — is documented separately in
-    ``doc/symbolic_term.md``.
+    the full list of attributes — is documented in :ref:`SymbolicTermSec`.
 
 .. _IntegralsSec:
 
