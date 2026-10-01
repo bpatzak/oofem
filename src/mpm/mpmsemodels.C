@@ -437,7 +437,7 @@ NonStationaryMPMSProblem :: printOutputAt(FILE *file, TimeStep *tStep)
         sprintf(filename, "time_%lf.csv", t);
         FILE *file1 = fopen(filename, "w");
         fprintf(file1, "t=%lf[s]\nx, pw, pa, T, u\n", t);
-        for ( int i =1; i<= 141; i++) {
+        for ( int i =1; i<= d->giveNumberOfDofManagers(); i++) {
             DofManager *dm = d->giveDofManager(i);
             double x = dm->giveCoordinate(1);
             FloatArray pw,pa,u,T,Sw;
