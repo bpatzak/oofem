@@ -12,10 +12,10 @@ finite element. Nonzero strains read
 
 .. math::
 
-   \varepsilon_{x}=\varepsilon_{r}&=&\frac{\partial u}{\partial x}\\
-   \varepsilon_{y}=\varepsilon_{z}&=&\frac{\partial v}{\partial y}\\
-   \varepsilon_{\theta}&=&\frac{u}{r}\\
-   \gamma_{xy}=\gamma_{rz}&=&\frac{\partial u}{\partial y} + \frac{\partial v}{\partial x}
+   \varepsilon_{x}=\varepsilon_{r}&=\frac{\partial u}{\partial x}\\
+   \varepsilon_{y}=\varepsilon_{z}&=\frac{\partial v}{\partial y}\\
+   \varepsilon_{\theta}&=\frac{u}{r}\\
+   \gamma_{xy}=\gamma_{rz}&=\frac{\partial u}{\partial y} + \frac{\partial v}{\partial x}
 
 Stress components can be computed from elasticity matrix. Note that this matrix
 corresponds to a submatrix of the full 3D elasticity matrix.

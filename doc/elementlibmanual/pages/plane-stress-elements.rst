@@ -472,16 +472,16 @@ displacements at edge midpoint can be expressed as
 
 .. math::
 
-   u_n\vert_{l/2} &=& \del{u_{ni}+u_{nj}}{2}+\del{l}{8}(\omega_i-\omega_j)\\
-   u_t\vert_{l/2} &=& \del{u_{ti}+u_{tj}}{2}
+   u_n\vert_{l/2} &= \del{u_{ni}+u_{nj}}{2}+\del{l}{8}(\omega_i-\omega_j)\\
+   u_t\vert_{l/2} &= \del{u_{ti}+u_{tj}}{2}
 
 where :math:`l` is edge length. This allows to express global displacements in element
 midside nodes using vertex displacements and rotations. For a single edge, one obtains:
 
 .. math::
 
-   u\vert_{l/2} &=&-\del{u_{ni}+u_{nj}}{2}+\del{l}{8}(\omega_i-\omega_j)\del{\Delta y_{ji}}{l}+(\del{u_{t1}+u_{t2}}{2})\del{\Delta x_{ji}}{l}\\
-   v\vert_{l/2} &=& \del{u_{ni}+u_{nj}}{2}+\del{l}{8}(\omega_i-\omega_j)\del{\Delta x_{ji}}{l}+(\del{u_{t1}+u_{t2}}{2})\del{\Delta y_{ji}}{l}\\
+   u\vert_{l/2} &=-\del{u_{ni}+u_{nj}}{2}+\del{l}{8}(\omega_i-\omega_j)\del{\Delta y_{ji}}{l}+(\del{u_{t1}+u_{t2}}{2})\del{\Delta x_{ji}}{l}\\
+   v\vert_{l/2} &= \del{u_{ni}+u_{nj}}{2}+\del{l}{8}(\omega_i-\omega_j)\del{\Delta x_{ji}}{l}+(\del{u_{t1}+u_{t2}}{2})\del{\Delta y_{ji}}{l}\\
 
 .. table:: trplanestressrotallman element summary
    :name: TrPlaneStressRotAllmansummary
