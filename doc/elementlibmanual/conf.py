@@ -20,7 +20,7 @@ release = '3.0'
 # provides the "tikz" directive used by the element figures.
 sys.path.insert(0, os.path.abspath(os.path.join('..', '_ext')))
 
-extensions = ['oofemroles', 'oofemtikz', 'oofemmath']
+extensions = ['oofemroles', 'oofemtikz', 'oofemmath', 'oofemlatex']
 
 # The source directory also holds the LaTeX sources and the latex2html output.
 exclude_patterns = [

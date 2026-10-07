@@ -88,6 +88,7 @@ The damage initiation is based on a trial stress. It becomes necessary for highe
 
 .. table:: Orthotropic damage model with fixed crack orientations for composites -- summary
    :name: compdammat_table
+   :widths: 20 94
 
    +--------------------+----------------------------------------------------------------------------------------------+
    | Description        | Orthotropic damage model with fixed crack orientations for composites                        |

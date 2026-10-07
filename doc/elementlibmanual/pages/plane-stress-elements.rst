@@ -50,6 +50,7 @@ in the same plane. The element features are summarized in Table
 
 .. table:: planestress2d element summary
    :name: planestress2dsummary
+   :widths: 26 94
 
    +--------------------------+----------------------------------------------------------------------------------------------+
    | Keyword                  | planestress2d                                                                                |
@@ -106,6 +107,7 @@ in the same plane. The element features are summarized in Table
 
 .. table:: linquad3dplanestress element summary
    :name: linquad3dplanestresssummary
+   :widths: 26 94
 
    +--------------------------+----------------------------------------------------------------------------------------------+
    | Keyword                  | linquad3dplanestress                                                                         |
@@ -181,6 +183,7 @@ explained in fig. (:ref:`qplanstrssfig`). The element features are summarized in
 
 .. table:: qplanestress2d element summary
    :name: qplanestress2dsummary
+   :widths: 26 94
 
    +--------------------------+----------------------------------------------------------------------------------------------+
    | Keyword                  | qplanestress2d                                                                               |
@@ -248,6 +251,7 @@ features are summarized in :numref:`trplanestress2dsummary`.
 
 .. table:: trplanestress2d element summary
    :name: trplanestress2dsummary
+   :widths: 26 94
 
    +--------------------------+----------------------------------------------------------------------------------------------+
    | Keyword                  | trplanestress2d                                                                              |
@@ -320,6 +324,7 @@ degrees of freedom. Node numbering is anti-clockwise and is shown in fig.
 
 .. table:: qtrplstr element summary
    :name: qtrplstrsummary
+   :widths: 26 94
 
    +--------------------------+----------------------------------------------------------------------------------------------+
    | Keyword                  | qtrplstr                                                                                     |
@@ -345,7 +350,7 @@ degrees of freedom. Node numbering is anti-clockwise and is shown in fig.
    +--------------------------+----------------------------------------------------------------------------------------------+
    | Nlgeo                    | 0, 1.                                                                                        |
    +--------------------------+----------------------------------------------------------------------------------------------+
-   | Status                   | -                                                                                            |
+   | Status                   | \-                                                                                           |
    +--------------------------+----------------------------------------------------------------------------------------------+
    | Tests/Examples           | `sm/patch140.in                                                                              |
    |                          | <https://github.com/oofem/oofem/blob/devel/tests/regression/sm/patch140.in>`_ (and 1 more)   |
@@ -379,6 +384,7 @@ is elasticity modulus in shear.
 
 .. table:: trplanestrrot element summary
    :name: trplanestrrotsummary
+   :widths: 26 94
 
    +--------------------------+----------------------------------------------------------------------------------------------+
    | Keyword                  | trplanestrrot                                                                                |
@@ -400,15 +406,15 @@ is elasticity modulus in shear.
    |                          | with rotational field integration using 1 point is default (4 and 7 points rules can be      |
    |                          | specified using :param:`NIPRot` parameter).                                                  |
    +--------------------------+----------------------------------------------------------------------------------------------+
-   | Features                 | -                                                                                            |
+   | Features                 | \-                                                                                           |
    +--------------------------+----------------------------------------------------------------------------------------------+
    | CS properties            | Cross section thickness is required.                                                         |
    +--------------------------+----------------------------------------------------------------------------------------------+
-   | Loads                    | -                                                                                            |
+   | Loads                    | \-                                                                                           |
    +--------------------------+----------------------------------------------------------------------------------------------+
    | Nlgeo                    | 0.                                                                                           |
    +--------------------------+----------------------------------------------------------------------------------------------+
-   | Status                   | -                                                                                            |
+   | Status                   | \-                                                                                           |
    +--------------------------+----------------------------------------------------------------------------------------------+
    | Tests/Examples           | `sm/patch150.in                                                                              |
    |                          | <https://github.com/oofem/oofem/blob/devel/tests/regression/sm/patch150.in>`_                |
@@ -416,6 +422,7 @@ is elasticity modulus in shear.
 
 .. table:: trplanestrrot3d element summary
    :name: trplanestrrot3dsummary
+   :widths: 26 94
 
    +--------------------------+----------------------------------------------------------------------------------------------+
    | Keyword                  | trplanestrrot3d                                                                              |
@@ -438,15 +445,15 @@ is elasticity modulus in shear.
    |                          | with rotational field integration using 1 point is default (4 and 7 points rules can be      |
    |                          | specified using :param:`NIPRot` parameter).                                                  |
    +--------------------------+----------------------------------------------------------------------------------------------+
-   | Features                 | -                                                                                            |
+   | Features                 | \-                                                                                           |
    +--------------------------+----------------------------------------------------------------------------------------------+
    | CS properties            | Cross section thickness is required.                                                         |
    +--------------------------+----------------------------------------------------------------------------------------------+
-   | Loads                    | -                                                                                            |
+   | Loads                    | \-                                                                                           |
    +--------------------------+----------------------------------------------------------------------------------------------+
    | Nlgeo                    | 0.                                                                                           |
    +--------------------------+----------------------------------------------------------------------------------------------+
-   | Status                   | -                                                                                            |
+   | Status                   | \-                                                                                           |
    +--------------------------+----------------------------------------------------------------------------------------------+
 
 TrPlaneStressRotAllman
@@ -485,6 +492,7 @@ midside nodes using vertex displacements and rotations. For a single edge, one o
 
 .. table:: trplanestressrotallman element summary
    :name: TrPlaneStressRotAllmansummary
+   :widths: 26 94
 
    +--------------------------+----------------------------------------------------------------------------------------------+
    | Keyword                  | trplanestressrotallman                                                                       |
@@ -500,15 +508,15 @@ midside nodes using vertex displacements and rotations. For a single edge, one o
    | Zero energy mode         | The zero energy mode (equal rotations) is handled by adding additional energy term           |
    |                          | preventing spurious modes.                                                                   |
    +--------------------------+----------------------------------------------------------------------------------------------+
-   | Features                 | -                                                                                            |
+   | Features                 | \-                                                                                           |
    +--------------------------+----------------------------------------------------------------------------------------------+
    | CS properties            | Cross section thickness is required.                                                         |
    +--------------------------+----------------------------------------------------------------------------------------------+
-   | Loads                    | -                                                                                            |
+   | Loads                    | \-                                                                                           |
    +--------------------------+----------------------------------------------------------------------------------------------+
    | Nlgeo                    | 0.                                                                                           |
    +--------------------------+----------------------------------------------------------------------------------------------+
-   | Status                   | -                                                                                            |
+   | Status                   | \-                                                                                           |
    +--------------------------+----------------------------------------------------------------------------------------------+
    | Tests/Examples           | `sm/patch108.in                                                                              |
    |                          | <https://github.com/oofem/oofem/blob/devel/tests/regression/sm/patch108.in>`_, `sm/beam44.in |
@@ -517,6 +525,7 @@ midside nodes using vertex displacements and rotations. For a single edge, one o
 
 .. table:: trplanestressrotallman3d element summary
    :name: trplanestressrotallman3dsummary
+   :widths: 26 94
 
    +--------------------------+----------------------------------------------------------------------------------------------+
    | Keyword                  | trplanestressrotallman3d                                                                     |
@@ -532,13 +541,13 @@ midside nodes using vertex displacements and rotations. For a single edge, one o
    | Zero energy mode         | The zero energy mode (equal rotations) is handled by adding additional energy term           |
    |                          | preventing spurious modes.                                                                   |
    +--------------------------+----------------------------------------------------------------------------------------------+
-   | Features                 | -                                                                                            |
+   | Features                 | \-                                                                                           |
    +--------------------------+----------------------------------------------------------------------------------------------+
    | CS properties            | Cross section thickness is required.                                                         |
    +--------------------------+----------------------------------------------------------------------------------------------+
-   | Loads                    | -                                                                                            |
+   | Loads                    | \-                                                                                           |
    +--------------------------+----------------------------------------------------------------------------------------------+
    | Nlgeo                    | 0.                                                                                           |
    +--------------------------+----------------------------------------------------------------------------------------------+
-   | Status                   | -                                                                                            |
+   | Status                   | \-                                                                                           |
    +--------------------------+----------------------------------------------------------------------------------------------+

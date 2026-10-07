@@ -27,6 +27,7 @@ The model description and parameters are summarized in :numref:`LSmasterMat_tabl
 
 .. table:: Large-strain master material material - summary.
    :name: LSmasterMat_table
+   :widths: 20 94
 
    +--------------------+----------------------------------------------------------------------------------------------+
    | Description        | Large-strain master material material                                                        |

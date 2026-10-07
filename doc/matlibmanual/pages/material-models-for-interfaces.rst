@@ -40,6 +40,7 @@ Shear stiffness remains constant during all possible loadings and there is no in
 
 .. table:: Cohesive interface material -- summary.
    :name: cohint_table
+   :widths: 20 94
 
    +--------------------+----------------------------------------------------------------------------------------------+
    | Description        | Cohesive interface material                                                                  |
@@ -112,6 +113,7 @@ The model description and parameters are summarized in :numref:`simpleinterfacem
 
 .. table:: Simple interface material
    :name: simpleinterfacemat_table
+   :widths: 20 94
 
    +--------------------+----------------------------------------------------------------------------------------------+
    | Description        | Simple interface material                                                                    |
@@ -184,6 +186,7 @@ Model description and the input parameters are summarized in :numref:`bondceb_ta
 
 .. table:: Bond-slip model for reinforced concrete -- summary.
    :name: bondceb_table
+   :widths: 20 94
 
    +--------------------+----------------------------------------------------------------------------------------------+
    | Description        | Bond-slip model for reinforced concrete                                                      |
@@ -228,6 +231,7 @@ There are three types of constitutive relations supported which are shown in :re
 
 .. table:: Slip model for truss and beam elements -- summary
    :name: linkslip_table
+   :widths: 20 94
 
    +--------------------+----------------------------------------------------------------------------------------------+
    | Description        | Slip model                                                                                   |

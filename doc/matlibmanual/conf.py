@@ -22,7 +22,7 @@ release = '3.0'
 # \descitem, ...).
 sys.path.insert(0, os.path.abspath(os.path.join('..', '_ext')))
 
-extensions = ['oofemroles', 'oofemmath']
+extensions = ['oofemroles', 'oofemmath', 'oofemlatex']
 
 # The source directory also holds the LaTeX sources and the latex2html output,
 # so keep the builder away from everything that is not part of this manual.

@@ -55,6 +55,7 @@ element length in the form of strains. The element is defined in x,y plane (see 
 
 .. table:: lattice2d element summary
    :name: lattice2dsummary
+   :widths: 26 94
 
    +--------------------------+----------------------------------------------------------------------------------------------+
    | Keyword                  | lattice2d                                                                                    |
@@ -114,6 +115,7 @@ this element in addition to those used for lattice2d are shown in Table
 
 .. table:: latticeboundary2D element summary
    :name: latticeboundary2D summary
+   :widths: 26 94
 
    +--------------------------+----------------------------------------------------------------------------------------------+
    | Keyword                  | latticeboundary2D                                                                            |
@@ -157,6 +159,7 @@ parameters for this element are shown in :numref:`lattice3dsummary`.
 
 .. table:: lattice3d element summary
    :name: lattice3dsummary
+   :widths: 26 94
 
    +--------------------------+----------------------------------------------------------------------------------------------+
    | Keyword                  | lattice3d                                                                                    |
@@ -231,6 +234,7 @@ provided in the form of a location parameter as shown in Table
 
 .. table:: lattice3dboundary element summary
    :name: lattice3dboundarysummary
+   :widths: 26 94
 
    +--------------------------+----------------------------------------------------------------------------------------------+
    | Keyword                  | lattice3dboundary                                                                            |
@@ -269,6 +273,7 @@ parameters for this element are shown in :numref:`latticelink3dsummary`.
 
 .. table:: latticelink3d element summary
    :name: latticelink3dsummary
+   :widths: 26 94
 
    +--------------------------+----------------------------------------------------------------------------------------------+
    | Keyword                  | latticelink3d                                                                                |
@@ -305,6 +310,7 @@ element in addition of those for latticelink3d are shown in Table
 
 .. table:: latticelink3dboundary element summary
    :name: latticelink3dboundarysummary
+   :widths: 26 94
 
    +--------------------------+----------------------------------------------------------------------------------------------+
    | Keyword                  | latticelink3dboundary                                                                        |
@@ -336,6 +342,7 @@ vectors for rotation about a single axis.
 
 .. table:: lattice3dnl element summary
    :name: lattice3dnlsummary
+   :widths: 26 94
 
    +--------------------------+----------------------------------------------------------------------------------------------+
    | Keyword                  | lattice3dnl                                                                                  |
