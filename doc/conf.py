@@ -28,7 +28,7 @@ html_theme_options=dict(
     external_links=[
         {'name':'Element Library','url':'http://www.oofem.org/resources/doc/elementlibmanual/html/elementlibmanual.html'},
         {'name':'Material Library','url':'http://www.oofem.org/resources/doc/matlibmanual/html/matlibmanual.html'},
-        {'name':'Extractor','url':'http://www.oofem.org/resources/doc/extractorInput/html/extractorInput.html'},
+        {'name':'Extractor','url':'http://www.oofem.org/resources/doc/extractorInput/html/index.html'},
         {'name':'C++ reference','url':'http://www.oofem.org/resources/doc/oofemrefman/index.html'},
     ],
     icon_links=[
