@@ -41,9 +41,14 @@ however, must be made available under the LGPL.
 
 .. |copy| unicode:: 0xA9 .. copyright sign
 
-Indices and tables
-==================
+.. The index and search pages exist in the HTML only; in the PDF this would be
+   an empty chapter.
 
-* :ref:`genindex`
-* :ref:`search`
+.. only:: html
+
+   Indices and tables
+   ==================
+
+   * :ref:`genindex`
+   * :ref:`search`
 

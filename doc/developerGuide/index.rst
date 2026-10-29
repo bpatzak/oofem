@@ -28,10 +28,15 @@ Version: |version|
 
    about
 
-Indices and tables
-==================
+.. The index and search pages exist in the HTML only; in the PDF this would be
+   an empty chapter.
 
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+.. only:: html
+
+   Indices and tables
+   ==================
+
+   * :ref:`genindex`
+   * :ref:`modindex`
+   * :ref:`search`
  
