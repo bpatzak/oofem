@@ -147,14 +147,16 @@ Settings that must be the same in every manual live in one place, so that they
 cannot drift apart between manuals:
 
   global_conf.py   Project metadata (author, version, copyright) and the shared
-                   HTML and figure-conversion settings.  A manual picks these
-                   up with "from global_conf import *".
+                   HTML and figure-conversion settings, including the HTML
+                   theme: every manual uses alabaster with the same options and
+                   sidebar.  A manual picks these up with
+                   "from global_conf import *" and must not set html_theme or
+                   html_theme_options itself.
 
   _static/oofem.css
                    The stylesheet shared by every manual.  This is where the
-                   page width and the figure sizing are defined, for all the
-                   themes the manuals use.  Do not set page_width or
-                   body_max_width in a manual's html_theme_options: the
+                   page width and the figure sizing are defined.  Do not set
+                   page_width or body_max_width in html_theme_options: the
                    stylesheet loads after the theme and would override them.
 
   _ext/oofemroles.py

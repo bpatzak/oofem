@@ -19,6 +19,20 @@ rst_epilog = f"""
 
 # -- Shared HTML presentation -------------------------------------------------
 #
+# Every manual uses the alabaster theme, so they look and navigate alike.  Do
+# not set html_theme or html_theme_options in a manual; anything a manual needs
+# on top of these should extend the dict rather than replace it.
+html_theme = 'alabaster'
+html_theme_options = {
+    'sidebar_width': '250px',
+    'show_relbar_bottom': True,
+}
+# alabaster's default sidebar, listed explicitly so that every manual shows the
+# same one: title, global table of contents, prev/next links and search.
+html_sidebars = {
+    '**': ['about.html', 'navigation.html', 'relations.html', 'searchbox.html'],
+}
+
 # doc/_static/oofem.css is the single place where the page width and the figure
 # sizing are defined, for every manual and every theme.  A manual that needs
 # static directories of its own must keep '../_static' among them, so that the
