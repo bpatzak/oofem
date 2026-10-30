@@ -18,7 +18,7 @@ DOXYGEN_MANUALS = refman
 
 # Only these define a www-install target of their own.
 WWW_MANUALS = oofemInput usermanual theorymanual2 developerGuide \
-              extractorInput $(DOXYGEN_MANUALS)
+              extractorInput elementlibmanual matlibmanual $(DOXYGEN_MANUALS)
 
 .PHONY: sphinx-html html pdf www-install clean
 
