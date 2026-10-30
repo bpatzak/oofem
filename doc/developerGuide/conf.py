@@ -36,5 +36,6 @@ master_doc = 'index'
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = 'classic'
+# The theme (alabaster), the page width and the figure sizing come from
+# global_conf.py and doc/_static/oofem.css; do not set them per manual here.
 html_static_path = ['../_static']
