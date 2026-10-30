@@ -32,8 +32,7 @@ Version: |version|, Date: |today|
 
 .. only:: html
 
-   Indices and tables
-   ==================
+   .. rubric:: Indices and tables
 
    * :ref:`genindex`
    * :ref:`modindex`

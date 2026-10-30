@@ -31,8 +31,7 @@ tests; :doc:`errorcheck` lists the differences.
 
 .. only:: html
 
-   Indices and tables
-   ==================
+   .. rubric:: Indices and tables
 
    * :ref:`genindex`
    * :ref:`search`

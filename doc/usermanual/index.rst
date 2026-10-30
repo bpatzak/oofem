@@ -33,8 +33,7 @@ welcome on the `OOFEM forum <https://www.oofem.org/forum/>`_.
 
 .. only:: html
 
-   Indices and tables
-   ==================
+   .. rubric:: Indices and tables
 
    * :ref:`genindex`
    * :ref:`modindex`

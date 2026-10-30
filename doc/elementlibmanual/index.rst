@@ -46,8 +46,7 @@ however, must be made available under the LGPL.
 
 .. only:: html
 
-   Indices and tables
-   ==================
+   .. rubric:: Indices and tables
 
    * :ref:`genindex`
    * :ref:`search`
