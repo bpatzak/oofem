@@ -4,8 +4,9 @@ export ROBOT = /usr/bin/perl -I/home/bp/oofem-doc/www/en /home/bp/oofem-doc/www/
 # The manuals are Sphinx projects.  Sphinx has no "pdf" builder, so the
 # pdf target builds the LaTeX sources and then runs all-pdf in them, which is
 # the same as "make latex; make all-pdf" by hand in a manual directory.
+# python is a symlink to bindings/python/docs, where the bindings manual lives.
 SPHINX_MANUALS = oofemInput usermanual theorymanual2 developerGuide \
-                 matlibmanual elementlibmanual extractorInput
+                 matlibmanual elementlibmanual extractorInput python
 
 # paper-actap is a conference paper rather than part of the documentation set,
 # and it still uses latex2html constructs (\begin{htmlonly}), so pdflatex stops
@@ -18,7 +19,8 @@ DOXYGEN_MANUALS = refman
 
 # Only these define a www-install target of their own.
 WWW_MANUALS = oofemInput usermanual theorymanual2 developerGuide \
-              extractorInput elementlibmanual matlibmanual $(DOXYGEN_MANUALS)
+              extractorInput elementlibmanual matlibmanual python \
+              $(DOXYGEN_MANUALS)
 
 .PHONY: sphinx-html html pdf www-install clean
 
