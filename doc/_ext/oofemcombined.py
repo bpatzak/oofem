@@ -72,3 +72,29 @@ def collect(manuals, root='.'):
             excludes.append(manual + '/' + pattern)
 
     return extensions, macros, excludes
+
+
+def connect_substitutions(app, manuals, author, copyright, root='.'):
+    """Give the pages of each manual its own ``|author|`` and ``|copyright|``.
+
+    A standalone build appends them through ``rst_epilog`` (see
+    ``global_conf.setup``), but the combined site has a single ``rst_epilog``,
+    which would show one author list in every manual.  Instead the manual's
+    substitutions are appended to each of its ``.rst`` pages as they are read.
+    ``author`` and ``copyright`` are used for a manual that does not set its
+    own.
+    """
+    from global_conf import substitutions
+
+    text = {}
+    for manual in manuals:
+        conf = _literals(os.path.join(root, manual, 'conf.py'))
+        text[manual] = substitutions(conf.get('author', author),
+                                     conf.get('copyright', copyright))
+
+    def _source_read(app, docname, source):
+        manual = docname.split('/', 1)[0]
+        if manual in text and str(app.env.doc2path(docname)).endswith('.rst'):
+            source[0] += text[manual]
+
+    app.connect('source-read', _source_read)

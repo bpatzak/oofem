@@ -11,11 +11,23 @@ author = 'Bořek Patzák, Martin Horák, Vít Šmilauer, Milan Jirásek, et al.'
 release = '3.0'
 version = '3.0'
 
-# Inject into all .rst files as a substitution
-rst_epilog = f"""
-.. |author| replace:: {author}
-.. |copyright| replace:: {copyright}
-"""
+
+def substitutions(author, copyright):
+    """The |author| and |copyright| substitutions, as reST source."""
+    return (f"\n.. |author| replace:: {author}\n"
+            f".. |copyright| replace:: {copyright}\n")
+
+
+# |author| and |copyright| are appended to every .rst file once the
+# configuration is final, rather than fixed here: a manual that sets its own
+# author after "from global_conf import *" (the library manuals do) would
+# otherwise show the generic list above.  The "from global_conf import *" in a
+# manual's conf.py brings this setup() along, and Sphinx calls it.
+def setup(app):
+    def _epilog(app, config):
+        config.rst_epilog = ((config.rst_epilog or '')
+                             + substitutions(config.author, config.copyright))
+    app.connect('config-inited', _epilog)
 
 # -- Shared HTML presentation -------------------------------------------------
 #

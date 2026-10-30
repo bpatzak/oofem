@@ -16,7 +16,8 @@ sys.path.insert(0, os.path.abspath('_ext'))
 
 # Shared settings: the alabaster theme, the stylesheet, numfig.
 from global_conf import *
-from oofemcombined import collect
+import global_conf
+from oofemcombined import collect, connect_substitutions
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
@@ -39,6 +40,14 @@ myst_enable_extensions=['attrs_inline','linkify','colon_fence']
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store'] + _excludes
+
+
+# Replaces the setup() imported from global_conf: its single rst_epilog would
+# give every manual the same |author|.  Each manual's pages get that manual's
+# own author instead, or global_conf's for a manual that sets none.
+def setup(app):
+    connect_substitutions(app, MANUALS, global_conf.author,
+                          global_conf.copyright)
 
 #breathe_projects={'oofem':'refman/xml/'}
 #breathe_default_project='oofem'
