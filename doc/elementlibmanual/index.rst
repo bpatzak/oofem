@@ -1,7 +1,9 @@
 OOFEM Element Library Manual
 ############################
 
-Version:
+Authors: |author|
+
+Version: |version|, Date: |today|
 
 This manual is part of `OOFEM <https://oofem.org>`_, a parallel,
 object-oriented finite element solver for mechanical, transport and fluid

@@ -20,7 +20,7 @@ from global_conf import *
 
 # -- Project information -----------------------------------------------------
 
-project = 'OOFEM Python bindings'
+project = 'OOFEM Python Bindings'
 
 # -- General configuration ---------------------------------------------------
 

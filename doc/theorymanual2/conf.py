@@ -22,7 +22,7 @@ from global_conf import *
 
 # -- Project information -----------------------------------------------------
 
-project = 'OOFEM Theory manual'
+project = 'OOFEM Theory Manual'
 
 # -- General configuration ---------------------------------------------------
 
