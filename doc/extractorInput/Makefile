@@ -18,7 +18,7 @@ help:
 www-install:
 ifdef INSTALLDIR
 	cd _build/html; $(RCP) -r . $(INSTALLDIR)/resources/doc/extractorInput
-	cd _build; $(RCP) -r latex/oofemextractormanual.pdf $(INSTALLDIR)/resources/doc/extractorInput
+	cd _build; $(RCP) -r latex/oofemextractormanual.pdf $(INSTALLDIR)/resources/doc/extractorInput/extractorInput.pdf
 else
 	echo "INSTALLDIR not defined"
 endif
