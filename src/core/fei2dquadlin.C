@@ -81,17 +81,7 @@ std::pair<double, FloatMatrixF<2,4>>
 FEI2dQuadLin :: evaldNdx(const FloatArrayF<2> &lcoords, const FEICellGeometry &cellgeo) const
 {
     auto dndu = this->evaldNdxi(lcoords);
-
-    FloatMatrixF<2,2> jacT;
-    for ( std::size_t i = 0; i < dndu.cols(); i++ ) {
-        double x = cellgeo.giveVertexCoordinates(i+1).at(xind);
-        double y = cellgeo.giveVertexCoordinates(i+1).at(yind);
-
-        jacT(0, 0) += dndu(0, i) * x;
-        jacT(0, 1) += dndu(0, i) * y;
-        jacT(1, 0) += dndu(1, i) * x;
-        jacT(1, 1) += dndu(1, i) * y;
-    }
+    auto jacT = giveJacobianTransposed(dndu, cellgeo);
     return {det(jacT), dot(inv(jacT), dndu)};
 }
 
