@@ -172,20 +172,40 @@ std::pair<double, FloatMatrixF<2,9>>
 FEI2dQuadBiQuad :: _evaldNdx(const FloatArrayF<2> &lcoords, const FEICellGeometry &cellgeo) const
 {
     auto dn = evaldNdxi(lcoords);
-    FloatMatrixF<2,2> jacT;
-    for ( std::size_t i = 1; i <= dn.cols(); i++ ) {
-        const auto &c = cellgeo.giveVertexCoordinates(i);
-        double x = c.at(xind);
-        double y = c.at(yind);
-
-        ///@todo check transpose
-        jacT(0, 0) += dn.at(1, i) * x;
-        jacT(0, 1) += dn.at(1, i) * y;
-        jacT(1, 0) += dn.at(2, i) * x;
-        jacT(1, 1) += dn.at(2, i) * y;
-    }
-
+    auto jacT = giveJacobianTransposed(dn, cellgeo);
     return {det(jacT), dot(inv(jacT), dn)};
+}
+
+
+double
+FEI2dQuadBiQuad :: evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
+{
+    // A cell with a different geometry interpolation (e.g. MPM cells) is handled by the generic FEI2dQuadQuad version.
+    const FEInterpolation *geoInterp = cellgeo.getGeometryInterpolation();
+    if ( geoInterp && geoInterp != this ) {
+        return FEI2dQuadQuad :: evaldNdx(answer, lcoords, cellgeo);
+    }
+    // Own fixed size kernel (the FEI2dQuadQuad one works with 8 nodes only). It returns dN/dx
+    // transposed (2x9), while this interface expects one row per node (9x2).
+    auto tmp = _evaldNdx(lcoords, cellgeo);
+    answer = transpose(tmp.second);
+    return tmp.first;
+}
+
+
+void
+FEI2dQuadBiQuad :: giveJacobianMatrixAt(FloatMatrix &jacobianMatrix, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
+{
+    // fixed size kernel gives J^T (9 nodes, not inherited from FEI2dQuadQuad)
+    jacobianMatrix = transpose(giveJacobianTransposed(evaldNdxi(lcoords), cellgeo));
+}
+
+
+double
+FEI2dQuadBiQuad :: giveTransformationJacobian(const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
+{
+    // Only det(J) is needed, evaluated by the fixed size kernel (9 nodes, not inherited from FEI2dQuadQuad).
+    return det(giveJacobianTransposed(evaldNdxi(lcoords), cellgeo));
 }
 
 
