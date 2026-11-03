@@ -194,11 +194,7 @@ std::pair<double, FloatMatrixF<3,15>>
 FEI3dWedgeQuad :: evaldNdx(const FloatArrayF<3> &lcoords, const FEICellGeometry &cellgeo)
 {
     auto dNduvw = evaldNdxi(lcoords);
-    FloatMatrixF<3,15> coords;
-    for ( int i = 0; i < 15; i++ ) {
-        coords.setColumn(cellgeo.giveVertexCoordinates(i+1), i);
-    }
-    auto jacT = dotT(dNduvw, coords);
+    auto jacT = giveJacobianTransposed(dNduvw, cellgeo);
     return {det(jacT), dot(inv(jacT), dNduvw)};
 }
 
@@ -206,17 +202,11 @@ FEI3dWedgeQuad :: evaldNdx(const FloatArrayF<3> &lcoords, const FEICellGeometry 
 double
 FEI3dWedgeQuad :: evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-    FloatMatrix jacobianMatrix, inv, dNduvw, coords;
-    this->evaldNdxi(dNduvw, lcoords, cellgeo);
-    coords.resize(3, 15);
-    for ( int i = 1; i <= 15; i++ ) {
-        coords.setColumn(cellgeo.giveVertexCoordinates(i), i);
-    }
-    jacobianMatrix.beProductOf(coords, dNduvw);
-    inv.beInverseOf(jacobianMatrix);
-
-    answer.beProductOf(dNduvw, inv);
-    return jacobianMatrix.giveDeterminant();
+    // Evaluated by the fixed size kernel (no FloatMatrix temporaries). The kernel returns dN/dx
+    // transposed (3x15), while this interface expects one row per node (15x3).
+    auto tmp = evaldNdx(lcoords, cellgeo);
+    answer = transpose(tmp.second);
+    return tmp.first;
 }
 
 
