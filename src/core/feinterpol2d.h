@@ -181,6 +181,13 @@ public:
 
 protected:
     /**
+     * Returns the parent coordinates as a fixed size array, for the fixed size kernels.
+     * Only the first two components are taken: callers may pass more (e.g. three area coordinates of
+     * a triangle), which the FloatArrayF conversion would reject in debug builds.
+     */
+    static FloatArrayF< 2 >giveFixedLocalCoordinates(const FloatArray &lcoords) { return { lcoords [ 0 ], lcoords [ 1 ] }; }
+
+    /**
      * Evaluates the transposed jacobian matrix of the mapping from parent to global coordinates,
      * @f$ (J^T)_{ij} = \partial x_j / \partial \xi_i @f$, where x_1, x_2 are the xind, yind global components.
      * Shared fixed size kernel of isoparametric 2d interpolations: the result lives on the stack (no
