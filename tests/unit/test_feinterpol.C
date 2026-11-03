@@ -6,6 +6,8 @@
  * computed here by the generic algorithm from the dynamic evaldNdxi:
  *   J_ij = sum_a x_a,i dN_a/dxi_j,  dN/dx = dN/dxi J^-1,  detJ = det(J).
  * In addition, the consistency conditions sum_a dN_a/dx = 0 and sum_a x_a dN_a/dx = I are checked.
+ * evaldNdxi itself is checked against central differences of evalN, so that N and dN/dxi
+ * implemented separately (e.g. with different node orderings) are caught.
  */
 #include "fei2dquadlin.h"
 #include "fei2dquadquad.h"
@@ -77,6 +79,27 @@ void checkGeometry(const FEInterpolation &interp, const std::vector< Coordinates
     REQUIRE(detRef > 1.e-3);
     jacInv.beInverseOf(jac);
     dNdxRef.beProductOf(dNdxi, jacInv);
+
+    // the reference relies on evaldNdxi: check it against central differences of evalN
+    // (independent of how evaldNdxi is implemented) and the partition of unity
+    FloatArray n, np, nm;
+    interp.evalN(n, lcoords, cellgeo);
+    REQUIRE(n.giveSize() == nn);
+    CHECK_THAT(n.sum(), WithinAbs(1., tol) );
+    const double h = 1.e-5;
+    for ( int j = 1; j <= nsd; j++ ) {
+        FloatArray lp = lcoords, lm = lcoords;
+        lp.at(j) += h;
+        lm.at(j) -= h;
+        interp.evalN(np, lp, cellgeo);
+        interp.evalN(nm, lm, cellgeo);
+        double sum = 0.;
+        for ( int a = 1; a <= nn; a++ ) {
+            CHECK_THAT(dNdxi.at(a, j), WithinAbs( ( np.at(a) - nm.at(a) ) / ( 2. * h ), 1.e-7) );
+            sum += dNdxi.at(a, j);
+        }
+        CHECK_THAT(sum, WithinAbs(0., tol) );
+    }
 
     // evaldNdx
     FloatMatrix dNdx;
