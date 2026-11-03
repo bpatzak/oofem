@@ -182,19 +182,7 @@ std::pair<double, FloatMatrixF<2,8>>
 FEI2dQuadQuad :: evaldNdx(const FloatArrayF<2> &lcoords, const FEICellGeometry &cellgeo) const
 {
     auto dn = evaldNdxi(lcoords);
-    FloatMatrixF<2,2> jacT;
-    for ( std::size_t i = 1; i <= dn.cols(); i++ ) {
-        const auto &c = cellgeo.giveVertexCoordinates(i);
-        double x = c.at(xind);
-        double y = c.at(yind);
-
-        ///@todo check transpose
-        jacT(0, 0) += dn.at(1, i) * x;
-        jacT(0, 1) += dn.at(1, i) * y;
-        jacT(1, 0) += dn.at(2, i) * x;
-        jacT(1, 1) += dn.at(2, i) * y;
-    }
-
+    auto jacT = giveJacobianTransposed(dn, cellgeo);
     return {det(jacT), dot(inv(jacT), dn)};
 }
 
@@ -202,35 +190,24 @@ FEI2dQuadQuad :: evaldNdx(const FloatArrayF<2> &lcoords, const FEICellGeometry &
 double
 FEI2dQuadQuad :: evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-#if 0
-    auto tmp = evaldNdx(lcoords, cellgeo);
-    answer = tmp.second;
-    return tmp.first;
-#else
-    FloatMatrix jacobianMatrix(2, 2), inv, dn;
-
-    this->evaldNdxi(dn, lcoords, cellgeo);
-#if 1
     // The jacobian comes from the geometry interpolation of the cell, which may differ from the receiver
     // (e.g. MPM cells). Cells not wrapping an element (FEIVertexListGeometryWrapper) provide none, use the receiver then.
     const FEInterpolation *geoInterp = cellgeo.getGeometryInterpolation();
-    ( geoInterp ? geoInterp : this )->giveJacobianMatrixAt(jacobianMatrix, lcoords, cellgeo);
-#else
-    for ( int i = 1; i <= dn.giveNumberOfRows(); i++ ) {
-        double x = cellgeo.giveVertexCoordinates(i).at(xind);
-        double y = cellgeo.giveVertexCoordinates(i).at(yind);
-
-        jacobianMatrix.at(1, 1) += dn.at(i, 1) * x;
-        jacobianMatrix.at(1, 2) += dn.at(i, 1) * y;
-        jacobianMatrix.at(2, 1) += dn.at(i, 2) * x;
-        jacobianMatrix.at(2, 2) += dn.at(i, 2) * y;
+    if ( !geoInterp || geoInterp == this ) {
+        // Isoparametric case, evaluated by the fixed size kernel (no FloatMatrix temporaries). The kernel returns
+        // dN/dx transposed (2x8), while this interface expects one row per node (8x2).
+        auto tmp = evaldNdx(lcoords, cellgeo);
+        answer = transpose(tmp.second);
+        return tmp.first;
     }
-#endif
+
+    FloatMatrix jacobianMatrix(2, 2), inv, dn;
+    this->evaldNdxi(dn, lcoords, cellgeo);
+    geoInterp->giveJacobianMatrixAt(jacobianMatrix, lcoords, cellgeo);
     inv.beInverseOf(jacobianMatrix);
 
     answer.beProductOf(dn, inv);
     return jacobianMatrix.giveDeterminant();
-#endif
 }
 
 void
