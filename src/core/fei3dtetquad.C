@@ -185,7 +185,7 @@ FEI3dTetQuad :: evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, const F
 {
     // Evaluated by the fixed size kernel (no FloatMatrix temporaries). The kernel returns dN/dx
     // transposed (3x10), while this interface expects one row per node (10x3).
-    auto tmp = evaldNdx(lcoords, cellgeo);
+    auto tmp = evaldNdx(giveFixedLocalCoordinates(lcoords), cellgeo);
     answer = transpose(tmp.second);
     return tmp.first;
 }
@@ -372,7 +372,7 @@ void
 FEI3dTetQuad :: giveJacobianMatrixAt(FloatMatrix &jacobianMatrix, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
     // fixed size kernel gives J^T
-    jacobianMatrix = transpose(giveJacobianTransposed(evaldNdxi(lcoords), cellgeo));
+    jacobianMatrix = transpose(giveJacobianTransposed(evaldNdxi(giveFixedLocalCoordinates(lcoords)), cellgeo));
 }
 
 double
@@ -380,7 +380,7 @@ FEI3dTetQuad :: giveTransformationJacobian(const FloatArray &lcoords, const FEIC
 {
     // Only det(J) is needed; overridden to bypass the generic path through giveJacobianMatrixAt
     // (FloatMatrix temporaries). Called for every integration point by computeVolumeAround.
-    return det(giveJacobianTransposed(evaldNdxi(lcoords), cellgeo));
+    return det(giveJacobianTransposed(evaldNdxi(giveFixedLocalCoordinates(lcoords)), cellgeo));
 }
 
 

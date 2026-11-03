@@ -187,7 +187,7 @@ FEI2dQuadBiQuad :: evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, cons
     }
     // Own fixed size kernel (the FEI2dQuadQuad one works with 8 nodes only). It returns dN/dx
     // transposed (2x9), while this interface expects one row per node (9x2).
-    auto tmp = _evaldNdx(lcoords, cellgeo);
+    auto tmp = _evaldNdx(giveFixedLocalCoordinates(lcoords), cellgeo);
     answer = transpose(tmp.second);
     return tmp.first;
 }
@@ -197,7 +197,7 @@ void
 FEI2dQuadBiQuad :: giveJacobianMatrixAt(FloatMatrix &jacobianMatrix, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
     // fixed size kernel gives J^T (9 nodes, not inherited from FEI2dQuadQuad)
-    jacobianMatrix = transpose(giveJacobianTransposed(evaldNdxi(lcoords), cellgeo));
+    jacobianMatrix = transpose(giveJacobianTransposed(evaldNdxi(giveFixedLocalCoordinates(lcoords)), cellgeo));
 }
 
 
@@ -205,7 +205,7 @@ double
 FEI2dQuadBiQuad :: giveTransformationJacobian(const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
     // Only det(J) is needed, evaluated by the fixed size kernel (9 nodes, not inherited from FEI2dQuadQuad).
-    return det(giveJacobianTransposed(evaldNdxi(lcoords), cellgeo));
+    return det(giveJacobianTransposed(evaldNdxi(giveFixedLocalCoordinates(lcoords)), cellgeo));
 }
 
 

@@ -74,7 +74,7 @@ FEI2dQuadLin :: evalN(const FloatArrayF<2> &lcoords)
 void
 FEI2dQuadLin :: evalN(FloatArray &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-    answer = evalN({lcoords[0], lcoords[1]});
+    answer = evalN(giveFixedLocalCoordinates(lcoords));
 }
 
 std::pair<double, FloatMatrixF<2,4>>
@@ -88,7 +88,7 @@ FEI2dQuadLin :: evaldNdx(const FloatArrayF<2> &lcoords, const FEICellGeometry &c
 double
 FEI2dQuadLin :: evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-    auto tmp = evaldNdx(lcoords, cellgeo);
+    auto tmp = evaldNdx(giveFixedLocalCoordinates(lcoords), cellgeo);
     answer = transpose(tmp.second);
     return tmp.first;
 }
@@ -97,7 +97,7 @@ void
 FEI2dQuadLin :: giveJacobianMatrixAt(FloatMatrix &jacobianMatrix, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
     // fixed size kernel gives J^T; replaces the generic FEInterpolation2d version (FloatMatrix temporaries)
-    jacobianMatrix = transpose(giveJacobianTransposed(evaldNdxi(lcoords), cellgeo));
+    jacobianMatrix = transpose(giveJacobianTransposed(evaldNdxi(giveFixedLocalCoordinates(lcoords)), cellgeo));
 }
 
 double
@@ -105,7 +105,7 @@ FEI2dQuadLin :: giveTransformationJacobian(const FloatArray &lcoords, const FEIC
 {
     // Only det(J) is needed; overridden to bypass the generic path through giveJacobianMatrixAt.
     // Called for every integration point by computeVolumeAround (also by FEI2dQuadLinAxi).
-    return det(giveJacobianTransposed(evaldNdxi(lcoords), cellgeo));
+    return det(giveJacobianTransposed(evaldNdxi(giveFixedLocalCoordinates(lcoords)), cellgeo));
 }
 
 void

@@ -156,7 +156,7 @@ FEI3dWedgeLin :: evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, const 
 {
     // Evaluated by the fixed size kernel (no FloatMatrix temporaries). The kernel returns dN/dx
     // transposed (3x6), while this interface expects one row per node (6x3).
-    auto tmp = evaldNdx(lcoords, cellgeo);
+    auto tmp = evaldNdx(giveFixedLocalCoordinates(lcoords), cellgeo);
     answer = transpose(tmp.second);
     return tmp.first;
 }
@@ -246,7 +246,7 @@ double
 FEI3dWedgeLin :: giveTransformationJacobian(const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
     // Only det(J) is needed, evaluated by the fixed size kernel (no FloatMatrix temporaries).
-    return det(giveJacobianTransposed(evaldNdxi(lcoords), cellgeo));
+    return det(giveJacobianTransposed(evaldNdxi(giveFixedLocalCoordinates(lcoords)), cellgeo));
 }
 
 
@@ -255,7 +255,7 @@ FEI3dWedgeLin :: giveJacobianMatrixAt(FloatMatrix &jacobianMatrix, const FloatAr
 // Returns the jacobian matrix  J (x,y,z)/(ksi,eta,dzeta)  of the receiver.
 {
     // fixed size kernel gives J^T
-    jacobianMatrix = transpose(giveJacobianTransposed(evaldNdxi(lcoords), cellgeo));
+    jacobianMatrix = transpose(giveJacobianTransposed(evaldNdxi(giveFixedLocalCoordinates(lcoords)), cellgeo));
 }
 
 

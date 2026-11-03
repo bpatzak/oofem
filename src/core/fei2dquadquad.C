@@ -196,7 +196,7 @@ FEI2dQuadQuad :: evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, const 
     if ( !geoInterp || geoInterp == this ) {
         // Isoparametric case, evaluated by the fixed size kernel (no FloatMatrix temporaries). The kernel returns
         // dN/dx transposed (2x8), while this interface expects one row per node (8x2).
-        auto tmp = evaldNdx(lcoords, cellgeo);
+        auto tmp = evaldNdx(giveFixedLocalCoordinates(lcoords), cellgeo);
         answer = transpose(tmp.second);
         return tmp.first;
     }
@@ -215,7 +215,7 @@ FEI2dQuadQuad :: giveJacobianMatrixAt(FloatMatrix &jacobianMatrix, const FloatAr
 {
     // fixed size kernel gives J^T; replaces the generic FEInterpolation2d version (FloatMatrix temporaries).
     // 8 nodes only, FEI2dQuadBiQuad has its own version.
-    jacobianMatrix = transpose(giveJacobianTransposed(evaldNdxi(lcoords), cellgeo));
+    jacobianMatrix = transpose(giveJacobianTransposed(evaldNdxi(giveFixedLocalCoordinates(lcoords)), cellgeo));
 }
 
 double
@@ -223,7 +223,7 @@ FEI2dQuadQuad :: giveTransformationJacobian(const FloatArray &lcoords, const FEI
 {
     // Only det(J) is needed; overridden to bypass the generic path through giveJacobianMatrixAt.
     // Called for every integration point by computeVolumeAround (also by FEI2dQuadQuadAxi).
-    return det(giveJacobianTransposed(evaldNdxi(lcoords), cellgeo));
+    return det(giveJacobianTransposed(evaldNdxi(giveFixedLocalCoordinates(lcoords)), cellgeo));
 }
 
 void
