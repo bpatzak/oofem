@@ -319,10 +319,8 @@ double FEI3dWedgeQuad :: giveCharacteristicLength(const FEICellGeometry &cellgeo
 double
 FEI3dWedgeQuad :: giveTransformationJacobian(const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-    FloatMatrix jacobianMatrix;
-
-    this->giveJacobianMatrixAt(jacobianMatrix, lcoords, cellgeo);
-    return jacobianMatrix.giveDeterminant();
+    // Only det(J) is needed, evaluated by the fixed size kernel (no FloatMatrix temporaries).
+    return det(giveJacobianTransposed(evaldNdxi(lcoords), cellgeo));
 }
 
 
@@ -330,13 +328,8 @@ void
 FEI3dWedgeQuad :: giveJacobianMatrixAt(FloatMatrix &jacobianMatrix, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 // Returns the jacobian matrix  J (x,y,z)/(ksi,eta,dzeta)  of the receiver.
 {
-    FloatMatrix dNduvw, coords;
-    this->evaldNdxi(dNduvw, lcoords, cellgeo);
-    coords.resize(3, 15);
-    for ( int i = 1; i <= 15; i++ ) {
-        coords.setColumn(cellgeo.giveVertexCoordinates(i), i);
-    }
-    jacobianMatrix.beProductOf(coords, dNduvw);
+    // fixed size kernel gives J^T
+    jacobianMatrix = transpose(giveJacobianTransposed(evaldNdxi(lcoords), cellgeo));
 }
 
 
