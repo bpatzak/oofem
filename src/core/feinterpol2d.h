@@ -192,6 +192,10 @@ protected:
      * @f$ (J^T)_{ij} = \partial x_j / \partial \xi_i @f$, where x_1, x_2 are the xind, yind global components.
      * Shared fixed size kernel of isoparametric 2d interpolations: the result lives on the stack (no
      * FloatMatrix temporaries) and each vertex is requested from cellgeo only once.
+     * The fixed size paths built on it assume an isoparametric cell, i.e. the first N vertices of cellgeo
+     * are the nodes of the receiver. Only FEI2dQuadQuad and FEI2dQuadBiQuad::evaldNdx consult
+     * cellgeo.getGeometryInterpolation() and defer to it when it differs (MPM cells with a quadratic
+     * field on a linear geometry).
      * @param dNdxi Derivatives of shape functions with respect to parent coordinates, dNdxi(i,a) = dN_a/dxi_i.
      * @param cellgeo Underlying cell geometry, providing (at least) N vertices.
      * @return Transposed jacobian matrix.
