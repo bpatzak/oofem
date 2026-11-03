@@ -371,13 +371,16 @@ FEI3dTetQuad :: giveCharacteristicLength(const FEICellGeometry &cellgeo) const
 void
 FEI3dTetQuad :: giveJacobianMatrixAt(FloatMatrix &jacobianMatrix, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-    FloatMatrix dNduvw, coords;
-    this->evaldNdxi(dNduvw, lcoords, cellgeo);
-    coords.resize( 3, dNduvw.giveNumberOfRows() );
-    for ( int i = 1; i <= dNduvw.giveNumberOfRows(); i++ ) {
-        coords.setColumn(cellgeo.giveVertexCoordinates(i), i);
-    }
-    jacobianMatrix.beProductOf(coords, dNduvw);
+    // fixed size kernel gives J^T
+    jacobianMatrix = transpose(giveJacobianTransposed(evaldNdxi(lcoords), cellgeo));
+}
+
+double
+FEI3dTetQuad :: giveTransformationJacobian(const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
+{
+    // Only det(J) is needed; overridden to bypass the generic path through giveJacobianMatrixAt
+    // (FloatMatrix temporaries). Called for every integration point by computeVolumeAround.
+    return det(giveJacobianTransposed(evaldNdxi(lcoords), cellgeo));
 }
 
 
