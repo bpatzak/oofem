@@ -66,24 +66,8 @@ FEI3dHexaLin :: evalN(const FloatArrayF<3> &lcoords)
 void
 FEI3dHexaLin :: evalN(FloatArray &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-#if 0
-    answer = evalN(lcoords);
-#else
-    double x = lcoords[0];
-    double y = lcoords[1];
-    double z = lcoords[2];
-
-    answer = Vec8(
-        0.125 * ( 1. - x ) * ( 1. - y ) * ( 1. + z ),
-        0.125 * ( 1. - x ) * ( 1. + y ) * ( 1. + z ),
-        0.125 * ( 1. + x ) * ( 1. + y ) * ( 1. + z ),
-        0.125 * ( 1. + x ) * ( 1. - y ) * ( 1. + z ),
-        0.125 * ( 1. - x ) * ( 1. - y ) * ( 1. - z ),
-        0.125 * ( 1. - x ) * ( 1. + y ) * ( 1. - z ),
-        0.125 * ( 1. + x ) * ( 1. + y ) * ( 1. - z ),
-        0.125 * ( 1. + x ) * ( 1. - y ) * ( 1. - z )
-    );
-#endif
+    // evaluated by the fixed size kernel, the single implementation of the shape functions
+    answer = evalN(giveFixedLocalCoordinates(lcoords));
 }
 
 
@@ -126,43 +110,9 @@ FEI3dHexaLin :: evaldNdxi(const FloatArrayF<3> &lcoords)
 void
 FEI3dHexaLin :: evaldNdxi(FloatMatrix &dN, const FloatArray &lcoords, const FEICellGeometry &) const
 {
-#if 0
-    dN = evaldNdxi(lcoords);
-#else
-    double u, v, w;
-    u = lcoords.at(1);
-    v = lcoords.at(2);
-    w = lcoords.at(3);
-
-    dN.resize(8, 3);
-
-    dN.at(1, 1) = -0.125 * ( 1. - v ) * ( 1. + w );
-    dN.at(2, 1) = -0.125 * ( 1. + v ) * ( 1. + w );
-    dN.at(3, 1) =  0.125 * ( 1. + v ) * ( 1. + w );
-    dN.at(4, 1) =  0.125 * ( 1. - v ) * ( 1. + w );
-    dN.at(5, 1) = -0.125 * ( 1. - v ) * ( 1. - w );
-    dN.at(6, 1) = -0.125 * ( 1. + v ) * ( 1. - w );
-    dN.at(7, 1) =  0.125 * ( 1. + v ) * ( 1. - w );
-    dN.at(8, 1) =  0.125 * ( 1. - v ) * ( 1. - w );
-
-    dN.at(1, 2) = -0.125 * ( 1. - u ) * ( 1. + w );
-    dN.at(2, 2) =  0.125 * ( 1. - u ) * ( 1. + w );
-    dN.at(3, 2) =  0.125 * ( 1. + u ) * ( 1. + w );
-    dN.at(4, 2) = -0.125 * ( 1. + u ) * ( 1. + w );
-    dN.at(5, 2) = -0.125 * ( 1. - u ) * ( 1. - w );
-    dN.at(6, 2) =  0.125 * ( 1. - u ) * ( 1. - w );
-    dN.at(7, 2) =  0.125 * ( 1. + u ) * ( 1. - w );
-    dN.at(8, 2) = -0.125 * ( 1. + u ) * ( 1. - w );
-
-    dN.at(1, 3) =  0.125 * ( 1. - u ) * ( 1. - v );
-    dN.at(2, 3) =  0.125 * ( 1. - u ) * ( 1. + v );
-    dN.at(3, 3) =  0.125 * ( 1. + u ) * ( 1. + v );
-    dN.at(4, 3) =  0.125 * ( 1. + u ) * ( 1. - v );
-    dN.at(5, 3) = -0.125 * ( 1. - u ) * ( 1. - v );
-    dN.at(6, 3) = -0.125 * ( 1. - u ) * ( 1. + v );
-    dN.at(7, 3) = -0.125 * ( 1. + u ) * ( 1. + v );
-    dN.at(8, 3) = -0.125 * ( 1. + u ) * ( 1. - v );
-#endif
+    // evaluated by the fixed size kernel, the single implementation of the derivatives; it returns
+    // them transposed (one column per node), while this interface expects one row per node
+    dN = transpose(evaldNdxi(giveFixedLocalCoordinates(lcoords)));
 }
 
 
