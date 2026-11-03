@@ -63,19 +63,8 @@ FEI3dWedgeLin :: evalN(const FloatArrayF<3> &lcoords)
 void
 FEI3dWedgeLin :: evalN(FloatArray &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-    double u, v, w;
-    answer.resize(6);
-
-    u = lcoords.at(1);
-    v = lcoords.at(2);
-    w = lcoords.at(3);
-
-    answer.at(1) = 0.5 * ( 1. - w ) * ( 1. - u - v );
-    answer.at(2) = 0.5 * ( 1. - w ) * u;
-    answer.at(3) = 0.5 * ( 1. - w ) * v;
-    answer.at(4) = 0.5 * ( 1. + w ) * ( 1. - u - v );
-    answer.at(5) = 0.5 * ( 1. + w ) * u;
-    answer.at(6) = 0.5 * ( 1. + w ) * v;
+    // evaluated by the fixed size kernel, the single implementation of the shape functions
+    answer = evalN(giveFixedLocalCoordinates(lcoords));
 }
 
 
@@ -113,32 +102,9 @@ FEI3dWedgeLin :: evaldNdxi(const FloatArrayF<3> &lcoords)
 void
 FEI3dWedgeLin :: evaldNdxi(FloatMatrix &dN, const FloatArray &lcoords, const FEICellGeometry &) const
 {
-    double u = lcoords.at(1);
-    double v = lcoords.at(2);
-    double w = lcoords.at(3);
-
-    dN.resize(6, 3);
-
-    dN.at(1, 1) = -0.5 * ( 1. - w );
-    dN.at(2, 1) =  0.5 * ( 1. - w );
-    dN.at(3, 1) =  0.;
-    dN.at(4, 1) = -0.5 * ( 1. + w );
-    dN.at(5, 1) =  0.5 * ( 1. + w );
-    dN.at(6, 1) =  0.;
-
-    dN.at(1, 2) = -0.5 * ( 1. - w );
-    dN.at(2, 2) =  0.;
-    dN.at(3, 2) =  0.5 * ( 1. - w );
-    dN.at(4, 2) = -0.5 * ( 1. + w );
-    dN.at(5, 2) =  0.;
-    dN.at(6, 2) =  0.5 * ( 1. + w );
-
-    dN.at(1, 3) = -0.5 * ( 1. - u - v );
-    dN.at(2, 3) = -0.5 * u;
-    dN.at(3, 3) = -0.5 * v;
-    dN.at(4, 3) =  0.5 * ( 1. - u - v );
-    dN.at(5, 3) =  0.5 * u;
-    dN.at(6, 3) =  0.5 * v;
+    // evaluated by the fixed size kernel, the single implementation of the derivatives; it returns
+    // them transposed (one column per node), while this interface expects one row per node
+    dN = transpose(evaldNdxi(giveFixedLocalCoordinates(lcoords)));
 }
 
 
