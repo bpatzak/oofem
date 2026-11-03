@@ -62,22 +62,8 @@ FEI2dTrQuad :: evalN(const FloatArrayF<2> &lcoords)
 void
 FEI2dTrQuad :: evalN(FloatArray &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const 
 {
-#if 0
-    answer = evalN(lcoords);
-#else
-    double l1 = lcoords.at(1);
-    double l2 = lcoords.at(2);
-    double l3 = 1. - l1 - l2;
-
-    answer = Vec6(
-        ( 2. * l1 - 1. ) * l1,
-        ( 2. * l2 - 1. ) * l2,
-        ( 2. * l3 - 1. ) * l3,
-        4. * l1 * l2,
-        4. * l2 * l3,
-        4. * l3 * l1
-    );
-#endif
+    // evaluated by the fixed size kernel, the single implementation of the shape functions
+    answer = evalN(giveFixedLocalCoordinates(lcoords));
 }
 
 
@@ -307,25 +293,9 @@ FEI2dTrQuad :: computeLocalEdgeMapping(int iedge) const
 
 void FEI2dTrQuad :: evaldNdxi(FloatMatrix &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-    double l1 = lcoords.at(1);
-    double l2 = lcoords.at(2);
-    double l3 = 1.0 - l1 - l2;
-
-    answer.resize(6, 2);
-
-    answer.at(1, 1) =  4.0 * l1 - 1.0;
-    answer.at(2, 1) =  0.0;
-    answer.at(3, 1) = -1.0 * ( 4.0 * l3 - 1.0 );
-    answer.at(4, 1) =  4.0 * l2;
-    answer.at(5, 1) = -4.0 * l2;
-    answer.at(6, 1) =  4.0 * l3 - 4.0 * l1;
-
-    answer.at(1, 2) =  0.0;
-    answer.at(2, 2) =  4.0 * l2 - 1.0;
-    answer.at(3, 2) = -1.0 * ( 4.0 * l3 - 1.0 );
-    answer.at(4, 2) =  4.0 * l1;
-    answer.at(5, 2) =  4.0 * l3 - 4.0 * l2;
-    answer.at(6, 2) = -4.0 * l1;
+    // evaluated by the fixed size kernel, the single implementation of the derivatives; it returns
+    // them transposed (one column per node), while this interface expects one row per node
+    answer = transpose(evaldNdxi(giveFixedLocalCoordinates(lcoords)));
 }
 
 
