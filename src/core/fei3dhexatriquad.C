@@ -455,21 +455,31 @@ std::pair<double, FloatMatrixF<3,27>>
 FEI3dHexaTriQuad :: evaldNdx(const FloatArrayF<3> &lcoords, const FEICellGeometry &cellgeo)
 {
     auto dNduvw = evaldNdxi(lcoords);
-    FloatMatrixF<3,27> coords;
-    for ( int i = 0; i < 27; i++ ) {
-        ///@todo cellgeo should give a FloatArrayF<3>, this will add a "costly" construction now:
-        coords.setColumn(cellgeo.giveVertexCoordinates(i+1), i);
-    }
-    auto jacT = dotT(dNduvw, coords);
+    auto jacT = giveJacobianTransposed(dNduvw, cellgeo);
     return {det(jacT), dot(inv(jacT), dNduvw)};
 }
 
 double
 FEI3dHexaTriQuad :: evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
+    // The fixed size kernel returns dN/dx transposed (3x27), this interface expects one row per node (27x3).
     auto tmp = evaldNdx(lcoords, cellgeo);
     answer = transpose(tmp.second);
     return tmp.first;
+}
+
+void
+FEI3dHexaTriQuad :: giveJacobianMatrixAt(FloatMatrix &jacobianMatrix, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
+{
+    // Own fixed size version, the one inherited from FEI3dHexaQuad works with 20 nodes only.
+    jacobianMatrix = transpose(giveJacobianTransposed(evaldNdxi(lcoords), cellgeo));
+}
+
+double
+FEI3dHexaTriQuad :: giveTransformationJacobian(const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
+{
+    // Only det(J) is needed, no FloatMatrix temporaries (see FEI3dHexaLin::giveTransformationJacobian).
+    return det(giveJacobianTransposed(evaldNdxi(lcoords), cellgeo));
 }
 
 double
