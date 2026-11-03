@@ -149,27 +149,8 @@ FEI3dTetQuad :: evalN(const FloatArrayF<3> &lcoords)
 void
 FEI3dTetQuad :: evalN(FloatArray &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-#if 0
-    answer = evalN(lcoords);
-#else
-    double x1 = lcoords[0];
-    double x2 = lcoords[1];
-    double x3 = lcoords[2];
-    double x4 = 1.0 - x1 - x2 - x3;
-
-    answer.resize(10);
-    answer[0] = x1 * ( 2 * x1 - 1 );
-    answer[1] = x2 * ( 2 * x2 - 1 );
-    answer[2] = x3 * ( 2 * x3 - 1 );
-    answer[3] = x4 * ( 2 * x4 - 1 );
-
-    answer[4] = 4 * x1 * x2;
-    answer[5] = 4 * x2 * x3;
-    answer[6] = 4 * x3 * x1;
-    answer[7] = 4 * x1 * x4;
-    answer[8] = 4 * x2 * x4;
-    answer[9] = 4 * x3 * x4;
-#endif
+    // evaluated by the fixed size kernel, the single implementation of the shape functions
+    answer = evalN(giveFixedLocalCoordinates(lcoords));
 }
 
 std::pair<double, FloatMatrixF<3,10>>
@@ -235,52 +216,9 @@ FEI3dTetQuad :: evaldNdxi(const FloatArrayF<3> &lcoords)
 void
 FEI3dTetQuad :: evaldNdxi(FloatMatrix &answer, const FloatArray &lcoords , const FEICellGeometry &cellgeo) const
 {
-#if 0
-    answer = evaldNdxi(lcoords);
-#else
-    double x1 = lcoords[0];
-    double x2 = lcoords[1];
-    double x3 = lcoords[2];
-    double x4 = 1.0 - x1 - x2 - x3;
-
-    answer.resize(10, 3);
-
-    // dNj/dx1
-    answer(0, 0) = 4 * x1 - 1;
-    answer(1, 0) = 0;
-    answer(2, 0) = 0;
-    answer(3, 0) = -4 * x4 + 1;
-    answer(4, 0) = 4 * x2;
-    answer(5, 0) = 0;
-    answer(6, 0) = 4 * x3;
-    answer(7, 0) = 4 * ( x4 - x1 );
-    answer(8, 0) = -4 * x2;
-    answer(9, 0) = -4 * x3;
-
-    // dNj/dx2
-    answer(0, 1) = 0;
-    answer(1, 1) = 4 * x2 - 1;
-    answer(2, 1) = 0;
-    answer(3, 1) = -4 * x4 + 1;
-    answer(4, 1) = 4 * x1;
-    answer(5, 1) = 4 * x3;
-    answer(6, 1) = 0;
-    answer(7, 1) = -4 * x1;
-    answer(8, 1) = 4 * ( x4 - x2 );
-    answer(9, 1) = -4 * x3;
-
-    // dNj/dx3
-    answer(0, 2) = 0;
-    answer(1, 2) = 0;
-    answer(2, 2) = 4 * x3 - 1;
-    answer(3, 2) = -4 * x4 + 1;
-    answer(4, 2) = 0;
-    answer(5, 2) = 4 * x2;
-    answer(6, 2) = 4 * x1;
-    answer(7, 2) = -4 * x1;
-    answer(8, 2) = -4 * x2;
-    answer(9, 2) = 4 * ( x4 - x3 );
-#endif
+    // evaluated by the fixed size kernel, the single implementation of the derivatives; it returns
+    // them transposed (one column per node), while this interface expects one row per node
+    answer = transpose(evaldNdxi(giveFixedLocalCoordinates(lcoords)));
 }
 
 
