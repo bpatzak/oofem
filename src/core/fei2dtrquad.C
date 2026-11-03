@@ -109,19 +109,7 @@ std::pair<double,FloatMatrixF<2,6>>
 FEI2dTrQuad :: evaldNdx(const FloatArrayF<2> &lcoords, const FEICellGeometry &cellgeo) const
 {
     auto dn = evaldNdxi(lcoords);
-    FloatMatrixF<2,2> jacT;
-    for ( std::size_t i = 1; i <= dn.cols(); i++ ) {
-        const auto &c = cellgeo.giveVertexCoordinates(i);
-        double x = c.at(xind);
-        double y = c.at(yind);
-
-        ///@todo check transpose
-        jacT(0, 0) += dn.at(1, i) * x;
-        jacT(0, 1) += dn.at(1, i) * y;
-        jacT(1, 0) += dn.at(2, i) * x;
-        jacT(1, 1) += dn.at(2, i) * y;
-    }
-
+    auto jacT = giveJacobianTransposed(dn, cellgeo);
     return {det(jacT), dot(inv(jacT), dn)};
 }
 
@@ -129,28 +117,11 @@ FEI2dTrQuad :: evaldNdx(const FloatArrayF<2> &lcoords, const FEICellGeometry &ce
 double
 FEI2dTrQuad :: evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const 
 {
-#if 0
+    // Evaluated by the fixed size kernel (no FloatMatrix temporaries). The kernel returns dN/dx
+    // transposed (2x6), while this interface expects one row per node (6x2).
     auto tmp = evaldNdx(lcoords, cellgeo);
-    answer = tmp.second;
+    answer = transpose(tmp.second);
     return tmp.first;
-#else
-    FloatMatrix jacobianMatrix(2, 2), inv, dn;
-
-    this->evaldNdxi(dn, lcoords, cellgeo);
-    for ( int i = 1; i <= dn.giveNumberOfRows(); i++ ) {
-        double x = cellgeo.giveVertexCoordinates(i).at(xind);
-        double y = cellgeo.giveVertexCoordinates(i).at(yind);
-
-        jacobianMatrix.at(1, 1) += dn.at(i, 1) * x;
-        jacobianMatrix.at(1, 2) += dn.at(i, 1) * y;
-        jacobianMatrix.at(2, 1) += dn.at(i, 2) * x;
-        jacobianMatrix.at(2, 2) += dn.at(i, 2) * y;
-    }
-    inv.beInverseOf(jacobianMatrix);
-
-    answer.beProductTOf(dn, inv);
-    return jacobianMatrix.giveDeterminant();
-#endif
 }
 
 void
