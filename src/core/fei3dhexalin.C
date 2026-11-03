@@ -170,12 +170,7 @@ std::pair<double, FloatMatrixF<3,8>>
 FEI3dHexaLin :: evaldNdx(const FloatArrayF<3> &lcoords, const FEICellGeometry &cellgeo) 
 {
     auto dNduvw = evaldNdxi(lcoords);
-    FloatMatrixF<3,8> coords;
-    for ( int i = 0; i < 8; i++ ) {
-        ///@todo cellgeo should give a FloatArrayF<3>, this will add a "costly" construction now:
-        coords.setColumn(cellgeo.giveVertexCoordinates(i+1), i);
-    }
-    auto jacT = dotT(dNduvw, coords);
+    auto jacT = giveJacobianTransposed(dNduvw, cellgeo);
     return {det(jacT), dot(inv(jacT), dNduvw)};
 }
 
@@ -183,25 +178,11 @@ FEI3dHexaLin :: evaldNdx(const FloatArrayF<3> &lcoords, const FEICellGeometry &c
 double
 FEI3dHexaLin :: evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-#if 0
+    // Evaluated by the fixed size kernel (no FloatMatrix temporaries). The kernel returns dN/dx
+    // transposed (3x8), while this interface expects one row per node (8x3).
     auto tmp = evaldNdx(lcoords, cellgeo);
-    //auto [det, dndx] = evaldNdx(lcoords, cellgeo);
-    answer = tmp.second;
+    answer = transpose(tmp.second);
     return tmp.first;
-#else
-    FloatMatrix jacobianMatrix, inv, dNduvw, coords;
-
-    this->evaldNdxi(dNduvw, lcoords, cellgeo);
-    coords.resize(3, 8);
-    for ( int i = 1; i <= 8; i++ ) {
-        coords.setColumn(cellgeo.giveVertexCoordinates(i), i);
-    }
-    jacobianMatrix.beProductOf(coords, dNduvw);
-    inv.beInverseOf(jacobianMatrix);
-
-    answer.beProductOf(dNduvw, inv);
-    return jacobianMatrix.giveDeterminant();
-#endif
 }
 
 void
