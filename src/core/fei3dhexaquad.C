@@ -665,13 +665,16 @@ void
 FEI3dHexaQuad :: giveJacobianMatrixAt(FloatMatrix &jacobianMatrix, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 // Returns the jacobian matrix  J (x,y,z)/(ksi,eta,dzeta)  of the receiver.
 {
-    FloatMatrix dNduvw, coords;
-    this->evaldNdxi(dNduvw, lcoords, cellgeo);
-    coords.resize( 3, dNduvw.giveNumberOfRows() );
-    for ( int i = 1; i <= dNduvw.giveNumberOfRows(); i++ ) {
-        coords.setColumn(cellgeo.giveVertexCoordinates(i), i);
-    }
-    jacobianMatrix.beProductOf(coords, dNduvw);
+    // fixed size kernel gives J^T (20 nodes; FEI3dHexaTriQuad has its own version)
+    jacobianMatrix = transpose(giveJacobianTransposed(evaldNdxi(lcoords), cellgeo));
+}
+
+double
+FEI3dHexaQuad :: giveTransformationJacobian(const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
+{
+    // Only det(J) is needed; overridden to bypass the generic path through giveJacobianMatrixAt
+    // (FloatMatrix temporaries). Called for every integration point by computeVolumeAround.
+    return det(giveJacobianTransposed(evaldNdxi(lcoords), cellgeo));
 }
 
 
