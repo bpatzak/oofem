@@ -88,6 +88,8 @@ FEI2dQuadLin :: evaldNdx(const FloatArrayF<2> &lcoords, const FEICellGeometry &c
 double
 FEI2dQuadLin :: evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
+    // Evaluated by the fixed size kernel (no FloatMatrix temporaries). The kernel returns dN/dx
+    // transposed (2x4), while this interface expects one row per node (4x2).
     auto tmp = evaldNdx(giveFixedLocalCoordinates(lcoords), cellgeo);
     answer = transpose(tmp.second);
     return tmp.first;
@@ -103,8 +105,10 @@ FEI2dQuadLin :: giveJacobianMatrixAt(FloatMatrix &jacobianMatrix, const FloatArr
 double
 FEI2dQuadLin :: giveTransformationJacobian(const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-    // Only det(J) is needed; overridden to bypass the generic path through giveJacobianMatrixAt.
-    // Called for every integration point by computeVolumeAround (also by FEI2dQuadLinAxi).
+    // Only det(J) is needed: evaluated directly by the fixed size kernel, without the generic
+    // path through giveJacobianMatrixAt (FloatMatrix temporaries). Called for every integration
+    // point by computeVolumeAround.
+    // Also used by FEI2dQuadLinAxi.
     return det(giveJacobianTransposed(evaldNdxi(giveFixedLocalCoordinates(lcoords)), cellgeo));
 }
 

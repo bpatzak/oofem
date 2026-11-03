@@ -248,7 +248,9 @@ double FEI3dWedgeQuad :: giveCharacteristicLength(const FEICellGeometry &cellgeo
 double
 FEI3dWedgeQuad :: giveTransformationJacobian(const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-    // Only det(J) is needed, evaluated by the fixed size kernel (no FloatMatrix temporaries).
+    // Only det(J) is needed: evaluated directly by the fixed size kernel, without the generic
+    // path through giveJacobianMatrixAt (FloatMatrix temporaries). Called for every integration
+    // point by computeVolumeAround.
     return det(giveJacobianTransposed(evaldNdxi(giveFixedLocalCoordinates(lcoords)), cellgeo));
 }
 

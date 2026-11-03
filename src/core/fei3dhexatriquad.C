@@ -269,7 +269,8 @@ FEI3dHexaTriQuad :: evaldNdx(const FloatArrayF<3> &lcoords, const FEICellGeometr
 double
 FEI3dHexaTriQuad :: evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-    // The fixed size kernel returns dN/dx transposed (3x27), this interface expects one row per node (27x3).
+    // Evaluated by the fixed size kernel (no FloatMatrix temporaries). The kernel returns dN/dx
+    // transposed (3x27), while this interface expects one row per node (27x3).
     auto tmp = evaldNdx(giveFixedLocalCoordinates(lcoords), cellgeo);
     answer = transpose(tmp.second);
     return tmp.first;
@@ -278,14 +279,17 @@ FEI3dHexaTriQuad :: evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, con
 void
 FEI3dHexaTriQuad :: giveJacobianMatrixAt(FloatMatrix &jacobianMatrix, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-    // Own fixed size version, the one inherited from FEI3dHexaQuad works with 20 nodes only.
+    // fixed size kernel gives J^T (27 nodes, not inherited from FEI3dHexaQuad)
     jacobianMatrix = transpose(giveJacobianTransposed(evaldNdxi(giveFixedLocalCoordinates(lcoords)), cellgeo));
 }
 
 double
 FEI3dHexaTriQuad :: giveTransformationJacobian(const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-    // Only det(J) is needed, no FloatMatrix temporaries (see FEI3dHexaLin::giveTransformationJacobian).
+    // Only det(J) is needed: evaluated directly by the fixed size kernel, without the generic
+    // path through giveJacobianMatrixAt (FloatMatrix temporaries). Called for every integration
+    // point by computeVolumeAround.
+    // 27 nodes, not inherited from FEI3dHexaQuad.
     return det(giveJacobianTransposed(evaldNdxi(giveFixedLocalCoordinates(lcoords)), cellgeo));
 }
 

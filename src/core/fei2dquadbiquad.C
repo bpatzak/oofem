@@ -143,7 +143,8 @@ FEI2dQuadBiQuad :: evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, cons
 void
 FEI2dQuadBiQuad :: giveJacobianMatrixAt(FloatMatrix &jacobianMatrix, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-    // fixed size kernel gives J^T (9 nodes, not inherited from FEI2dQuadQuad)
+    // fixed size kernel gives J^T; replaces the generic FEInterpolation2d version (FloatMatrix temporaries)
+    // (9 nodes, not inherited from FEI2dQuadQuad)
     jacobianMatrix = transpose(giveJacobianTransposed(evaldNdxi(giveFixedLocalCoordinates(lcoords)), cellgeo));
 }
 
@@ -151,7 +152,10 @@ FEI2dQuadBiQuad :: giveJacobianMatrixAt(FloatMatrix &jacobianMatrix, const Float
 double
 FEI2dQuadBiQuad :: giveTransformationJacobian(const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-    // Only det(J) is needed, evaluated by the fixed size kernel (9 nodes, not inherited from FEI2dQuadQuad).
+    // Only det(J) is needed: evaluated directly by the fixed size kernel, without the generic
+    // path through giveJacobianMatrixAt (FloatMatrix temporaries). Called for every integration
+    // point by computeVolumeAround.
+    // 9 nodes, not inherited from FEI2dQuadQuad.
     return det(giveJacobianTransposed(evaldNdxi(giveFixedLocalCoordinates(lcoords)), cellgeo));
 }
 
