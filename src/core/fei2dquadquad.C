@@ -211,7 +211,10 @@ FEI2dQuadQuad :: evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, const 
 
     this->evaldNdxi(dn, lcoords, cellgeo);
 #if 1
-    cellgeo.getGeometryInterpolation()->giveJacobianMatrixAt(jacobianMatrix, lcoords, cellgeo);
+    // The jacobian comes from the geometry interpolation of the cell, which may differ from the receiver
+    // (e.g. MPM cells). Cells not wrapping an element (FEIVertexListGeometryWrapper) provide none, use the receiver then.
+    const FEInterpolation *geoInterp = cellgeo.getGeometryInterpolation();
+    ( geoInterp ? geoInterp : this )->giveJacobianMatrixAt(jacobianMatrix, lcoords, cellgeo);
 #else
     for ( int i = 1; i <= dn.giveNumberOfRows(); i++ ) {
         double x = cellgeo.giveVertexCoordinates(i).at(xind);
