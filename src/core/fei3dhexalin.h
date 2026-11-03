@@ -87,6 +87,7 @@ public:
     IntArray computeLocalSurfaceMapping(int iedge) const override;
 
     void giveJacobianMatrixAt(FloatMatrix &jacobianMatrix, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const override;
+    double giveTransformationJacobian(const FloatArray &lcoords, const FEICellGeometry &cellgeo) const override;
     double evalNXIntegral(int iEdge, const FEICellGeometry &cellgeo) const override;
 
     std::unique_ptr<IntegrationRule> giveIntegrationRule(int order, const Element_Geometry_Type) const override;
