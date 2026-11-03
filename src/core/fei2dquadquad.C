@@ -104,19 +104,8 @@ FEI2dQuadQuad :: evalN(const FloatArrayF<2> &lcoords)
 void
 FEI2dQuadQuad :: evalN(FloatArray &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-    double ksi = lcoords.at(1);
-    double eta = lcoords.at(2);
-
-    answer = Vec8(
-        ( 1. + ksi ) * ( 1. + eta ) * 0.25 * ( ksi + eta - 1. ),
-        ( 1. - ksi ) * ( 1. + eta ) * 0.25 * ( -ksi + eta - 1. ),
-        ( 1. - ksi ) * ( 1. - eta ) * 0.25 * ( -ksi - eta - 1. ),
-        ( 1. + ksi ) * ( 1. - eta ) * 0.25 * ( ksi - eta - 1. ),
-        0.5 * ( 1. - ksi * ksi ) * ( 1. + eta ),
-        0.5 * ( 1. - ksi ) * ( 1. - eta * eta ),
-        0.5 * ( 1. - ksi * ksi ) * ( 1. - eta ),
-        0.5 * ( 1. + ksi ) * ( 1. - eta * eta )
-    );
+    // evaluated by the fixed size kernel, the single implementation of the shape functions
+    answer = evalN(giveFixedLocalCoordinates(lcoords));
 }
 
 
@@ -149,32 +138,9 @@ FEI2dQuadQuad :: evaldNdxi(const FloatArrayF<2> &lcoords)
 
 void FEI2dQuadQuad :: evaldNdxi(FloatMatrix &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-#if 0
-    answer = dNdxi(lcoords);
-#else
-    double ksi = lcoords.at(1);
-    double eta = lcoords.at(2);
-    answer.resize(8, 2);
-
-    // dn/dxi
-    answer.at(1, 1) =  0.25 * ( 1. + eta ) * ( 2.0 * ksi + eta );
-    answer.at(2, 1) = -0.25 * ( 1. + eta ) * ( -2.0 * ksi + eta );
-    answer.at(3, 1) = -0.25 * ( 1. - eta ) * ( -2.0 * ksi - eta );
-    answer.at(4, 1) =  0.25 * ( 1. - eta ) * ( 2.0 * ksi - eta );
-    answer.at(5, 1) = -ksi * ( 1. + eta );
-    answer.at(6, 1) = -0.5 * ( 1. - eta * eta );
-    answer.at(7, 1) = -ksi * ( 1. - eta );
-    answer.at(8, 1) =  0.5 * ( 1. - eta * eta );
-
-    answer.at(1, 2) =  0.25 * ( 1. + ksi ) * ( 2.0 * eta + ksi );
-    answer.at(2, 2) =  0.25 * ( 1. - ksi ) * ( 2.0 * eta - ksi );
-    answer.at(3, 2) = -0.25 * ( 1. - ksi ) * ( -2.0 * eta - ksi );
-    answer.at(4, 2) = -0.25 * ( 1. + ksi ) * ( -2.0 * eta + ksi );
-    answer.at(5, 2) =  0.5 * ( 1. - ksi * ksi );
-    answer.at(6, 2) = -eta * ( 1. - ksi );
-    answer.at(7, 2) = -0.5 * ( 1. - ksi * ksi );
-    answer.at(8, 2) = -eta * ( 1. + ksi );
-#endif
+    // evaluated by the fixed size kernel, the single implementation of the derivatives; it returns
+    // them transposed (one column per node), while this interface expects one row per node
+    answer = transpose(evaldNdxi(giveFixedLocalCoordinates(lcoords)));
 }
 
 
