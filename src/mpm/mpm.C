@@ -491,6 +491,8 @@ MPElement::assembleStateVector(FloatArray &answer, const StateVariableLayout &la
 {
     answer.clear();
     int offset = 1;
+    // buffers reused by all entries of the layout (called for every integration point)
+    FloatArray u, contribution;
 
     for ( const StateVariableSpec &spec : layout ) {
         const Variable *v = this->giveStateVariableSource(spec.field);
@@ -499,7 +501,6 @@ MPElement::assembleStateVector(FloatArray &answer, const StateVariableLayout &la
                          "element %d", __FieldTypeToString(spec.field), this->giveNumber() );
         }
 
-        FloatArray u, contribution;
         this->getUnknownVector(u, v, spec.mode, tStep);
         // operator applied directly, without forming its (mostly zero) matrix
         this->applyStateOperatorAt(contribution, spec.op, v, gp, u);
