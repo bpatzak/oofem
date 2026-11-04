@@ -406,6 +406,22 @@ namespace oofem {
             //answer.plusProductSymmUpper(B, DB, 1.0);
             answer.beTProductOf(B,DB);
         }
+        /// Accumulates factor B^T D B directly; only its upper triangle when the term is symmetric (see Term::isSymmetric)
+        void evaluate_lin_add (FloatMatrix& answer, double factor, MPElement& e, GaussPoint* gp, TimeStep* tstep) const override {
+            FloatMatrix D, B, DB;
+            e.giveCrossSection()->giveMaterial(gp)->giveCharacteristicMatrix(D, this->lhsmatmode, gp, tstep);
+            this->grad(B, this->field, this->field->interpolation, e, gp->giveNaturalCoordinates(), gp->giveMaterialMode());
+            DB.beProductOf(D, B);
+            if ( this->isSymmetric(e) ) {
+                answer.plusProductSymmUpper(B, DB, factor);
+            } else {
+                answer.plusProductUnsym(B, DB, factor);
+            }
+        }
+        /// The same B on both sides: symmetric when the material matrix is
+        bool isSymmetric (MPElement& cell) const override {
+            return cell.giveCrossSection()->isCharacteristicMtrxSymmetric(this->lhsmatmode);
+        }
         /**
          * @brief Evaluates Internal forces vector, i.e. $b^T\sigma(u)$
          * 
