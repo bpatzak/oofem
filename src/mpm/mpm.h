@@ -562,7 +562,7 @@ class OOFEM_EXPORT MPElement : public Element {
         EvaluationScope(MPElement &e) : elem(e) { elem.evaluationDepth++; }
         ~EvaluationScope() {
             if ( --elem.evaluationDepth == 0 ) {
-                elem.unknownGatherMemo.clear();
+                elem.releaseEvaluationMemos();
             }
         }
         EvaluationScope(const EvaluationScope &) = delete;
@@ -606,6 +606,10 @@ protected:
     std::vector< UnknownGatherEntry > unknownGatherMemo;
     /// Nesting depth of EvaluationScope; the memo is used only when positive.
     int evaluationDepth = 0;
+    /// Frees the memos of the evaluation scope completely, so that no memory stays with the element between evaluations.
+    void releaseEvaluationMemos() {
+        std::vector< UnknownGatherEntry >().swap(this->unknownGatherMemo);
+    }
 
 public:
 
