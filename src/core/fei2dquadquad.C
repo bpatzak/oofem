@@ -104,19 +104,8 @@ FEI2dQuadQuad :: evalN(const FloatArrayF<2> &lcoords)
 void
 FEI2dQuadQuad :: evalN(FloatArray &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-    double ksi = lcoords.at(1);
-    double eta = lcoords.at(2);
-
-    answer = Vec8(
-        ( 1. + ksi ) * ( 1. + eta ) * 0.25 * ( ksi + eta - 1. ),
-        ( 1. - ksi ) * ( 1. + eta ) * 0.25 * ( -ksi + eta - 1. ),
-        ( 1. - ksi ) * ( 1. - eta ) * 0.25 * ( -ksi - eta - 1. ),
-        ( 1. + ksi ) * ( 1. - eta ) * 0.25 * ( ksi - eta - 1. ),
-        0.5 * ( 1. - ksi * ksi ) * ( 1. + eta ),
-        0.5 * ( 1. - ksi ) * ( 1. - eta * eta ),
-        0.5 * ( 1. - ksi * ksi ) * ( 1. - eta ),
-        0.5 * ( 1. + ksi ) * ( 1. - eta * eta )
-    );
+    // evaluated by the fixed size kernel, the single implementation of the shape functions
+    answer = evalN(giveFixedLocalCoordinates(lcoords));
 }
 
 
@@ -149,32 +138,9 @@ FEI2dQuadQuad :: evaldNdxi(const FloatArrayF<2> &lcoords)
 
 void FEI2dQuadQuad :: evaldNdxi(FloatMatrix &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-#if 0
-    answer = dNdxi(lcoords);
-#else
-    double ksi = lcoords.at(1);
-    double eta = lcoords.at(2);
-    answer.resize(8, 2);
-
-    // dn/dxi
-    answer.at(1, 1) =  0.25 * ( 1. + eta ) * ( 2.0 * ksi + eta );
-    answer.at(2, 1) = -0.25 * ( 1. + eta ) * ( -2.0 * ksi + eta );
-    answer.at(3, 1) = -0.25 * ( 1. - eta ) * ( -2.0 * ksi - eta );
-    answer.at(4, 1) =  0.25 * ( 1. - eta ) * ( 2.0 * ksi - eta );
-    answer.at(5, 1) = -ksi * ( 1. + eta );
-    answer.at(6, 1) = -0.5 * ( 1. - eta * eta );
-    answer.at(7, 1) = -ksi * ( 1. - eta );
-    answer.at(8, 1) =  0.5 * ( 1. - eta * eta );
-
-    answer.at(1, 2) =  0.25 * ( 1. + ksi ) * ( 2.0 * eta + ksi );
-    answer.at(2, 2) =  0.25 * ( 1. - ksi ) * ( 2.0 * eta - ksi );
-    answer.at(3, 2) = -0.25 * ( 1. - ksi ) * ( -2.0 * eta - ksi );
-    answer.at(4, 2) = -0.25 * ( 1. + ksi ) * ( -2.0 * eta + ksi );
-    answer.at(5, 2) =  0.5 * ( 1. - ksi * ksi );
-    answer.at(6, 2) = -eta * ( 1. - ksi );
-    answer.at(7, 2) = -0.5 * ( 1. - ksi * ksi );
-    answer.at(8, 2) = -eta * ( 1. + ksi );
-#endif
+    // evaluated by the fixed size kernel, the single implementation of the derivatives; it returns
+    // them transposed (one column per node), while this interface expects one row per node
+    answer = transpose(evaldNdxi(giveFixedLocalCoordinates(lcoords)));
 }
 
 
@@ -182,19 +148,7 @@ std::pair<double, FloatMatrixF<2,8>>
 FEI2dQuadQuad :: evaldNdx(const FloatArrayF<2> &lcoords, const FEICellGeometry &cellgeo) const
 {
     auto dn = evaldNdxi(lcoords);
-    FloatMatrixF<2,2> jacT;
-    for ( std::size_t i = 1; i <= dn.cols(); i++ ) {
-        const auto &c = cellgeo.giveVertexCoordinates(i);
-        double x = c.at(xind);
-        double y = c.at(yind);
-
-        ///@todo check transpose
-        jacT(0, 0) += dn.at(1, i) * x;
-        jacT(0, 1) += dn.at(1, i) * y;
-        jacT(1, 0) += dn.at(2, i) * x;
-        jacT(1, 1) += dn.at(2, i) * y;
-    }
-
+    auto jacT = giveJacobianTransposed(dn, cellgeo);
     return {det(jacT), dot(inv(jacT), dn)};
 }
 
@@ -202,32 +156,42 @@ FEI2dQuadQuad :: evaldNdx(const FloatArrayF<2> &lcoords, const FEICellGeometry &
 double
 FEI2dQuadQuad :: evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-#if 0
-    auto tmp = evaldNdx(lcoords, cellgeo);
-    answer = tmp.second;
-    return tmp.first;
-#else
-    FloatMatrix jacobianMatrix(2, 2), inv, dn;
-
-    this->evaldNdxi(dn, lcoords, cellgeo);
-#if 1
-    cellgeo.getGeometryInterpolation()->giveJacobianMatrixAt(jacobianMatrix, lcoords, cellgeo);
-#else
-    for ( int i = 1; i <= dn.giveNumberOfRows(); i++ ) {
-        double x = cellgeo.giveVertexCoordinates(i).at(xind);
-        double y = cellgeo.giveVertexCoordinates(i).at(yind);
-
-        jacobianMatrix.at(1, 1) += dn.at(i, 1) * x;
-        jacobianMatrix.at(1, 2) += dn.at(i, 1) * y;
-        jacobianMatrix.at(2, 1) += dn.at(i, 2) * x;
-        jacobianMatrix.at(2, 2) += dn.at(i, 2) * y;
+    // The jacobian comes from the geometry interpolation of the cell, which may differ from the receiver
+    // (e.g. MPM cells). Cells not wrapping an element (FEIVertexListGeometryWrapper) provide none, use the receiver then.
+    const FEInterpolation *geoInterp = cellgeo.getGeometryInterpolation();
+    if ( !geoInterp || geoInterp == this ) {
+        // Isoparametric case, evaluated by the fixed size kernel (no FloatMatrix temporaries). The kernel returns
+        // dN/dx transposed (2x8), while this interface expects one row per node (8x2).
+        auto tmp = evaldNdx(giveFixedLocalCoordinates(lcoords), cellgeo);
+        answer = transpose(tmp.second);
+        return tmp.first;
     }
-#endif
+
+    FloatMatrix jacobianMatrix(2, 2), inv, dn;
+    this->evaldNdxi(dn, lcoords, cellgeo);
+    geoInterp->giveJacobianMatrixAt(jacobianMatrix, lcoords, cellgeo);
     inv.beInverseOf(jacobianMatrix);
 
     answer.beProductOf(dn, inv);
     return jacobianMatrix.giveDeterminant();
-#endif
+}
+
+void
+FEI2dQuadQuad :: giveJacobianMatrixAt(FloatMatrix &jacobianMatrix, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
+{
+    // fixed size kernel gives J^T; replaces the generic FEInterpolation2d version (FloatMatrix temporaries)
+    // (8 nodes; FEI2dQuadBiQuad has its own version)
+    jacobianMatrix = transpose(giveJacobianTransposed(evaldNdxi(giveFixedLocalCoordinates(lcoords)), cellgeo));
+}
+
+double
+FEI2dQuadQuad :: giveTransformationJacobian(const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
+{
+    // Only det(J) is needed: evaluated directly by the fixed size kernel, without the generic
+    // path through giveJacobianMatrixAt (FloatMatrix temporaries). Called for every integration
+    // point by computeVolumeAround.
+    // 8 nodes; FEI2dQuadBiQuad has its own version. Also used by FEI2dQuadQuadAxi.
+    return det(giveJacobianTransposed(evaldNdxi(giveFixedLocalCoordinates(lcoords)), cellgeo));
 }
 
 void

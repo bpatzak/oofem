@@ -77,40 +77,8 @@ FEI3dHexaQuad :: evalN(const FloatArrayF<3> &lcoords)
 void
 FEI3dHexaQuad :: evalN(FloatArray &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-#if 0
-    answer = evalN(lcoords);
-#else
-    double u, v, w;
-    answer.resize(20);
-
-    u = lcoords.at(1);
-    v = lcoords.at(2);
-    w = lcoords.at(3);
-
-    answer.at(1)  = 0.125 * ( 1.0 - u ) * ( 1.0 - v ) * ( 1.0 + w ) * ( -u - v + w - 2.0 );
-    answer.at(2)  = 0.125 * ( 1.0 - u ) * ( 1.0 + v ) * ( 1.0 + w ) * ( -u + v + w - 2.0 );
-    answer.at(3)  = 0.125 * ( 1.0 + u ) * ( 1.0 + v ) * ( 1.0 + w ) * ( u + v + w - 2.0 );
-    answer.at(4)  = 0.125 * ( 1.0 + u ) * ( 1.0 - v ) * ( 1.0 + w ) * ( u - v + w - 2.0 );
-    answer.at(5)  = 0.125 * ( 1.0 - u ) * ( 1.0 - v ) * ( 1.0 - w ) * ( -u - v - w - 2.0 );
-    answer.at(6)  = 0.125 * ( 1.0 - u ) * ( 1.0 + v ) * ( 1.0 - w ) * ( -u + v - w - 2.0 );
-    answer.at(7)  = 0.125 * ( 1.0 + u ) * ( 1.0 + v ) * ( 1.0 - w ) * ( u + v - w - 2.0 );
-    answer.at(8)  = 0.125 * ( 1.0 + u ) * ( 1.0 - v ) * ( 1.0 - w ) * ( u - v - w - 2.0 );
-
-    answer.at(9)  = 0.25 * ( 1.0 - v * v ) * ( 1.0 - u ) * ( 1.0 + w );
-    answer.at(10)  = 0.25 * ( 1.0 - u * u ) * ( 1.0 + v ) * ( 1.0 + w );
-    answer.at(11)  = 0.25 * ( 1.0 - v * v ) * ( 1.0 + u ) * ( 1.0 + w );
-    answer.at(12)  = 0.25 * ( 1.0 - u * u ) * ( 1.0 - v ) * ( 1.0 + w );
-
-    answer.at(13)  = 0.25 * ( 1.0 - v * v ) * ( 1.0 - u ) * ( 1.0 - w );
-    answer.at(14)  = 0.25 * ( 1.0 - u * u ) * ( 1.0 + v ) * ( 1.0 - w );
-    answer.at(15)  = 0.25 * ( 1.0 - v * v ) * ( 1.0 + u ) * ( 1.0 - w );
-    answer.at(16)  = 0.25 * ( 1.0 - u * u ) * ( 1.0 - v ) * ( 1.0 - w );
-
-    answer.at(17)  = 0.25 * ( 1.0 - u ) * ( 1.0 - v ) * ( 1.0 - w * w );
-    answer.at(18)  = 0.25 * ( 1.0 - u ) * ( 1.0 + v ) * ( 1.0 - w * w );
-    answer.at(19)  = 0.25 * ( 1.0 + u ) * ( 1.0 + v ) * ( 1.0 - w * w );
-    answer.at(20)  = 0.25 * ( 1.0 + u ) * ( 1.0 - v ) * ( 1.0 - w * w );
-#endif
+    // evaluated by the fixed size kernel, the single implementation of the shape functions
+    answer = evalN(giveFixedLocalCoordinates(lcoords));
 }
 
 
@@ -153,8 +121,8 @@ FEI3dHexaQuad :: evaldNdxi(const FloatArrayF<3> &lcoords)
         -0.50 * u * ( 1.0 + v ) * ( 1.0 + w ),
         0.25 * ( 1.0 - u * u ) * ( 1.0 + w ),
         0.25 * ( 1.0 - u * u ) * ( 1.0 + v ),
-        -0.50 * v * ( 1.0 + u ) * ( 1.0 + w ),
         0.25 * ( 1.0 - v * v ) * ( 1.0 + w ),
+        -0.50 * v * ( 1.0 + u ) * ( 1.0 + w ),
         0.25 * ( 1.0 - v * v ) * ( 1.0 + u ),
         -0.50 * u * ( 1.0 - v ) * ( 1.0 + w ),
         -0.25 * ( 1.0 - u * u ) * ( 1.0 + w ),
@@ -190,79 +158,9 @@ FEI3dHexaQuad :: evaldNdxi(const FloatArrayF<3> &lcoords)
 void
 FEI3dHexaQuad :: evaldNdxi(FloatMatrix &dN, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-#if 0
-    dN = evaldNdxi(lcoords);
-#else
-    double u, v, w;
-    u = lcoords.at(1);
-    v = lcoords.at(2);
-    w = lcoords.at(3);
-
-    dN.resize(20, 3);
-
-    dN.at(1, 1) = 0.125 * ( 1.0 - v ) * ( 1.0 + w ) * ( 2.0 * u + v - w + 1.0 );
-    dN.at(2, 1) = 0.125 * ( 1.0 + v ) * ( 1.0 + w ) * ( 2.0 * u - v - w + 1.0 );
-    dN.at(3, 1) = 0.125 * ( 1.0 + v ) * ( 1.0 + w ) * ( 2.0 * u + v + w - 1.0 );
-    dN.at(4, 1) = 0.125 * ( 1.0 - v ) * ( 1.0 + w ) * ( 2.0 * u - v + w - 1.0 );
-    dN.at(5, 1) = 0.125 * ( 1.0 - v ) * ( 1.0 - w ) * ( 2.0 * u + v + w + 1.0 );
-    dN.at(6, 1) = 0.125 * ( 1.0 + v ) * ( 1.0 - w ) * ( 2.0 * u - v + w + 1.0 );
-    dN.at(7, 1) = 0.125 * ( 1.0 + v ) * ( 1.0 - w ) * ( 2.0 * u + v - w - 1.0 );
-    dN.at(8, 1) = 0.125 * ( 1.0 - v ) * ( 1.0 - w ) * ( 2.0 * u - v - w - 1.0 );
-    dN.at(9, 1) = -0.25 * ( 1.0 - v * v ) * ( 1.0 + w );
-    dN.at(10, 1) =  -0.5 * u * ( 1.0 + v ) * ( 1.0 + w );
-    dN.at(11, 1) =  0.25 * ( 1.0 - v * v ) * ( 1.0 + w );
-    dN.at(12, 1) =  -0.5 * u * ( 1.0 - v ) * ( 1.0 + w );
-    dN.at(13, 1) = -0.25 * ( 1.0 - v * v ) * ( 1.0 - w );
-    dN.at(14, 1) =  -0.5 * u * ( 1.0 + v ) * ( 1.0 - w );
-    dN.at(15, 1) =  0.25 * ( 1.0 - v * v ) * ( 1.0 - w );
-    dN.at(16, 1) =  -0.5 * u * ( 1.0 - v ) * ( 1.0 - w );
-    dN.at(17, 1) = -0.25 * ( 1.0 - v ) * ( 1.0 - w * w );
-    dN.at(18, 1) = -0.25 * ( 1.0 + v ) * ( 1.0 - w * w );
-    dN.at(19, 1) =  0.25 * ( 1.0 + v ) * ( 1.0 - w * w );
-    dN.at(20, 1) =  0.25 * ( 1.0 - v ) * ( 1.0 - w * w );
-
-    dN.at(1, 2) = 0.125 * ( 1.0 - u ) * ( 1.0 + w ) * ( 2.0 * v + u - w + 1.0 );
-    dN.at(2, 2) = 0.125 * ( 1.0 - u ) * ( 1.0 + w ) * ( 2.0 * v - u + w - 1.0 );
-    dN.at(3, 2) = 0.125 * ( 1.0 + u ) * ( 1.0 + w ) * ( 2.0 * v + u + w - 1.0 );
-    dN.at(4, 2) = 0.125 * ( 1.0 + u ) * ( 1.0 + w ) * ( 2.0 * v - u - w + 1.0 );
-    dN.at(5, 2) = 0.125 * ( 1.0 - u ) * ( 1.0 - w ) * ( 2.0 * v + u + w + 1.0 );
-    dN.at(6, 2) = 0.125 * ( 1.0 - u ) * ( 1.0 - w ) * ( 2.0 * v - u - w - 1.0 );
-    dN.at(7, 2) = 0.125 * ( 1.0 + u ) * ( 1.0 - w ) * ( 2.0 * v + u - w - 1.0 );
-    dN.at(8, 2) = 0.125 * ( 1.0 + u ) * ( 1.0 - w ) * ( 2.0 * v - u + w + 1.0 );
-    dN.at(9, 2) =  -0.5 * v * ( 1.0 - u ) * ( 1.0 + w );
-    dN.at(10, 2) =  0.25 * ( 1.0 - u * u ) * ( 1.0 + w );
-    dN.at(11, 2) =  -0.5 * v * ( 1.0 + u ) * ( 1.0 + w );
-    dN.at(12, 2) = -0.25 * ( 1.0 - u * u ) * ( 1.0 + w );
-    dN.at(13, 2) =  -0.5 * v * ( 1.0 - u ) * ( 1.0 - w );
-    dN.at(14, 2) =  0.25 * ( 1.0 - u * u ) * ( 1.0 - w );
-    dN.at(15, 2) =  -0.5 * v * ( 1.0 + u ) * ( 1.0 - w );
-    dN.at(16, 2) = -0.25 * ( 1.0 - u * u ) * ( 1.0 - w );
-    dN.at(17, 2) = -0.25 * ( 1.0 - u ) * ( 1.0 - w * w );
-    dN.at(18, 2) =  0.25 * ( 1.0 - u ) * ( 1.0 - w * w );
-    dN.at(19, 2) =  0.25 * ( 1.0 + u ) * ( 1.0 - w * w );
-    dN.at(20, 2) = -0.25 * ( 1.0 + u ) * ( 1.0 - w * w );
-
-    dN.at(1, 3) = 0.125 * ( 1.0 - u ) * ( 1.0 - v ) * ( 2.0 * w - u - v - 1.0 );
-    dN.at(2, 3) = 0.125 * ( 1.0 - u ) * ( 1.0 + v ) * ( 2.0 * w - u + v - 1.0 );
-    dN.at(3, 3) = 0.125 * ( 1.0 + u ) * ( 1.0 + v ) * ( 2.0 * w + u + v - 1.0 );
-    dN.at(4, 3) = 0.125 * ( 1.0 + u ) * ( 1.0 - v ) * ( 2.0 * w + u - v - 1.0 );
-    dN.at(5, 3) = 0.125 * ( 1.0 - u ) * ( 1.0 - v ) * ( 2.0 * w + u + v + 1.0 );
-    dN.at(6, 3) = 0.125 * ( 1.0 - u ) * ( 1.0 + v ) * ( 2.0 * w + u - v + 1.0 );
-    dN.at(7, 3) = 0.125 * ( 1.0 + u ) * ( 1.0 + v ) * ( 2.0 * w - u - v + 1.0 );
-    dN.at(8, 3) = 0.125 * ( 1.0 + u ) * ( 1.0 - v ) * ( 2.0 * w - u + v + 1.0 );
-    dN.at(9, 3) =  0.25 * ( 1.0 - v * v ) * ( 1.0 - u );
-    dN.at(10, 3) =  0.25 * ( 1.0 - u * u ) * ( 1.0 + v );
-    dN.at(11, 3) =  0.25 * ( 1.0 - v * v ) * ( 1.0 + u );
-    dN.at(12, 3) =  0.25 * ( 1.0 - u * u ) * ( 1.0 - v );
-    dN.at(13, 3) = -0.25 * ( 1.0 - v * v ) * ( 1.0 - u );
-    dN.at(14, 3) = -0.25 * ( 1.0 - u * u ) * ( 1.0 + v );
-    dN.at(15, 3) = -0.25 * ( 1.0 - v * v ) * ( 1.0 + u );
-    dN.at(16, 3) = -0.25 * ( 1.0 - u * u ) * ( 1.0 - v );
-    dN.at(17, 3) =  -0.5 * ( 1.0 - u ) * ( 1.0 - v ) * w;
-    dN.at(18, 3) =  -0.5 * ( 1.0 - u ) * ( 1.0 + v ) * w;
-    dN.at(19, 3) =  -0.5 * ( 1.0 + u ) * ( 1.0 + v ) * w;
-    dN.at(20, 3) =  -0.5 * ( 1.0 + u ) * ( 1.0 - v ) * w;
-#endif
+    // evaluated by the fixed size kernel, the single implementation of the derivatives; it returns
+    // them transposed (one column per node), while this interface expects one row per node
+    dN = transpose(evaldNdxi(giveFixedLocalCoordinates(lcoords)));
 }
 
 
@@ -270,12 +168,7 @@ std::pair<double, FloatMatrixF<3,20>>
 FEI3dHexaQuad :: evaldNdx(const FloatArrayF<3> &lcoords, const FEICellGeometry &cellgeo)
 {
     auto dNduvw = evaldNdxi(lcoords);
-    FloatMatrixF<3,20> coords;
-    for ( int i = 0; i < 20; i++ ) {
-        ///@todo cellgeo should give a FloatArrayF<3>, this will add a "costly" construction now:
-        coords.setColumn(cellgeo.giveVertexCoordinates(i+1), i);
-    }
-    auto jacT = dotT(dNduvw, coords);
+    auto jacT = giveJacobianTransposed(dNduvw, cellgeo);
     return {det(jacT), dot(inv(jacT), dNduvw)};
 }
 
@@ -283,23 +176,12 @@ FEI3dHexaQuad :: evaldNdx(const FloatArrayF<3> &lcoords, const FEICellGeometry &
 double
 FEI3dHexaQuad :: evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-#if 0
-    auto tmp = evaldNdx(lcoords, cellgeo);
-    answer = tmp.second;
+    // Evaluated by the fixed size kernel (no FloatMatrix temporaries). The kernel returns dN/dx
+    // transposed (3x20), while this interface expects one row per node (20x3).
+    // 20 nodes; FEI3dHexaTriQuad has its own version.
+    auto tmp = evaldNdx(giveFixedLocalCoordinates(lcoords), cellgeo);
+    answer = transpose(tmp.second);
     return tmp.first;
-#else
-    FloatMatrix jacobianMatrix, inv, dNduvw, coords;
-    this->evaldNdxi(dNduvw, lcoords, cellgeo);
-    coords.resize( 3, dNduvw.giveNumberOfRows() );
-    for ( int i = 1; i <= dNduvw.giveNumberOfRows(); i++ ) {
-        coords.setColumn(cellgeo.giveVertexCoordinates(i), i);
-    }
-    jacobianMatrix.beProductOf(coords, dNduvw);
-    inv.beInverseOf(jacobianMatrix);
-
-    answer.beProductOf(dNduvw, inv);
-    return jacobianMatrix.giveDeterminant();
-#endif
 }
 
 void
@@ -681,13 +563,18 @@ void
 FEI3dHexaQuad :: giveJacobianMatrixAt(FloatMatrix &jacobianMatrix, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 // Returns the jacobian matrix  J (x,y,z)/(ksi,eta,dzeta)  of the receiver.
 {
-    FloatMatrix dNduvw, coords;
-    this->evaldNdxi(dNduvw, lcoords, cellgeo);
-    coords.resize( 3, dNduvw.giveNumberOfRows() );
-    for ( int i = 1; i <= dNduvw.giveNumberOfRows(); i++ ) {
-        coords.setColumn(cellgeo.giveVertexCoordinates(i), i);
-    }
-    jacobianMatrix.beProductOf(coords, dNduvw);
+    // fixed size kernel gives J^T (20 nodes; FEI3dHexaTriQuad has its own version)
+    jacobianMatrix = transpose(giveJacobianTransposed(evaldNdxi(giveFixedLocalCoordinates(lcoords)), cellgeo));
+}
+
+double
+FEI3dHexaQuad :: giveTransformationJacobian(const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
+{
+    // Only det(J) is needed: evaluated directly by the fixed size kernel, without the generic
+    // path through giveJacobianMatrixAt (FloatMatrix temporaries). Called for every integration
+    // point by computeVolumeAround.
+    // 20 nodes; FEI3dHexaTriQuad has its own version.
+    return det(giveJacobianTransposed(evaldNdxi(giveFixedLocalCoordinates(lcoords)), cellgeo));
 }
 
 

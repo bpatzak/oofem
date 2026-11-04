@@ -55,9 +55,11 @@ public:
 
     // Bulk
     static FloatArrayF<4> evalN(const FloatArrayF<3> &lcoords);
+    static FloatMatrixF<3,4> evaldNdxi(const FloatArrayF<3> &lcoords);
     static std::pair<double, FloatMatrixF<3,4>> evaldNdx(const FEICellGeometry &cellgeo);
 
     void evalN(FloatArray &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const override;
+    void evaldNdxi(FloatMatrix &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const override;
     double evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const override;
     void local2global(Coordinates &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const override;
     int  global2local(FloatArray &answer, const Coordinates &lcoords, const FEICellGeometry &cellgeo) const override;

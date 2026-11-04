@@ -36,6 +36,7 @@
 #define feinterpol2d_h
 
 #include "feinterpol.h"
+#include "floatmatrixf.h"
 #include "mathfem.h"
 
 namespace oofem {
@@ -178,6 +179,42 @@ public:
     virtual double edgeGiveTransformationJacobian(int iedge, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const ;
     //@}
 
+protected:
+    /**
+     * Returns the parent coordinates as a fixed size array, for the fixed size kernels.
+     * Only the first two components are taken: callers may pass more (e.g. three area coordinates of
+     * a triangle), which the FloatArrayF conversion would reject in debug builds.
+     */
+    static FloatArrayF< 2 >giveFixedLocalCoordinates(const FloatArray &lcoords) { return { lcoords [ 0 ], lcoords [ 1 ] }; }
+
+    /**
+     * Evaluates the transposed jacobian matrix of the mapping from parent to global coordinates,
+     * @f$ (J^T)_{ij} = \partial x_j / \partial \xi_i @f$, where x_1, x_2 are the xind, yind global components.
+     * Shared fixed size kernel of isoparametric 2d interpolations: the result lives on the stack (no
+     * FloatMatrix temporaries) and each vertex is requested from cellgeo only once.
+     * The fixed size paths built on it assume an isoparametric cell, i.e. the first N vertices of cellgeo
+     * are the nodes of the receiver. Only FEI2dQuadQuad and FEI2dQuadBiQuad::evaldNdx consult
+     * cellgeo.getGeometryInterpolation() and defer to it when it differs (MPM cells with a quadratic
+     * field on a linear geometry).
+     * @param dNdxi Derivatives of shape functions with respect to parent coordinates, dNdxi(i,a) = dN_a/dxi_i.
+     * @param cellgeo Underlying cell geometry, providing (at least) N vertices.
+     * @return Transposed jacobian matrix.
+     */
+    template< std::size_t N >
+    FloatMatrixF< 2, 2 >giveJacobianTransposed(const FloatMatrixF< 2, N > &dNdxi, const FEICellGeometry &cellgeo) const
+    {
+        FloatMatrixF< 2, 2 >jacT;
+        for ( std::size_t a = 0; a < N; a++ ) {
+            const auto c = cellgeo.giveVertexCoordinates(a + 1);
+            double x = c.at(xind);
+            double y = c.at(yind);
+            jacT(0, 0) += dNdxi(0, a) * x;
+            jacT(0, 1) += dNdxi(0, a) * y;
+            jacT(1, 0) += dNdxi(1, a) * x;
+            jacT(1, 1) += dNdxi(1, a) * y;
+        }
+        return jacT;
+    }
 };
 } // end namespace oofem
 #endif // feinterpol2d_h

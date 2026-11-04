@@ -66,24 +66,8 @@ FEI3dHexaLin :: evalN(const FloatArrayF<3> &lcoords)
 void
 FEI3dHexaLin :: evalN(FloatArray &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-#if 0
-    answer = evalN(lcoords);
-#else
-    double x = lcoords[0];
-    double y = lcoords[1];
-    double z = lcoords[2];
-
-    answer = Vec8(
-        0.125 * ( 1. - x ) * ( 1. - y ) * ( 1. + z ),
-        0.125 * ( 1. - x ) * ( 1. + y ) * ( 1. + z ),
-        0.125 * ( 1. + x ) * ( 1. + y ) * ( 1. + z ),
-        0.125 * ( 1. + x ) * ( 1. - y ) * ( 1. + z ),
-        0.125 * ( 1. - x ) * ( 1. - y ) * ( 1. - z ),
-        0.125 * ( 1. - x ) * ( 1. + y ) * ( 1. - z ),
-        0.125 * ( 1. + x ) * ( 1. + y ) * ( 1. - z ),
-        0.125 * ( 1. + x ) * ( 1. - y ) * ( 1. - z )
-    );
-#endif
+    // evaluated by the fixed size kernel, the single implementation of the shape functions
+    answer = evalN(giveFixedLocalCoordinates(lcoords));
 }
 
 
@@ -126,43 +110,9 @@ FEI3dHexaLin :: evaldNdxi(const FloatArrayF<3> &lcoords)
 void
 FEI3dHexaLin :: evaldNdxi(FloatMatrix &dN, const FloatArray &lcoords, const FEICellGeometry &) const
 {
-#if 0
-    dN = evaldNdxi(lcoords);
-#else
-    double u, v, w;
-    u = lcoords.at(1);
-    v = lcoords.at(2);
-    w = lcoords.at(3);
-
-    dN.resize(8, 3);
-
-    dN.at(1, 1) = -0.125 * ( 1. - v ) * ( 1. + w );
-    dN.at(2, 1) = -0.125 * ( 1. + v ) * ( 1. + w );
-    dN.at(3, 1) =  0.125 * ( 1. + v ) * ( 1. + w );
-    dN.at(4, 1) =  0.125 * ( 1. - v ) * ( 1. + w );
-    dN.at(5, 1) = -0.125 * ( 1. - v ) * ( 1. - w );
-    dN.at(6, 1) = -0.125 * ( 1. + v ) * ( 1. - w );
-    dN.at(7, 1) =  0.125 * ( 1. + v ) * ( 1. - w );
-    dN.at(8, 1) =  0.125 * ( 1. - v ) * ( 1. - w );
-
-    dN.at(1, 2) = -0.125 * ( 1. - u ) * ( 1. + w );
-    dN.at(2, 2) =  0.125 * ( 1. - u ) * ( 1. + w );
-    dN.at(3, 2) =  0.125 * ( 1. + u ) * ( 1. + w );
-    dN.at(4, 2) = -0.125 * ( 1. + u ) * ( 1. + w );
-    dN.at(5, 2) = -0.125 * ( 1. - u ) * ( 1. - w );
-    dN.at(6, 2) =  0.125 * ( 1. - u ) * ( 1. - w );
-    dN.at(7, 2) =  0.125 * ( 1. + u ) * ( 1. - w );
-    dN.at(8, 2) = -0.125 * ( 1. + u ) * ( 1. - w );
-
-    dN.at(1, 3) =  0.125 * ( 1. - u ) * ( 1. - v );
-    dN.at(2, 3) =  0.125 * ( 1. - u ) * ( 1. + v );
-    dN.at(3, 3) =  0.125 * ( 1. + u ) * ( 1. + v );
-    dN.at(4, 3) =  0.125 * ( 1. + u ) * ( 1. - v );
-    dN.at(5, 3) = -0.125 * ( 1. - u ) * ( 1. - v );
-    dN.at(6, 3) = -0.125 * ( 1. - u ) * ( 1. + v );
-    dN.at(7, 3) = -0.125 * ( 1. + u ) * ( 1. + v );
-    dN.at(8, 3) = -0.125 * ( 1. + u ) * ( 1. - v );
-#endif
+    // evaluated by the fixed size kernel, the single implementation of the derivatives; it returns
+    // them transposed (one column per node), while this interface expects one row per node
+    dN = transpose(evaldNdxi(giveFixedLocalCoordinates(lcoords)));
 }
 
 
@@ -170,12 +120,7 @@ std::pair<double, FloatMatrixF<3,8>>
 FEI3dHexaLin :: evaldNdx(const FloatArrayF<3> &lcoords, const FEICellGeometry &cellgeo) 
 {
     auto dNduvw = evaldNdxi(lcoords);
-    FloatMatrixF<3,8> coords;
-    for ( int i = 0; i < 8; i++ ) {
-        ///@todo cellgeo should give a FloatArrayF<3>, this will add a "costly" construction now:
-        coords.setColumn(cellgeo.giveVertexCoordinates(i+1), i);
-    }
-    auto jacT = dotT(dNduvw, coords);
+    auto jacT = giveJacobianTransposed(dNduvw, cellgeo);
     return {det(jacT), dot(inv(jacT), dNduvw)};
 }
 
@@ -183,25 +128,11 @@ FEI3dHexaLin :: evaldNdx(const FloatArrayF<3> &lcoords, const FEICellGeometry &c
 double
 FEI3dHexaLin :: evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-#if 0
-    auto tmp = evaldNdx(lcoords, cellgeo);
-    //auto [det, dndx] = evaldNdx(lcoords, cellgeo);
-    answer = tmp.second;
+    // Evaluated by the fixed size kernel (no FloatMatrix temporaries). The kernel returns dN/dx
+    // transposed (3x8), while this interface expects one row per node (8x3).
+    auto tmp = evaldNdx(giveFixedLocalCoordinates(lcoords), cellgeo);
+    answer = transpose(tmp.second);
     return tmp.first;
-#else
-    FloatMatrix jacobianMatrix, inv, dNduvw, coords;
-
-    this->evaldNdxi(dNduvw, lcoords, cellgeo);
-    coords.resize(3, 8);
-    for ( int i = 1; i <= 8; i++ ) {
-        coords.setColumn(cellgeo.giveVertexCoordinates(i), i);
-    }
-    jacobianMatrix.beProductOf(coords, dNduvw);
-    inv.beInverseOf(jacobianMatrix);
-
-    answer.beProductOf(dNduvw, inv);
-    return jacobianMatrix.giveDeterminant();
-#endif
 }
 
 void
@@ -614,13 +545,17 @@ void
 FEI3dHexaLin :: giveJacobianMatrixAt(FloatMatrix &jacobianMatrix, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 // Returns the jacobian matrix  J (x,y,z)/(ksi,eta,dzeta)  of the receiver.
 {
-    FloatMatrix dNduvw, coords;
-    this->evaldNdxi(dNduvw, lcoords, cellgeo);
-    coords.resize(3, 8);
-    for ( int i = 1; i <= 8; i++ ) {
-        coords.setColumn(cellgeo.giveVertexCoordinates(i), i);
-    }
-    jacobianMatrix.beProductOf(coords, dNduvw);
+    // fixed size kernel gives J^T
+    jacobianMatrix = transpose(giveJacobianTransposed(evaldNdxi(giveFixedLocalCoordinates(lcoords)), cellgeo));
+}
+
+double
+FEI3dHexaLin :: giveTransformationJacobian(const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
+{
+    // Only det(J) is needed: evaluated directly by the fixed size kernel, without the generic
+    // path through giveJacobianMatrixAt (FloatMatrix temporaries). Called for every integration
+    // point by computeVolumeAround.
+    return det(giveJacobianTransposed(evaldNdxi(giveFixedLocalCoordinates(lcoords)), cellgeo));
 }
 
 

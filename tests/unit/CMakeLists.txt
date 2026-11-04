@@ -37,3 +37,13 @@ if (USE_MPM)
     # Now apply labels explicitly to all discovered tests 
     set_tests_properties(${unit_tests} PROPERTIES LABELS "unit" )
 endif()
+
+# Geometry services of continuum interpolations (evaldNdx, jacobian)
+add_executable(test_feinterpol test_feinterpol.C)
+target_link_libraries(test_feinterpol PRIVATE Catch2::Catch2WithMain liboofem)
+catch_discover_tests(test_feinterpol
+    TEST_LIST feinterpol_tests
+    PROPERTIES
+        ENVIRONMENT "PATH=$<TARGET_FILE_DIR:liboofem>;$ENV{PATH}"
+        LABELS "unit"
+)

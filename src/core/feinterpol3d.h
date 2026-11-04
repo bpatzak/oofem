@@ -36,6 +36,7 @@
 #define feinterpol3d_h
 
 #include "feinterpol.h"
+#include "floatmatrixf.h"
 
 namespace oofem {
 /**
@@ -236,6 +237,40 @@ public:
         OOFEM_ERROR("Not overloaded"); 
     };
     IntArray boundarySurfaceGiveNodes(int boundary, Element_Geometry_Type, bool includeHierarchical=false) const override;
+
+protected:
+    /**
+     * Returns the parent coordinates as a fixed size array, for the fixed size kernels.
+     * Only the first three components are taken: callers may pass more, which the FloatArrayF
+     * conversion would reject in debug builds.
+     */
+    static FloatArrayF< 3 >giveFixedLocalCoordinates(const FloatArray &lcoords) { return { lcoords [ 0 ], lcoords [ 1 ], lcoords [ 2 ] }; }
+
+    /**
+     * Evaluates the transposed jacobian matrix of the mapping from parent to global coordinates,
+     * @f$ (J^T)_{ij} = \partial x_j / \partial \xi_i = \sum_a \partial N_a / \partial \xi_i \, x_{a,j} @f$.
+     * Shared fixed size kernel of isoparametric 3d interpolations: the result lives on the stack (no
+     * FloatMatrix temporaries) and each vertex is requested from cellgeo only once.
+     * The fixed size paths built on it assume an isoparametric cell, i.e. the first N vertices of cellgeo
+     * are the nodes of the receiver; cellgeo.getGeometryInterpolation() is not consulted.
+     * @param dNdxi Derivatives of shape functions with respect to parent coordinates, dNdxi(i,a) = dN_a/dxi_i.
+     * @param cellgeo Underlying cell geometry, providing (at least) N vertices.
+     * @return Transposed jacobian matrix.
+     */
+    template< std::size_t N >
+    static FloatMatrixF< 3, 3 >giveJacobianTransposed(const FloatMatrixF< 3, N > &dNdxi, const FEICellGeometry &cellgeo)
+    {
+        FloatMatrixF< 3, 3 >jacT;
+        for ( std::size_t a = 0; a < N; a++ ) {
+            const auto x = cellgeo.giveVertexCoordinates(a + 1);
+            for ( std::size_t i = 0; i < 3; i++ ) {
+                for ( std::size_t j = 0; j < 3; j++ ) {
+                    jacT(i, j) += dNdxi(i, a) * x [ j ];
+                }
+            }
+        }
+        return jacT;
+    }
 };
 } // end namespace oofem
 #endif // feinterpol3d_h

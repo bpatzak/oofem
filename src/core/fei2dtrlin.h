@@ -57,10 +57,13 @@ public:
 
     // Bulk
     static FloatArrayF<3> evalN(const FloatArrayF<2> &lcoords) ;
+    static FloatMatrixF<2,3> evaldNdxi(const FloatArrayF<2> &lcoords);
     std::pair<double,FloatMatrixF<2,3>> evaldNdx(const FEICellGeometry &cellgeo) const;
 
     void evalN(FloatArray &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const override;
+    void evaldNdxi(FloatMatrix &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const override;
     double evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const override;
+    void giveJacobianMatrixAt(FloatMatrix &jacobianMatrix, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const override;
     void local2global(Coordinates &answer, const FloatArray &gcoords, const FEICellGeometry &cellgeo) const override;
     int global2local(FloatArray &answer, const Coordinates &lcoords, const FEICellGeometry &cellgeo) const override;
     double giveTransformationJacobian(const FloatArray &lcoords, const FEICellGeometry &cellgeo) const override;

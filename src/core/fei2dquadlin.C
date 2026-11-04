@@ -74,33 +74,42 @@ FEI2dQuadLin :: evalN(const FloatArrayF<2> &lcoords)
 void
 FEI2dQuadLin :: evalN(FloatArray &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-    answer = evalN({lcoords[0], lcoords[1]});
+    answer = evalN(giveFixedLocalCoordinates(lcoords));
 }
 
 std::pair<double, FloatMatrixF<2,4>>
 FEI2dQuadLin :: evaldNdx(const FloatArrayF<2> &lcoords, const FEICellGeometry &cellgeo) const
 {
     auto dndu = this->evaldNdxi(lcoords);
-
-    FloatMatrixF<2,2> jacT;
-    for ( std::size_t i = 0; i < dndu.cols(); i++ ) {
-        double x = cellgeo.giveVertexCoordinates(i+1).at(xind);
-        double y = cellgeo.giveVertexCoordinates(i+1).at(yind);
-
-        jacT(0, 0) += dndu(0, i) * x;
-        jacT(0, 1) += dndu(0, i) * y;
-        jacT(1, 0) += dndu(1, i) * x;
-        jacT(1, 1) += dndu(1, i) * y;
-    }
+    auto jacT = giveJacobianTransposed(dndu, cellgeo);
     return {det(jacT), dot(inv(jacT), dndu)};
 }
 
 double
 FEI2dQuadLin :: evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-    auto tmp = evaldNdx(lcoords, cellgeo);
+    // Evaluated by the fixed size kernel (no FloatMatrix temporaries). The kernel returns dN/dx
+    // transposed (2x4), while this interface expects one row per node (4x2).
+    auto tmp = evaldNdx(giveFixedLocalCoordinates(lcoords), cellgeo);
     answer = transpose(tmp.second);
     return tmp.first;
+}
+
+void
+FEI2dQuadLin :: giveJacobianMatrixAt(FloatMatrix &jacobianMatrix, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
+{
+    // fixed size kernel gives J^T; replaces the generic FEInterpolation2d version (FloatMatrix temporaries)
+    jacobianMatrix = transpose(giveJacobianTransposed(evaldNdxi(giveFixedLocalCoordinates(lcoords)), cellgeo));
+}
+
+double
+FEI2dQuadLin :: giveTransformationJacobian(const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
+{
+    // Only det(J) is needed: evaluated directly by the fixed size kernel, without the generic
+    // path through giveJacobianMatrixAt (FloatMatrix temporaries). Called for every integration
+    // point by computeVolumeAround.
+    // Also used by FEI2dQuadLinAxi.
+    return det(giveJacobianTransposed(evaldNdxi(giveFixedLocalCoordinates(lcoords)), cellgeo));
 }
 
 void

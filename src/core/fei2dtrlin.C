@@ -51,11 +51,29 @@ FEI2dTrLin :: evalN(const FloatArrayF<2> &lcoords)
 void
 FEI2dTrLin :: evalN(FloatArray &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-    answer = Vec3(
-        lcoords.at(1),
-        lcoords.at(2),
-        1. - lcoords.at(1) - lcoords.at(2)
-    );
+    // evaluated by the fixed size kernel, the single implementation of the shape functions
+    answer = evalN(giveFixedLocalCoordinates(lcoords));
+}
+
+
+FloatMatrixF<2,3>
+FEI2dTrLin :: evaldNdxi(const FloatArrayF<2> &lcoords)
+{
+    // derivatives of N = (l1, l2, 1-l1-l2) with respect to l1, l2; constant on the linear triangle
+    return {
+        1., 0.,
+        0., 1.,
+        -1., -1.
+    };
+}
+
+
+void
+FEI2dTrLin :: evaldNdxi(FloatMatrix &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
+{
+    // evaluated by the fixed size kernel, the single implementation of the derivatives; it returns
+    // them transposed (one column per node), while this interface expects one row per node
+    answer = transpose(evaldNdxi(giveFixedLocalCoordinates(lcoords)));
 }
 
 std::pair<double, FloatMatrixF<2,3>>
@@ -82,29 +100,19 @@ FEI2dTrLin :: evaldNdx(const FEICellGeometry &cellgeo) const
 double
 FEI2dTrLin :: evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-    double x1, x2, x3, y1, y2, y3, detJ;
+    // Evaluated by the closed form fixed size kernel (dN/dx is constant on the linear triangle). The kernel
+    // returns dN/dx transposed (2x3), while this interface expects one row per node (3x2).
+    auto tmp = evaldNdx(cellgeo);
+    answer = transpose(tmp.second);
+    return tmp.first;
+}
 
-    x1 = cellgeo.giveVertexCoordinates(1).at(xind);
-    x2 = cellgeo.giveVertexCoordinates(2).at(xind);
-    x3 = cellgeo.giveVertexCoordinates(3).at(xind);
 
-    y1 = cellgeo.giveVertexCoordinates(1).at(yind);
-    y2 = cellgeo.giveVertexCoordinates(2).at(yind);
-    y3 = cellgeo.giveVertexCoordinates(3).at(yind);
-
-    detJ = x1 * ( y2 - y3 ) + x2 * ( -y1 + y3 ) + x3 * ( y1 - y2 );
-
-    answer.resize(3, 2);
-    answer.at(1, 1) = ( y2 - y3 ) / detJ;
-    answer.at(1, 2) = ( x3 - x2 ) / detJ;
-
-    answer.at(2, 1) = ( y3 - y1 ) / detJ;
-    answer.at(2, 2) = ( x1 - x3 ) / detJ;
-
-    answer.at(3, 1) = ( y1 - y2 ) / detJ;
-    answer.at(3, 2) = ( x2 - x1 ) / detJ;
-
-    return detJ;
+void
+FEI2dTrLin :: giveJacobianMatrixAt(FloatMatrix &jacobianMatrix, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
+{
+    // fixed size kernel gives J^T; replaces the generic FEInterpolation2d version (FloatMatrix temporaries)
+    jacobianMatrix = transpose(giveJacobianTransposed(evaldNdxi(giveFixedLocalCoordinates(lcoords)), cellgeo));
 }
 
 void

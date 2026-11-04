@@ -76,8 +76,8 @@ FEI3dHexaTriQuad :: evalN(const FloatArrayF<3> &lcoords)
         a [ 1 ] * b [ 1 ] * c [ 2 ],
         a [ 1 ] * b [ 0 ] * c [ 2 ],
         a [ 2 ] * b [ 2 ] * c [ 1 ],
-        a [ 0 ] * b [ 2 ] * c [ 2 ],
         a [ 2 ] * b [ 2 ] * c [ 0 ],
+        a [ 0 ] * b [ 2 ] * c [ 2 ],
         a [ 2 ] * b [ 1 ] * c [ 2 ],
         a [ 1 ] * b [ 2 ] * c [ 2 ],
         a [ 2 ] * b [ 0 ] * c [ 2 ],
@@ -88,61 +88,8 @@ FEI3dHexaTriQuad :: evalN(const FloatArrayF<3> &lcoords)
 void
 FEI3dHexaTriQuad :: evalN(FloatArray &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-#if 0
-    answer = evalN(lcoords);
-#else
-    double u = lcoords.at(1);
-    double v = lcoords.at(2);
-    double w = lcoords.at(3);
-
-    double a[] = {
-        0.5 * ( u - 1.0 ) * u, 0.5 * ( u + 1.0 ) * u, 1.0 - u * u
-    };
-    double b[] = {
-        0.5 * ( v - 1.0 ) * v, 0.5 * ( v + 1.0 ) * v, 1.0 - v * v
-    };
-    double c[] = {
-        0.5 * ( w - 1.0 ) * w, 0.5 * ( w + 1.0 ) * w, 1.0 - w * w
-    };
-
-    answer.resize(27);
-
-    answer.at(5) = a [ 0 ] * b [ 0 ] * c [ 0 ];
-    answer.at(8) = a [ 1 ] * b [ 0 ] * c [ 0 ];
-    answer.at(16) = a [ 2 ] * b [ 0 ] * c [ 0 ];
-
-    answer.at(6) = a [ 0 ] * b [ 1 ] * c [ 0 ];
-    answer.at(7) = a [ 1 ] * b [ 1 ] * c [ 0 ];
-    answer.at(14) = a [ 2 ] * b [ 1 ] * c [ 0 ];
-
-    answer.at(13) = a [ 0 ] * b [ 2 ] * c [ 0 ];
-    answer.at(15) = a [ 1 ] * b [ 2 ] * c [ 0 ];
-    answer.at(22) = a [ 2 ] * b [ 2 ] * c [ 0 ];
-
-    answer.at(1) = a [ 0 ] * b [ 0 ] * c [ 1 ];
-    answer.at(4) = a [ 1 ] * b [ 0 ] * c [ 1 ];
-    answer.at(12) = a [ 2 ] * b [ 0 ] * c [ 1 ];
-
-    answer.at(2) = a [ 0 ] * b [ 1 ] * c [ 1 ];
-    answer.at(3) = a [ 1 ] * b [ 1 ] * c [ 1 ];
-    answer.at(10) = a [ 2 ] * b [ 1 ] * c [ 1 ];
-
-    answer.at(9) = a [ 0 ] * b [ 2 ] * c [ 1 ];
-    answer.at(11) = a [ 1 ] * b [ 2 ] * c [ 1 ];
-    answer.at(21) = a [ 2 ] * b [ 2 ] * c [ 1 ];
-
-    answer.at(17) = a [ 0 ] * b [ 0 ] * c [ 2 ];
-    answer.at(20) = a [ 1 ] * b [ 0 ] * c [ 2 ];
-    answer.at(26) = a [ 2 ] * b [ 0 ] * c [ 2 ];
-
-    answer.at(18) = a [ 0 ] * b [ 1 ] * c [ 2 ];
-    answer.at(19) = a [ 1 ] * b [ 1 ] * c [ 2 ];
-    answer.at(24) = a [ 2 ] * b [ 1 ] * c [ 2 ];
-
-    answer.at(23) = a [ 0 ] * b [ 2 ] * c [ 2 ];
-    answer.at(25) = a [ 1 ] * b [ 2 ] * c [ 2 ];
-    answer.at(27) = a [ 2 ] * b [ 2 ] * c [ 2 ];
-#endif
+    // evaluated by the fixed size kernel, the single implementation of the shape functions
+    answer = evalN(giveFixedLocalCoordinates(lcoords));
 }
 
 
@@ -305,149 +252,9 @@ FEI3dHexaTriQuad :: evaldNdxi(const FloatArrayF<3> &lcoords)
 void
 FEI3dHexaTriQuad :: evaldNdxi(FloatMatrix &dN, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-#if 0
-    dN = evaldNdxi(lcoords);
-#else
-    double u, v, w;
-    u = lcoords.at(1);
-    v = lcoords.at(2);
-    w = lcoords.at(3);
-
-    // Helpers expressions;
-    double a[] = {
-        0.5 * ( u - 1.0 ) * u, 0.5 * ( u + 1.0 ) * u, 1.0 - u * u
-    };
-    double b[] = {
-        0.5 * ( v - 1.0 ) * v, 0.5 * ( v + 1.0 ) * v, 1.0 - v * v
-    };
-    double c[] = {
-        0.5 * ( w - 1.0 ) * w, 0.5 * ( w + 1.0 ) * w, 1.0 - w * w
-    };
-
-    double da[] = {
-        -0.5 + u, 0.5 + u, -2.0 * u
-    };
-    double db[] = {
-        -0.5 + v, 0.5 + v, -2.0 * v
-    };
-    double dc[] = {
-        -0.5 + w, 0.5 + w, -2.0 * w
-    };
-
-    dN.resize(27, 3);
-
-    dN.at(5, 1) = da [ 0 ] * b [ 0 ] * c [ 0 ];
-    dN.at(8, 1) = da [ 1 ] * b [ 0 ] * c [ 0 ];
-    dN.at(16, 1) = da [ 2 ] * b [ 0 ] * c [ 0 ];
-
-    dN.at(6, 1) = da [ 0 ] * b [ 1 ] * c [ 0 ];
-    dN.at(7, 1) = da [ 1 ] * b [ 1 ] * c [ 0 ];
-    dN.at(14, 1) = da [ 2 ] * b [ 1 ] * c [ 0 ];
-
-    dN.at(13, 1) = da [ 0 ] * b [ 2 ] * c [ 0 ];
-    dN.at(15, 1) = da [ 1 ] * b [ 2 ] * c [ 0 ];
-    dN.at(22, 1) = da [ 2 ] * b [ 2 ] * c [ 0 ];
-
-    dN.at(1, 1) = da [ 0 ] * b [ 0 ] * c [ 1 ];
-    dN.at(4, 1) = da [ 1 ] * b [ 0 ] * c [ 1 ];
-    dN.at(12, 1) = da [ 2 ] * b [ 0 ] * c [ 1 ];
-
-    dN.at(2, 1) = da [ 0 ] * b [ 1 ] * c [ 1 ];
-    dN.at(3, 1) = da [ 1 ] * b [ 1 ] * c [ 1 ];
-    dN.at(10, 1) = da [ 2 ] * b [ 1 ] * c [ 1 ];
-
-    dN.at(9, 1) = da [ 0 ] * b [ 2 ] * c [ 1 ];
-    dN.at(11, 1) = da [ 1 ] * b [ 2 ] * c [ 1 ];
-    dN.at(21, 1) = da [ 2 ] * b [ 2 ] * c [ 1 ];
-
-    dN.at(17, 1) = da [ 0 ] * b [ 0 ] * c [ 2 ];
-    dN.at(20, 1) = da [ 1 ] * b [ 0 ] * c [ 2 ];
-    dN.at(26, 1) = da [ 2 ] * b [ 0 ] * c [ 2 ];
-
-    dN.at(18, 1) = da [ 0 ] * b [ 1 ] * c [ 2 ];
-    dN.at(19, 1) = da [ 1 ] * b [ 1 ] * c [ 2 ];
-    dN.at(24, 1) = da [ 2 ] * b [ 1 ] * c [ 2 ];
-
-    dN.at(23, 1) = da [ 0 ] * b [ 2 ] * c [ 2 ];
-    dN.at(25, 1) = da [ 1 ] * b [ 2 ] * c [ 2 ];
-    dN.at(27, 1) = da [ 2 ] * b [ 2 ] * c [ 2 ];
-
-    //
-
-    dN.at(5, 2) = a [ 0 ] * db [ 0 ] * c [ 0 ];
-    dN.at(8, 2) = a [ 1 ] * db [ 0 ] * c [ 0 ];
-    dN.at(16, 2) = a [ 2 ] * db [ 0 ] * c [ 0 ];
-
-    dN.at(6, 2) = a [ 0 ] * db [ 1 ] * c [ 0 ];
-    dN.at(7, 2) = a [ 1 ] * db [ 1 ] * c [ 0 ];
-    dN.at(14, 2) = a [ 2 ] * db [ 1 ] * c [ 0 ];
-
-    dN.at(13, 2) = a [ 0 ] * db [ 2 ] * c [ 0 ];
-    dN.at(15, 2) = a [ 1 ] * db [ 2 ] * c [ 0 ];
-    dN.at(22, 2) = a [ 2 ] * db [ 2 ] * c [ 0 ];
-
-    dN.at(1, 2) = a [ 0 ] * db [ 0 ] * c [ 1 ];
-    dN.at(4, 2) = a [ 1 ] * db [ 0 ] * c [ 1 ];
-    dN.at(12, 2) = a [ 2 ] * db [ 0 ] * c [ 1 ];
-
-    dN.at(2, 2) = a [ 0 ] * db [ 1 ] * c [ 1 ];
-    dN.at(3, 2) = a [ 1 ] * db [ 1 ] * c [ 1 ];
-    dN.at(10, 2) = a [ 2 ] * db [ 1 ] * c [ 1 ];
-
-    dN.at(9, 2) = a [ 0 ] * db [ 2 ] * c [ 1 ];
-    dN.at(11, 2) = a [ 1 ] * db [ 2 ] * c [ 1 ];
-    dN.at(21, 2) = a [ 2 ] * db [ 2 ] * c [ 1 ];
-
-    dN.at(17, 2) = a [ 0 ] * db [ 0 ] * c [ 2 ];
-    dN.at(20, 2) = a [ 1 ] * db [ 0 ] * c [ 2 ];
-    dN.at(26, 2) = a [ 2 ] * db [ 0 ] * c [ 2 ];
-
-    dN.at(18, 2) = a [ 0 ] * db [ 1 ] * c [ 2 ];
-    dN.at(19, 2) = a [ 1 ] * db [ 1 ] * c [ 2 ];
-    dN.at(24, 2) = a [ 2 ] * db [ 1 ] * c [ 2 ];
-
-    dN.at(23, 2) = a [ 0 ] * db [ 2 ] * c [ 2 ];
-    dN.at(25, 2) = a [ 1 ] * db [ 2 ] * c [ 2 ];
-    dN.at(27, 2) = a [ 2 ] * db [ 2 ] * c [ 2 ];
-
-    //
-
-    dN.at(5, 3) = a [ 0 ] * b [ 0 ] * dc [ 0 ];
-    dN.at(8, 3) = a [ 1 ] * b [ 0 ] * dc [ 0 ];
-    dN.at(16, 3) = a [ 2 ] * b [ 0 ] * dc [ 0 ];
-
-    dN.at(6, 3) = a [ 0 ] * b [ 1 ] * dc [ 0 ];
-    dN.at(7, 3) = a [ 1 ] * b [ 1 ] * dc [ 0 ];
-    dN.at(14, 3) = a [ 2 ] * b [ 1 ] * dc [ 0 ];
-
-    dN.at(13, 3) = a [ 0 ] * b [ 2 ] * dc [ 0 ];
-    dN.at(15, 3) = a [ 1 ] * b [ 2 ] * dc [ 0 ];
-    dN.at(22, 3) = a [ 2 ] * b [ 2 ] * dc [ 0 ];
-
-    dN.at(1, 3) = a [ 0 ] * b [ 0 ] * dc [ 1 ];
-    dN.at(4, 3) = a [ 1 ] * b [ 0 ] * dc [ 1 ];
-    dN.at(12, 3) = a [ 2 ] * b [ 0 ] * dc [ 1 ];
-
-    dN.at(2, 3) = a [ 0 ] * b [ 1 ] * dc [ 1 ];
-    dN.at(3, 3) = a [ 1 ] * b [ 1 ] * dc [ 1 ];
-    dN.at(10, 3) = a [ 2 ] * b [ 1 ] * dc [ 1 ];
-
-    dN.at(9, 3) = a [ 0 ] * b [ 2 ] * dc [ 1 ];
-    dN.at(11, 3) = a [ 1 ] * b [ 2 ] * dc [ 1 ];
-    dN.at(21, 3) = a [ 2 ] * b [ 2 ] * dc [ 1 ];
-
-    dN.at(17, 3) = a [ 0 ] * b [ 0 ] * dc [ 2 ];
-    dN.at(20, 3) = a [ 1 ] * b [ 0 ] * dc [ 2 ];
-    dN.at(26, 3) = a [ 2 ] * b [ 0 ] * dc [ 2 ];
-
-    dN.at(18, 3) = a [ 0 ] * b [ 1 ] * dc [ 2 ];
-    dN.at(19, 3) = a [ 1 ] * b [ 1 ] * dc [ 2 ];
-    dN.at(24, 3) = a [ 2 ] * b [ 1 ] * dc [ 2 ];
-
-    dN.at(23, 3) = a [ 0 ] * b [ 2 ] * dc [ 2 ];
-    dN.at(25, 3) = a [ 1 ] * b [ 2 ] * dc [ 2 ];
-    dN.at(27, 3) = a [ 2 ] * b [ 2 ] * dc [ 2 ];
-#endif
+    // evaluated by the fixed size kernel, the single implementation of the derivatives; it returns
+    // them transposed (one column per node), while this interface expects one row per node
+    dN = transpose(evaldNdxi(giveFixedLocalCoordinates(lcoords)));
 }
 
 
@@ -455,21 +262,35 @@ std::pair<double, FloatMatrixF<3,27>>
 FEI3dHexaTriQuad :: evaldNdx(const FloatArrayF<3> &lcoords, const FEICellGeometry &cellgeo)
 {
     auto dNduvw = evaldNdxi(lcoords);
-    FloatMatrixF<3,27> coords;
-    for ( int i = 0; i < 27; i++ ) {
-        ///@todo cellgeo should give a FloatArrayF<3>, this will add a "costly" construction now:
-        coords.setColumn(cellgeo.giveVertexCoordinates(i+1), i);
-    }
-    auto jacT = dotT(dNduvw, coords);
+    auto jacT = giveJacobianTransposed(dNduvw, cellgeo);
     return {det(jacT), dot(inv(jacT), dNduvw)};
 }
 
 double
 FEI3dHexaTriQuad :: evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-    auto tmp = evaldNdx(lcoords, cellgeo);
+    // Evaluated by the fixed size kernel (no FloatMatrix temporaries). The kernel returns dN/dx
+    // transposed (3x27), while this interface expects one row per node (27x3).
+    auto tmp = evaldNdx(giveFixedLocalCoordinates(lcoords), cellgeo);
     answer = transpose(tmp.second);
     return tmp.first;
+}
+
+void
+FEI3dHexaTriQuad :: giveJacobianMatrixAt(FloatMatrix &jacobianMatrix, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
+{
+    // fixed size kernel gives J^T (27 nodes, not inherited from FEI3dHexaQuad)
+    jacobianMatrix = transpose(giveJacobianTransposed(evaldNdxi(giveFixedLocalCoordinates(lcoords)), cellgeo));
+}
+
+double
+FEI3dHexaTriQuad :: giveTransformationJacobian(const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
+{
+    // Only det(J) is needed: evaluated directly by the fixed size kernel, without the generic
+    // path through giveJacobianMatrixAt (FloatMatrix temporaries). Called for every integration
+    // point by computeVolumeAround.
+    // 27 nodes, not inherited from FEI3dHexaQuad.
+    return det(giveJacobianTransposed(evaldNdxi(giveFixedLocalCoordinates(lcoords)), cellgeo));
 }
 
 double
