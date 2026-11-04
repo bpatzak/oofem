@@ -55,6 +55,27 @@ FEI2dTrLin :: evalN(FloatArray &answer, const FloatArray &lcoords, const FEICell
     answer = evalN(giveFixedLocalCoordinates(lcoords));
 }
 
+
+FloatMatrixF<2,3>
+FEI2dTrLin :: evaldNdxi(const FloatArrayF<2> &lcoords)
+{
+    // derivatives of N = (l1, l2, 1-l1-l2) with respect to l1, l2; constant on the linear triangle
+    return {
+        1., 0.,
+        0., 1.,
+        -1., -1.
+    };
+}
+
+
+void
+FEI2dTrLin :: evaldNdxi(FloatMatrix &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
+{
+    // evaluated by the fixed size kernel, the single implementation of the derivatives; it returns
+    // them transposed (one column per node), while this interface expects one row per node
+    answer = transpose(evaldNdxi(giveFixedLocalCoordinates(lcoords)));
+}
+
 std::pair<double, FloatMatrixF<2,3>>
 FEI2dTrLin :: evaldNdx(const FEICellGeometry &cellgeo) const
 {
@@ -84,6 +105,14 @@ FEI2dTrLin :: evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, const FEI
     auto tmp = evaldNdx(cellgeo);
     answer = transpose(tmp.second);
     return tmp.first;
+}
+
+
+void
+FEI2dTrLin :: giveJacobianMatrixAt(FloatMatrix &jacobianMatrix, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
+{
+    // fixed size kernel gives J^T; replaces the generic FEInterpolation2d version (FloatMatrix temporaries)
+    jacobianMatrix = transpose(giveJacobianTransposed(evaldNdxi(giveFixedLocalCoordinates(lcoords)), cellgeo));
 }
 
 void
