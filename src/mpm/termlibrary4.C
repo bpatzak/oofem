@@ -94,6 +94,19 @@ void dnTaN::evaluate_lin (FloatMatrix& answer, MPElement& e, GaussPoint* gp, Tim
     answer.beProductOf(dndx, anm);
 }
 
+void dnTaN::evaluate_lin_add (FloatMatrix& answer, double factor, MPElement& e, GaussPoint* gp, TimeStep* tstep) const  {
+    // dN/dx a N^T is the outer product of dN/dx a and N: accumulated directly
+    FloatArray n, a, dndxa;
+    Coordinates gc;
+    FloatMatrix dndx;
+    MPElement::evaldNdx(dndx, this->testField->interpolation, e, gp->giveNaturalCoordinates());
+    this->field->interpolation->evalN(n, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(&e));
+    e.getGeometryInterpolation()->local2global(gc, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(&e));
+    this->velocity->evaluateAt(a, gc, VM_Total, tstep);
+    dndxa.beProductOf(dndx, a);
+    answer.plusDyadUnsym(dndxa, n, factor);
+}
+
 void dnTaN::evaluate (FloatArray& answer, MPElement& cell, GaussPoint* gp, TimeStep* tstep) const  {
     FloatArray p;
     FloatMatrix S;
