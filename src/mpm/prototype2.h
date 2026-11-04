@@ -585,6 +585,15 @@ namespace oofem {
         IntArray lhsIntegrals;
         IntArray rhsIntegrals;
 
+        /// The integrals with given (1-based) indices as a group for Integral::assembleGroup_lhs/rhs.
+        std::vector< Integral::GroupMember > giveIntegralGroup(const IntArray &ids) const {
+            std::vector< Integral::GroupMember > group;
+            for ( int i : ids ) {
+                group.push_back({ this->integralList[i-1].get() });
+            }
+            return group;
+        }
+
     public:
         TestProblem(int i, EngngModel * _master) : EngngModel(i, _master) { ndomains = 1;}
 
@@ -644,18 +653,14 @@ namespace oofem {
                 effectiveMatrix->buildInternalStructure( this, 1, EModelDefaultEquationNumbering() );
             }
             // loop over lhs integrals
-            for (auto i: lhsIntegrals) {
-                Integral* integral = this->integralList[i-1].get();
-                integral->assemble_lhs (*effectiveMatrix, EModelDefaultEquationNumbering(), tStep); 
-            }
+            // lhs integrals, assembled element by element (see Integral::assembleGroup_lhs)
+            Integral::assembleGroup_lhs(*effectiveMatrix, this->giveIntegralGroup(lhsIntegrals), EModelDefaultEquationNumbering(), tStep);
             //effectiveMatrix->printYourself();
             // assemble rhs
             rhs.resize(this->giveNumberOfDomainEquations( 1, EModelDefaultEquationNumbering() ));
             // loop over rhs integrals
-            for (auto i: rhsIntegrals) {
-                Integral* integral = this->integralList[i-1].get();
-                integral->assemble_rhs (rhs, EModelDefaultEquationNumbering(), tStep); 
-            }
+            // rhs integrals, assembled element by element (see Integral::assembleGroup_rhs)
+            Integral::assembleGroup_rhs(rhs, this->giveIntegralGroup(rhsIntegrals), EModelDefaultEquationNumbering(), tStep);
             // experimental: allow traditional BCs to contribute to rhs as well by treating them as integrals
             this->assembleVectorFromBC(rhs, tStep, ExternalForceAssembler(), VM_Total,
                                        EModelDefaultEquationNumbering(), this->giveDomain(1) );
@@ -666,10 +671,7 @@ namespace oofem {
             // update the problem (evaluate residuals on lhs terms)
             FloatArray internalForces(rhs.giveSize());
             internalForces.zero();
-            for (auto i: lhsIntegrals) {
-                Integral* integral = this->integralList[i-1].get();
-                integral->assemble_rhs (internalForces, EModelDefaultEquationNumbering(), tStep); 
-            }          
+            Integral::assembleGroup_rhs(internalForces, this->giveIntegralGroup(lhsIntegrals), EModelDefaultEquationNumbering(), tStep);          
         }
 
         TimeStep *giveNextStep() override
