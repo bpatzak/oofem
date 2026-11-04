@@ -60,6 +60,31 @@ FEI3dTetLin :: evalN(FloatArray &answer, const FloatArray &lcoords, const FEICel
     answer = evalN(giveFixedLocalCoordinates(lcoords));
 }
 
+
+FloatMatrixF<3,4>
+FEI3dTetLin :: evaldNdxi(const FloatArrayF<3> &lcoords)
+{
+    // derivatives of N = (l1, l2, l3, 1-l1-l2-l3) with respect to l1, l2, l3; constant on the linear tetrahedron.
+    // Note: the closed form detJ of evaldNdx and giveTransformationJacobian follows the tet4 node orientation
+    // used in OOFEM and equals -det(dx/dl) of this parametrization (positive for valid elements). For that
+    // reason giveJacobianMatrixAt is not provided: the determinant of dx/dl would have the opposite sign.
+    return {
+        1., 0., 0.,
+        0., 1., 0.,
+        0., 0., 1.,
+        -1., -1., -1.
+    };
+}
+
+
+void
+FEI3dTetLin :: evaldNdxi(FloatMatrix &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
+{
+    // evaluated by the fixed size kernel, the single implementation of the derivatives; it returns
+    // them transposed (one column per node), while this interface expects one row per node
+    answer = transpose(evaldNdxi(giveFixedLocalCoordinates(lcoords)));
+}
+
 std::pair<double, FloatMatrixF<3,4>>
 FEI3dTetLin :: evaldNdx(const FEICellGeometry &cellgeo)
 {
