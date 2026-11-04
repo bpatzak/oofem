@@ -89,56 +89,60 @@ namespace oofem {
         }
         // evaluate term contribution to weak form on given cell at given point 
         void assemble_lhs (SparseMtrx& dest, const UnknownNumberingScheme &s, TimeStep* tStep, double factor2 = 1.0) const {
-            IntArray locr, locc;
-
             for (auto i: this->set->giveElementList()) { // loop over elements
                 MPElement *e = dynamic_cast<MPElement*>(this->domain->giveElement(i));
                 if (e) {
-                    FloatMatrix contrib;
-                    this->getElementTermCodeNumbers(locr, locc, e, *this->term, s);
-                    // determine integration rule (this has to be set up on element, as we need to track history there)
-                    // the IR is created by term.initialize, we just need mechanism to get this IR
-                    // specific terms can have specific integration requirements (reduced integration, etc)
-                    // at the same time same rules should be shared between terms->
-                    // ->need to querry/store/identify element IR based on NIP.
-                    IntegrationRule* ir =  this->term->giveElementIntegrationRule(e);
-                    e->integrateTerm_dw(contrib, *this->term, ir, tStep); // @todo IR 
-                    if (contrib.isNotEmpty()) {
-                        contrib.times(this->factor * factor2);
-                        // assemble
-                        dest.assemble (locr, locc, contrib);
-                    }
+                    this->assembleElement_lhs(dest, e, s, tStep, factor2);
                 }
             }
         }
         // evaluate contribution (all vars known) on given cell
         void assemble_rhs (FloatArray& dest, const UnknownNumberingScheme &s, TimeStep* tstep, FloatArray* eNorms=NULL, double factor2 = 1.0) const {
-            IntArray locr, locc, dofIDs;
-
             for (auto i: this->set->giveElementList()) { // loop over elements
                 MPElement *e = dynamic_cast<MPElement*>(this->domain->giveElement(i));
                 if (e) {
-                    FloatArray contrib;
-                    this->getElementTermCodeNumbers(locr, locc, e, *this->term, s, &dofIDs);
-                    // determine integration rule (this has to be set up on element, as we need to track history there)
-                    // the IR is created by term.initialize, we just need mechanism to get this IR
-                    // specific terms can have specific integration requirements (reduced integration, etc)
-                    // at the same time same rules should be shared between terms->
-                    // ->need to querry/store/identify element IR based on NIP.
-                    IntegrationRule* ir =  this->term->giveElementIntegrationRule(e);
-                    e->integrateTerm_c(contrib, *this->term, ir, tstep); // @todo IR
-                    contrib.times(this->factor * factor2);
-                    // assemble
-                    if (contrib.isNotEmpty()) {
-                        dest.assemble (contrib, locr);
-                    }
-                    if ( eNorms ) {
-                        eNorms->assembleSquared(contrib, dofIDs);
-                    }
+                    this->assembleElement_rhs(dest, e, s, tstep, eNorms, factor2);
                 }
             }
-           
-
+        }
+        /// Assembles the contribution of the term on one element of the integration domain to dest (see assemble_lhs).
+        void assembleElement_lhs (SparseMtrx& dest, MPElement *e, const UnknownNumberingScheme &s, TimeStep* tStep, double factor2 = 1.0) const {
+            IntArray locr, locc;
+            FloatMatrix contrib;
+            this->getElementTermCodeNumbers(locr, locc, e, *this->term, s);
+            // determine integration rule (this has to be set up on element, as we need to track history there)
+            // the IR is created by term.initialize, we just need mechanism to get this IR
+            // specific terms can have specific integration requirements (reduced integration, etc)
+            // at the same time same rules should be shared between terms->
+            // ->need to querry/store/identify element IR based on NIP.
+            IntegrationRule* ir =  this->term->giveElementIntegrationRule(e);
+            e->integrateTerm_dw(contrib, *this->term, ir, tStep); // @todo IR 
+            if (contrib.isNotEmpty()) {
+                contrib.times(this->factor * factor2);
+                // assemble
+                dest.assemble (locr, locc, contrib);
+            }
+        }
+        /// Assembles the contribution of the term on one element of the integration domain to dest (see assemble_rhs).
+        void assembleElement_rhs (FloatArray& dest, MPElement *e, const UnknownNumberingScheme &s, TimeStep* tstep, FloatArray* eNorms=NULL, double factor2 = 1.0) const {
+            IntArray locr, locc, dofIDs;
+            FloatArray contrib;
+            this->getElementTermCodeNumbers(locr, locc, e, *this->term, s, &dofIDs);
+            // determine integration rule (this has to be set up on element, as we need to track history there)
+            // the IR is created by term.initialize, we just need mechanism to get this IR
+            // specific terms can have specific integration requirements (reduced integration, etc)
+            // at the same time same rules should be shared between terms->
+            // ->need to querry/store/identify element IR based on NIP.
+            IntegrationRule* ir =  this->term->giveElementIntegrationRule(e);
+            e->integrateTerm_c(contrib, *this->term, ir, tstep); // @todo IR
+            contrib.times(this->factor * factor2);
+            // assemble
+            if (contrib.isNotEmpty()) {
+                dest.assemble (contrib, locr);
+            }
+            if ( eNorms ) {
+                eNorms->assembleSquared(contrib, dofIDs);
+            }
         }
         void getElementTermCodeNumbers (IntArray &locr, IntArray &locc, Element* e, const Term& t, const UnknownNumberingScheme &s, IntArray* rowDofIDs=NULL) const {
             IntArray nodes, internalDofMans, loc, masterDofIDs;
