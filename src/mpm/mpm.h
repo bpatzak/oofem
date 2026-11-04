@@ -555,9 +555,9 @@ class OOFEM_EXPORT MPElement : public Element {
      * Scope of one evaluation of the element (its terms, its state push), in which getUnknownVector gathers each
      * (field, value mode, time step) only once. The nodal unknowns do not change during such an evaluation, so
      * it is opened around it; the memo is dropped when the outermost scope ends (no invalidation needed).
-     * With memoiseGeometry, also dN/dx (see evaldNdx) is memoised; that pays off only when several terms are
-     * evaluated within the scope (e.g. all terms of the element in one assembler call), as each term visits
-     * every point once.
+     * With memoiseGeometry, also dN/dx (see evaldNdx) and the volume measure (computeVolumeAround) are memoised;
+     * that pays off only when several terms are evaluated within the scope (e.g. all terms of the element in one
+     * assembler call), as each term visits every point once.
      */
     class EvaluationScope
     {
@@ -631,6 +631,8 @@ protected:
     };
     mutable std::vector< DNdxEntry > dNdxMemo;
     mutable std::vector< double > dNdxPool;
+    /// Volume measure (computeVolumeAround) per integration point, inside the current EvaluationScope memoising geometry.
+    std::vector< std::pair< GaussPoint *, double > > volumeMemo;
     /// evaldNdx without the memo; mpcell is the cell as an MPElement (nullptr if it is not one).
     static void computeDNdx(FloatMatrix &answer, const FEInterpolation *interpol, const Element &cell, const MPElement *mpcell, const FloatArray &lcoords);
 
@@ -639,6 +641,7 @@ protected:
         std::vector< UnknownGatherEntry >().swap(this->unknownGatherMemo);
         std::vector< DNdxEntry >().swap(this->dNdxMemo);
         std::vector< double >().swap(this->dNdxPool);
+        std::vector< std::pair< GaussPoint *, double > >().swap(this->volumeMemo);
     }
 
 public:
@@ -747,7 +750,22 @@ public:
   virtual double computeEdgeVolumeAround(GaussPoint* igp, int iEdge) 
   {return igp->giveWeight()*this->getGeometryInterpolation()->boundaryEdgeGiveTransformationJacobian(iEdge, igp->giveNaturalCoordinates(), FEIElementGeometryWrapper(this));}
   virtual double computeVolumeAround(GaussPoint* igp) override
-  {return igp->giveWeight()*this->getGeometryInterpolation()->giveTransformationJacobian(igp->giveNaturalCoordinates(), FEIElementGeometryWrapper(this));}
+  {
+      // memoised per integration point inside an EvaluationScope memoising geometry, where several terms of the
+      // element are integrated with the same points
+      if ( this->geometryMemoDepth > 0 ) {
+          for ( const auto &entry : this->volumeMemo ) {
+              if ( entry.first == igp ) {
+                  return entry.second;
+              }
+          }
+      }
+      double dV = igp->giveWeight()*this->getGeometryInterpolation()->giveTransformationJacobian(igp->giveNaturalCoordinates(), FEIElementGeometryWrapper(this));
+      if ( this->geometryMemoDepth > 0 ) {
+          this->volumeMemo.emplace_back(igp, dV);
+      }
+      return dV;
+  }
   
    //const FEInterpolation& getGeometryInterpolation () const override = 0;
    FEInterpolation *giveInterpolation() const override { return const_cast<FEInterpolation*>( this->getGeometryInterpolation()); }
