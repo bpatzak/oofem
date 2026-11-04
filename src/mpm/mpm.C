@@ -521,8 +521,8 @@ MPElement::updateTempState(TimeStep *tStep)
 
     FloatArray state;
     // assembleStateVector gathers the nodal unknowns of each field at every integration point; they are
-    // the same for all of them, so they are gathered once for the whole sweep (see UnknownGatherScope)
-    UnknownGatherScope gatherScope(*this);
+    // the same for all of them, so they are gathered once for the whole sweep (see EvaluationScope)
+    EvaluationScope evalScope(*this);
 
     for ( auto &iRule : this->integrationRulesArray ) {
         for ( GaussPoint *gp : *iRule ) {

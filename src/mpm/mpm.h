@@ -357,8 +357,8 @@ class OOFEM_EXPORT MPElement : public Element {
     }
 
     void integrateTerm_dw (FloatMatrix& answer, const Term& term, IntegrationRule* iRule, TimeStep* tstep) {
-        // the nodal unknowns are gathered once for all integration points (see UnknownGatherScope)
-        UnknownGatherScope gatherScope(*this);
+        // the nodal unknowns are gathered once for all integration points (see EvaluationScope)
+        EvaluationScope evalScope(*this);
         // need for integration domain and rule.
         // who should determine integration domain? Element or term? Term is just integrand, not integral
         // so integral type (surface, volume, etc) defined by element ---
@@ -366,8 +366,8 @@ class OOFEM_EXPORT MPElement : public Element {
     } 
 
     void integrateTerm_c (FloatArray& answer, const Term& term, IntegrationRule* iRule, TimeStep* tstep) {
-        // the nodal unknowns are gathered once for all integration points (see UnknownGatherScope)
-        UnknownGatherScope gatherScope(*this);
+        // the nodal unknowns are gathered once for all integration points (see EvaluationScope)
+        EvaluationScope evalScope(*this);
         // need for integration domain and rule.
         // who should determine integration domain? Element or term? Term is just integrand, not integral
         // so integral type (surface, volume, etc) defined by element ---
@@ -380,8 +380,8 @@ class OOFEM_EXPORT MPElement : public Element {
     } 
 
     void integrateSurfaceTerm_dw (FloatMatrix& answer, const Term& term, IntegrationRule* iRule, int isurf, TimeStep* tstep) {
-            // the nodal unknowns are gathered once for all integration points (see UnknownGatherScope)
-            UnknownGatherScope gatherScope(*this);
+            // the nodal unknowns are gathered once for all integration points (see EvaluationScope)
+            EvaluationScope evalScope(*this);
             // need for integration domain and rule.
             // who should determine integration domain? Element or term? Term is just integrand, not integral
             // so integral type (surface, volume, etc) defined by element ---
@@ -389,8 +389,8 @@ class OOFEM_EXPORT MPElement : public Element {
         } 
 
     void integrateSurfaceTerm_c (FloatArray& answer, const Term& term, IntegrationRule* iRule, int isurf, TimeStep* tstep) {
-            // the nodal unknowns are gathered once for all integration points (see UnknownGatherScope)
-            UnknownGatherScope gatherScope(*this);
+            // the nodal unknowns are gathered once for all integration points (see EvaluationScope)
+            EvaluationScope evalScope(*this);
             // need for integration domain and rule.
             // who should determine integration domain? Element or term? Term is just integrand, not integral
             // so integral type (surface, volume, etc) defined by element ---
@@ -403,8 +403,8 @@ class OOFEM_EXPORT MPElement : public Element {
         } 
 
     void integrateEdgeTerm_dw (FloatMatrix& answer, const Term& term, IntegrationRule* iRule, int iedge, TimeStep* tstep) {
-            // the nodal unknowns are gathered once for all integration points (see UnknownGatherScope)
-            UnknownGatherScope gatherScope(*this);
+            // the nodal unknowns are gathered once for all integration points (see EvaluationScope)
+            EvaluationScope evalScope(*this);
             // need for integration domain and rule.
             // who should determine integration domain? Element or term? Term is just integrand, not integral
             // so integral type (surface, volume, etc) defined by element ---
@@ -412,8 +412,8 @@ class OOFEM_EXPORT MPElement : public Element {
         } 
 
     void integrateEdgeTerm_c (FloatArray& answer, const Term& term, IntegrationRule* iRule, int iedge, TimeStep* tstep) {
-            // the nodal unknowns are gathered once for all integration points (see UnknownGatherScope)
-            UnknownGatherScope gatherScope(*this);
+            // the nodal unknowns are gathered once for all integration points (see EvaluationScope)
+            EvaluationScope evalScope(*this);
             // need for integration domain and rule.
             // who should determine integration domain? Element or term? Term is just integrand, not integral
             // so integral type (surface, volume, etc) defined by element ---
@@ -534,9 +534,9 @@ class OOFEM_EXPORT MPElement : public Element {
      * @param tstep 
      */
     virtual const void getUnknownVector(FloatArray& answer, const Variable* field, ValueModeType mode, TimeStep* tstep) {
-        // Inside an UnknownGatherScope each (field, mode, time step) is gathered only once; terms evaluated at
+        // Inside an EvaluationScope each (field, mode, time step) is gathered only once; terms evaluated at
         // every integration point then reuse it.
-        if ( this->unknownGatherDepth > 0 ) {
+        if ( this->evaluationDepth > 0 ) {
             for ( const auto &entry : this->unknownGatherMemo ) {
                 if ( entry.field == field && entry.mode == mode && entry.tstep == tstep ) {
                     answer = entry.values;
@@ -551,22 +551,22 @@ class OOFEM_EXPORT MPElement : public Element {
     }
 
     /**
-     * Scope in which getUnknownVector of the element gathers each (field, value mode, time step) only once.
-     * The nodal unknowns do not change while the element integrates its terms or pushes its state, so it is
-     * opened around such sweeps; the memo is dropped when the outermost scope ends (no invalidation needed).
+     * Scope of one evaluation of the element (its terms, its state push), in which getUnknownVector gathers each
+     * (field, value mode, time step) only once. The nodal unknowns do not change during such an evaluation, so
+     * it is opened around it; the memo is dropped when the outermost scope ends (no invalidation needed).
      */
-    class UnknownGatherScope
+    class EvaluationScope
     {
         MPElement &elem;
     public:
-        UnknownGatherScope(MPElement &e) : elem(e) { elem.unknownGatherDepth++; }
-        ~UnknownGatherScope() {
-            if ( --elem.unknownGatherDepth == 0 ) {
+        EvaluationScope(MPElement &e) : elem(e) { elem.evaluationDepth++; }
+        ~EvaluationScope() {
+            if ( --elem.evaluationDepth == 0 ) {
                 elem.unknownGatherMemo.clear();
             }
         }
-        UnknownGatherScope(const UnknownGatherScope &) = delete;
-        UnknownGatherScope &operator=(const UnknownGatherScope &) = delete;
+        EvaluationScope(const EvaluationScope &) = delete;
+        EvaluationScope &operator=(const EvaluationScope &) = delete;
     };
 
 protected:
@@ -596,7 +596,7 @@ protected:
         answer.resizeWithValues(k);
     }
 
-    /// Unknown vectors gathered inside the current UnknownGatherScope.
+    /// Unknown vectors gathered inside the current EvaluationScope.
     struct UnknownGatherEntry {
         const Variable *field;
         ValueModeType mode;
@@ -604,8 +604,8 @@ protected:
         FloatArray values;
     };
     std::vector< UnknownGatherEntry > unknownGatherMemo;
-    /// Nesting depth of UnknownGatherScope; the memo is used only when positive.
-    int unknownGatherDepth = 0;
+    /// Nesting depth of EvaluationScope; the memo is used only when positive.
+    int evaluationDepth = 0;
 
 public:
 
