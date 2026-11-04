@@ -56,16 +56,8 @@ FEI3dTetLin :: evalN(const FloatArrayF<3> &lcoords)
 void
 FEI3dTetLin :: evalN(FloatArray &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-#if 0
-    answer = evalN(lcoords);
-#else
-    answer.resize(4);
-
-    answer.at(1) = lcoords.at(1);
-    answer.at(2) = lcoords.at(2);
-    answer.at(3) = lcoords.at(3);
-    answer.at(4) = 1. - lcoords.at(1) - lcoords.at(2) - lcoords.at(3);
-#endif
+    // evaluated by the fixed size kernel, the single implementation of the shape functions
+    answer = evalN(giveFixedLocalCoordinates(lcoords));
 }
 
 std::pair<double, FloatMatrixF<3,4>>
@@ -115,56 +107,14 @@ FEI3dTetLin :: evaldNdx(const FEICellGeometry &cellgeo)
 double
 FEI3dTetLin :: evaldNdx(FloatMatrix &answer, const FloatArray &lcoords, const FEICellGeometry &cellgeo) const
 {
-#if 0
-    auto tmp = evaldNdx(lcoords, cellgeo);
-    answer = tmp.second;
-    return tmp.first;
-#else
-    double x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4, detJ;
-    answer.resize(4, 3);
-
-    x1 = cellgeo.giveVertexCoordinates(1).at(1);
-    x2 = cellgeo.giveVertexCoordinates(2).at(1);
-    x3 = cellgeo.giveVertexCoordinates(3).at(1);
-    x4 = cellgeo.giveVertexCoordinates(4).at(1);
-
-    y1 = cellgeo.giveVertexCoordinates(1).at(2);
-    y2 = cellgeo.giveVertexCoordinates(2).at(2);
-    y3 = cellgeo.giveVertexCoordinates(3).at(2);
-    y4 = cellgeo.giveVertexCoordinates(4).at(2);
-
-    z1 = cellgeo.giveVertexCoordinates(1).at(3);
-    z2 = cellgeo.giveVertexCoordinates(2).at(3);
-    z3 = cellgeo.giveVertexCoordinates(3).at(3);
-    z4 = cellgeo.giveVertexCoordinates(4).at(3);
-
-    detJ = ( ( x4 - x1 ) * ( y2 - y1 ) * ( z3 - z1 ) - ( x4 - x1 ) * ( y3 - y1 ) * ( z2 - z1 ) +
-            ( x3 - x1 ) * ( y4 - y1 ) * ( z2 - z1 ) - ( x2 - x1 ) * ( y4 - y1 ) * ( z3 - z1 ) +
-            ( x2 - x1 ) * ( y3 - y1 ) * ( z4 - z1 ) - ( x3 - x1 ) * ( y2 - y1 ) * ( z4 - z1 ) );
-
-    if ( detJ <= 0.0 ) {
+    // Evaluated by the closed form fixed size kernel (dN/dx is constant on the linear tetrahedron). The kernel
+    // returns dN/dx transposed (3x4), while this interface expects one row per node (4x3).
+    auto tmp = evaldNdx(cellgeo);
+    if ( tmp.first <= 0.0 ) {
         OOFEM_ERROR("negative volume");
     }
-
-    answer.at(1, 1) = -( ( y3 - y2 ) * ( z4 - z2 ) - ( y4 - y2 ) * ( z3 - z2 ) );
-    answer.at(2, 1) = ( y4 - y3 ) * ( z1 - z3 ) - ( y1 - y3 ) * ( z4 - z3 );
-    answer.at(3, 1) = -( ( y1 - y4 ) * ( z2 - z4 ) - ( y2 - y4 ) * ( z1 - z4 ) );
-    answer.at(4, 1) = ( y2 - y1 ) * ( z3 - z1 ) - ( y3 - y1 ) * ( z2 - z1 );
-
-    answer.at(1, 2) = -( ( x4 - x2 ) * ( z3 - z2 ) - ( x3 - x2 ) * ( z4 - z2 ) );
-    answer.at(2, 2) = ( x1 - x3 ) * ( z4 - z3 ) - ( x4 - x3 ) * ( z1 - z3 );
-    answer.at(3, 2) = -( ( x2 - x4 ) * ( z1 - z4 ) - ( x1 - x4 ) * ( z2 - z4 ) );
-    answer.at(4, 2) = ( x3 - x1 ) * ( z2 - z1 ) - ( x2 - x1 ) * ( z3 - z1 );
-
-    answer.at(1, 3) = -( ( x3 - x2 ) * ( y4 - y2 ) - ( x4 - x2 ) * ( y3 - y2 ) );
-    answer.at(2, 3) = ( x4 - x3 ) * ( y1 - y3 ) - ( x1 - x3 ) * ( y4 - y3 );
-    answer.at(3, 3) = -( ( x1 - x4 ) * ( y2 - y4 ) - ( x2 - x4 ) * ( y1 - y4 ) );
-    answer.at(4, 3) = ( x2 - x1 ) * ( y3 - y1 ) - ( x3 - x1 ) * ( y2 - y1 );
-
-    answer.times(1. / detJ);
-
-    return detJ;
-#endif
+    answer = transpose(tmp.second);
+    return tmp.first;
 }
 
 void
