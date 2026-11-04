@@ -105,6 +105,8 @@ class gNTfTerm : public Term {
      * @param coords 
      */
     void evaluate_lin (FloatMatrix& answer, MPElement& e, GaussPoint* gp, TimeStep* tstep) const override;
+    void evaluate_lin_add (FloatMatrix& answer, double factor, MPElement& e, GaussPoint* gp, TimeStep* tstep) const override;
+    bool isSymmetric (MPElement& cell) const override;
     /**
      * @brief Evaluates Internal forces vector, i.e. $w^T(\grad N)^T f(p)$
      * 

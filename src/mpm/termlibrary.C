@@ -150,6 +150,24 @@ void gNTfTerm::evaluate_lin (FloatMatrix& answer, MPElement& e, GaussPoint* gp, 
     answer.beTProductOf(B, DB);
 }
 
+void gNTfTerm::evaluate_lin_add (FloatMatrix& answer, double factor, MPElement& e, GaussPoint* gp, TimeStep* tstep) const  {
+    // accumulates factor B^T D B directly; only its upper triangle when the term is symmetric (see Term::isSymmetric)
+    FloatMatrix D, B, DB;
+    e.giveCrossSection()->giveMaterial(gp)->giveCharacteristicMatrix(D, lhsType, gp, tstep);
+    this->grad(B, this->field, this->field->interpolation, e, gp->giveNaturalCoordinates());
+    DB.beProductOf(D, B);
+    if ( this->isSymmetric(e) ) {
+        answer.plusProductSymmUpper(B, DB, factor);
+    } else {
+        answer.plusProductUnsym(B, DB, factor);
+    }
+}
+
+bool gNTfTerm::isSymmetric (MPElement& cell) const {
+    // the same gradient on both sides: symmetric when the material matrix (e.g. permeability) is
+    return cell.giveCrossSection()->isCharacteristicMtrxSymmetric(lhsType);
+}
+
 void gNTfTerm::evaluate (FloatArray& answer, MPElement& cell, GaussPoint* gp, TimeStep* tstep) const  {
     FloatArray fp;
     FloatMatrix B;
