@@ -500,11 +500,9 @@ MPElement::assembleStateVector(FloatArray &answer, const StateVariableLayout &la
         }
 
         FloatArray u, contribution;
-        FloatMatrix op;
         this->getUnknownVector(u, v, spec.mode, tStep);
-        this->computeStateOperatorAt(op, spec.op, v, gp);
-
-        contribution.beProductOf(op, u);
+        // operator applied directly, without forming its (mostly zero) matrix
+        this->applyStateOperatorAt(contribution, spec.op, v, gp, u);
         answer.copySubVector(contribution, offset);
         offset += contribution.giveSize();
     }
