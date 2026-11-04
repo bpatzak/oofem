@@ -320,11 +320,11 @@ void NTcN::evaluate_lin (FloatMatrix& answer, MPElement& e, GaussPoint* gp, Time
 }
 
 void NTcN::evaluate (FloatArray& answer, MPElement& cell, GaussPoint* gp, TimeStep* tstep) const  {
+    // S p with S = c N N^T (see evaluate_lin) is evaluated as N c (N p): a dot product instead of forming S
     FloatArray p;
-    FloatMatrix S;
     cell.getUnknownVector(p, this->field, unknownFieldVMT, tstep);
-    this->evaluate_lin (S, cell,gp, tstep);
-    answer.beProductOf(S,p);
+    this->field->interpolation->evalN(answer, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(&cell));
+    answer.times(cell.giveCrossSection()->giveMaterial(gp)->giveCharacteristicValue(ctype, gp, tstep) * answer.dotProduct(p));
 }
 
 void NTcN::getDimensions(Element& cell) const  {
