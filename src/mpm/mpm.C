@@ -344,6 +344,127 @@ MPElement::computeStateOperatorAt(FloatMatrix &answer, StateOperator op, const V
 
 
 void
+MPElement::applyStateOperatorAt(FloatArray &answer, StateOperator op, const Variable *v, GaussPoint *gp, const FloatArray &u) const
+{
+    // The operators of compute*MatrixAt applied directly to u: only their non-zero entries are visited,
+    // accumulated row by row in the column order of the matrix-vector product, so the result is the same.
+    const MaterialMode mmode = gp->giveMaterialMode();
+    const int nd = v->size;
+    const int nnodes = v->interpolation->giveNumberOfNodes( this->giveGeometryType() );
+    const int nsd = 1 * mmodeIs1D(mmode) + 2 * mmodeIs2D(mmode) + 3 * mmodeIs3D(mmode);
+
+    bool done = false;
+    if ( u.giveSize() == nnodes * nd ) {
+        if ( op == SO_Value ) {
+            // N u: component k is sum_i N_i u_ik
+            FloatArray nvec;
+            v->interpolation->evalN( nvec, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(this) );
+            if ( nvec.giveSize() == nnodes ) {
+                answer.resize(nd);
+                for ( int k = 0; k < nd; k++ ) {
+                    double sum = 0.;
+                    for ( int i = 0; i < nnodes; i++ ) {
+                        sum += nvec [ i ] * u [ i * nd + k ];
+                    }
+                    answer [ k ] = sum;
+                }
+                done = true;
+            }
+        } else {
+            FloatMatrix dndx;
+            MPElement::evaldNdx( dndx, v->interpolation, *this, gp->giveNaturalCoordinates() );
+            // derivative of component k along direction j, summed over the nodes
+            auto du = [&](int k, int j) {
+                double sum = 0.;
+                for ( int i = 0; i < nnodes; i++ ) {
+                    sum += dndx(i, j) * u [ i * nd + k ];
+                }
+                return sum;
+            };
+            // shear component (dk/dj + dl/di), summed node by node in the column order of the matrix
+            auto shear = [&](int k, int j, int l, int m) {
+                double sum = 0.;
+                for ( int i = 0; i < nnodes; i++ ) {
+                    if ( k < l ) {
+                        sum += dndx(i, j) * u [ i * nd + k ];
+                        sum += dndx(i, m) * u [ i * nd + l ];
+                    } else {
+                        sum += dndx(i, m) * u [ i * nd + l ];
+                        sum += dndx(i, j) * u [ i * nd + k ];
+                    }
+                }
+                return sum;
+            };
+            if ( op == SO_Gradient && nd == 1 ) {
+                answer.resize(nsd);
+                for ( int j = 0; j < nsd; j++ ) {
+                    answer [ j ] = du(0, j);
+                }
+                done = true;
+            } else if ( op == SO_Divergence && nd >= nsd ) {
+                double sum = 0.;
+                for ( int i = 0; i < nnodes; i++ ) {
+                    for ( int j = 0; j < nsd; j++ ) {
+                        sum += dndx(i, j) * u [ i * nd + j ];
+                    }
+                }
+                answer.resize(1);
+                answer [ 0 ] = sum;
+                done = true;
+            } else if ( op == SO_SymmetricGradient ) {
+                // layouts of computeGradSymMatrixAt
+                if ( ( mmode == _3dUP || mmode == _3dUPV || mmode == _3dMat ) && nd >= 3 ) {
+                    answer.resize(6);
+                    answer [ 0 ] = du(0, 0);
+                    answer [ 1 ] = du(1, 1);
+                    answer [ 2 ] = du(2, 2);
+                    answer [ 3 ] = shear(1, 2, 2, 1);
+                    answer [ 4 ] = shear(0, 2, 2, 0);
+                    answer [ 5 ] = shear(0, 1, 1, 0);
+                    done = true;
+                } else if ( ( mmode == _2dUP || mmode == _2dUPV ) && nd >= 2 ) {
+                    answer.resize(6);
+                    answer.zero();
+                    answer [ 0 ] = du(0, 0);
+                    answer [ 1 ] = du(1, 1);
+                    answer [ 5 ] = shear(0, 1, 1, 0);
+                    done = true;
+                } else if ( mmode == _PlaneStress && nd >= 2 ) {
+                    answer.resize(3);
+                    answer [ 0 ] = du(0, 0);
+                    answer [ 1 ] = du(1, 1);
+                    answer [ 2 ] = shear(0, 1, 1, 0);
+                    done = true;
+                } else if ( mmode == _PlaneStrain && nd >= 2 ) {
+                    answer.resize(4);
+                    answer.zero();
+                    answer [ 0 ] = du(0, 0);
+                    answer [ 1 ] = du(1, 1);
+                    answer [ 3 ] = shear(0, 1, 1, 0);
+                    done = true;
+                } else if ( mmode == _1dUP ) {
+                    answer.resize(6);
+                    answer.zero();
+                    answer [ 0 ] = du(0, 0);
+                    done = true;
+                } else if ( mmode == _1dMat ) {
+                    answer.resize(1);
+                    answer [ 0 ] = du(0, 0);
+                    done = true;
+                }
+            }
+        }
+    }
+    if ( !done ) {
+        // anything else (and the error checks of the operators) through the operator matrix
+        FloatMatrix opm;
+        this->computeStateOperatorAt(opm, op, v, gp);
+        answer.beProductOf(opm, u);
+    }
+}
+
+
+void
 MPElement::registerStateVariable(const Variable *v)
 {
     if ( v == nullptr ) {

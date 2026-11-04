@@ -648,6 +648,12 @@ public:
     void computeDivMatrixAt(FloatMatrix &answer, const Variable *v, GaussPoint *gp) const;
     /// Dispatches to the operator named by @p op.
     void computeStateOperatorAt(FloatMatrix &answer, StateOperator op, const Variable *v, GaussPoint *gp) const;
+    /**
+     * Applies the operator named by @p op to the nodal values @p u of the field, i.e. the product of
+     * computeStateOperatorAt and @p u, without forming the operator matrix (mostly zeros for gradients).
+     * Gives the same result, summed in the same order; unsupported cases use the matrix.
+     */
+    void applyStateOperatorAt(FloatArray &answer, StateOperator op, const Variable *v, GaussPoint *gp, const FloatArray &u) const;
     //@}
 
     /// Maps a field, by what it physically is, onto the Variable supplying it.
