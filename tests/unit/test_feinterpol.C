@@ -12,10 +12,12 @@
 #include "fei2dquadlin.h"
 #include "fei2dquadquad.h"
 #include "fei2dquadbiquad.h"
+#include "fei2dtrlin.h"
 #include "fei2dtrquad.h"
 #include "fei3dhexalin.h"
 #include "fei3dhexaquad.h"
 #include "fei3dhexatriquad.h"
+#include "fei3dtetlin.h"
 #include "fei3dtetquad.h"
 #include "fei3dwedgelin.h"
 #include "fei3dwedgequad.h"
@@ -55,9 +57,12 @@ std::vector< Coordinates > distortNodes(const std::vector< std::array< double, 3
 /**
  * Checks the geometry services of interpolation at given parent coordinates.
  * @param comps Global coordinate components used by the interpolation (xind, yind[, zind]).
+ * @param detSign Sign of the determinant returned by evaldNdx/giveTransformationJacobian relative to det(dx/dxi)
+ * (-1 for FEI3dTetLin, whose closed form follows the opposite node orientation).
+ * @param checkJacobianMatrix Whether giveJacobianMatrixAt is provided.
  */
 void checkGeometry(const FEInterpolation &interp, const std::vector< Coordinates > &nodes, Element_Geometry_Type egt,
-                   const FloatArray &lcoords, const std::vector< int > &comps)
+                   const FloatArray &lcoords, const std::vector< int > &comps, double detSign = 1., bool checkJacobianMatrix = true)
 {
     FEIVertexListGeometryWrapper cellgeo(nodes, egt);
     int nsd = ( int ) comps.size();
@@ -76,7 +81,7 @@ void checkGeometry(const FEInterpolation &interp, const std::vector< Coordinates
         }
     }
     double detRef = jac.giveDeterminant();
-    REQUIRE(detRef > 1.e-3);
+    REQUIRE(detSign * detRef > 1.e-3);
     jacInv.beInverseOf(jac);
     dNdxRef.beProductOf(dNdxi, jacInv);
 
@@ -104,7 +109,7 @@ void checkGeometry(const FEInterpolation &interp, const std::vector< Coordinates
     // evaldNdx
     FloatMatrix dNdx;
     double det = interp.evaldNdx(dNdx, lcoords, cellgeo);
-    CHECK_THAT(det, WithinAbs(detRef, tol * detRef) );
+    CHECK_THAT(det, WithinAbs(detSign * detRef, tol * std::fabs(detRef) ) );
     REQUIRE(dNdx.giveNumberOfRows() == nn);
     REQUIRE(dNdx.giveNumberOfColumns() == nsd);
     for ( int a = 1; a <= nn; a++ ) {
@@ -130,9 +135,12 @@ void checkGeometry(const FEInterpolation &interp, const std::vector< Coordinates
     }
 
     // giveTransformationJacobian
-    CHECK_THAT(interp.giveTransformationJacobian(lcoords, cellgeo), WithinAbs(detRef, tol * detRef) );
+    CHECK_THAT(interp.giveTransformationJacobian(lcoords, cellgeo), WithinAbs(detSign * detRef, tol * std::fabs(detRef) ) );
 
     // giveJacobianMatrixAt
+    if ( !checkJacobianMatrix ) {
+        return;
+    }
     FloatMatrix jacobian;
     interp.giveJacobianMatrixAt(jacobian, lcoords, cellgeo);
     REQUIRE(jacobian.giveNumberOfRows() == nsd);
@@ -145,11 +153,11 @@ void checkGeometry(const FEInterpolation &interp, const std::vector< Coordinates
 }
 
 void check3d(const FEInterpolation &interp, const std::vector< std::array< double, 3 > > &ref, Element_Geometry_Type egt,
-             const std::vector< FloatArray > &points)
+             const std::vector< FloatArray > &points, double detSign = 1., bool checkJacobianMatrix = true)
 {
     auto nodes = distortNodes(ref);
     for ( auto &lc : points ) {
-        checkGeometry(interp, nodes, egt, lc, { 1, 2, 3 });
+        checkGeometry(interp, nodes, egt, lc, { 1, 2, 3 }, detSign, checkJacobianMatrix);
     }
 }
 
@@ -199,6 +207,12 @@ TEST_CASE("tests/unit/feinterpol/3d", "[FEInterpolation]")
         });
         check3d(FEI3dHexaTriQuad(), hexa27, EGT_hexa_27, cubePoints);
     }
+    SECTION("FEI3dTetLin") {
+        // tet4 node orientation of OOFEM (nodes 2 and 3 of tet10 swapped): its closed form detJ is -det(dx/dxi),
+        // positive for valid elements; no giveJacobianMatrixAt (see FEI3dTetLin::evaldNdxi)
+        std::vector< std::array< double, 3 > > tet4 = { { 1, 0, 0 }, { 0, 0, 1 }, { 0, 1, 0 }, { 0, 0, 0 } };
+        check3d(FEI3dTetLin(), tet4, EGT_tetra_1, tetPoints, -1., false);
+    }
     SECTION("FEI3dTetQuad") {
         check3d(FEI3dTetQuad(), tet10, EGT_tetra_2, tetPoints);
     }
@@ -233,6 +247,9 @@ TEST_CASE("tests/unit/feinterpol/2d", "[FEInterpolation]")
         check2d(FEI2dQuadBiQuad(1, 2), {
             { -1, -1, 0 }, { 1, -1, 0 }, { 1, 1, 0 }, { -1, 1, 0 }, { 0, -1, 0 }, { 1, 0, 0 }, { 0, 1, 0 }, { -1, 0, 0 }, { 0, 0, 0 }
         }, EGT_quad9_2, squarePoints);
+    }
+    SECTION("FEI2dTrLin") {
+        check2d(FEI2dTrLin(1, 2), { { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 0 } }, EGT_triangle_1, trianglePoints);
     }
     SECTION("FEI2dTrQuad") {
         check2d(FEI2dTrQuad(1, 2), {
