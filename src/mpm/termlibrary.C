@@ -172,11 +172,16 @@ void BTamNTerm::evaluate_lin (FloatMatrix& answer, MPElement& e, GaussPoint* gp,
 }
 
 void BTamNTerm::evaluate (FloatArray& answer, MPElement& cell, GaussPoint* gp, TimeStep* tstep) const  {
-    FloatArray p;
-    FloatMatrix Q;
+    // Q p with Q = B^T m a N^T (see evaluate_lin) is evaluated as B^T (m a (N p)): a dot product and one
+    // B^T-vector product instead of forming Q
+    FloatArray p, Np, m=Vec6(1,1,1,0,0,0);
+    FloatMatrix B;
+    MaterialMode mmode = (mode==0)?gp->giveMaterialMode():mode;
     cell.getUnknownVector(p, this->field, VM_TotalIntrinsic, tstep);
-    this->evaluate_lin (Q, cell,gp, tstep);
-    answer.beProductOf(Q,p);
+    this->field->interpolation->evalN(Np, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(&cell));
+    m.times(cell.giveCrossSection()->giveMaterial(gp)->giveCharacteristicValue(aType, gp, tstep) * Np.dotProduct(p));
+    this->grad(B, this->testField, this->testField->interpolation, cell, gp->giveNaturalCoordinates(), mmode);
+    answer.beTProductOf(B, m);
 }
 
 void BTamNTerm::getDimensions(Element& cell) const  {
