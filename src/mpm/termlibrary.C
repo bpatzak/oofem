@@ -379,6 +379,13 @@ void NTcN::evaluate_lin (FloatMatrix& answer, MPElement& e, GaussPoint* gp, Time
     answer.times(e.giveCrossSection()->giveMaterial(gp)->giveCharacteristicValue(ctype, gp, tstep));
 }
 
+void NTcN::evaluate_lin_add (FloatMatrix& answer, double factor, MPElement& e, GaussPoint* gp, TimeStep* tstep) const  {
+    // accumulates the upper triangle of factor c N N^T directly (the term is symmetric)
+    FloatArray Np;
+    this->field->interpolation->evalN(Np, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(&e));
+    answer.plusDyadSymmUpper(Np, factor * e.giveCrossSection()->giveMaterial(gp)->giveCharacteristicValue(ctype, gp, tstep));
+}
+
 void NTcN::evaluate (FloatArray& answer, MPElement& cell, GaussPoint* gp, TimeStep* tstep) const  {
     // S p with S = c N N^T (see evaluate_lin) is evaluated as N c (N p): a dot product instead of forming S
     FloatArray p;
