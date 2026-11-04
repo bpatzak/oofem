@@ -198,6 +198,17 @@ void NTaTmTe::evaluate_lin (FloatMatrix& answer, MPElement& e, GaussPoint* gp, T
     answer.plusDyadUnsym(Nt, Nt, this->bl->giveProperty('a', tstep));
 }
 
+void NTaTmTe::evaluate_lin_add (FloatMatrix& answer, double factor, MPElement& e, GaussPoint* gp, TimeStep* tstep) const {
+    // accumulates the upper triangle of factor a N N^T directly (the term is symmetric)
+    FloatArray Nt;
+    if (boundaryType == 's') {
+        this->testField->interpolation->boundarySurfaceEvalN(Nt, boundaryID, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(&e));
+    } else {
+        this->testField->interpolation->boundaryEdgeEvalN(Nt, boundaryID, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(&e));
+    }
+    answer.plusDyadSymmUpper(Nt, factor * this->bl->giveProperty('a', tstep));
+}
+
 void NTaTmTe::evaluate (FloatArray& answer, MPElement& e, GaussPoint* gp, TimeStep* tstep) const  {
     FloatArray Nt, rt, Te, coords;
     if (boundaryType == 's') {
