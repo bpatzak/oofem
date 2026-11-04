@@ -60,6 +60,24 @@ void BTSigTerm::evaluate_lin (FloatMatrix& answer, MPElement& e, GaussPoint* gp,
     answer.beTProductOf(B,DB);
 }
 
+void BTSigTerm::evaluate_lin_add (FloatMatrix& answer, double factor, MPElement& e, GaussPoint* gp, TimeStep* tstep) const {
+    // accumulates factor B^T D B directly; only its upper triangle when the term is symmetric (see Term::isSymmetric)
+    FloatMatrix D, B, DB;
+    e.giveCrossSection()->giveMaterial(gp)->giveCharacteristicMatrix(D, TangentStiffness, gp, tstep);
+    this->grad(B, this->field, this->field->interpolation, e, gp->giveNaturalCoordinates(), gp->giveMaterialMode());
+    DB.beProductOf(D, B);
+    if ( this->isSymmetric(e) ) {
+        answer.plusProductSymmUpper(B, DB, factor);
+    } else {
+        answer.plusProductUnsym(B, DB, factor);
+    }
+}
+
+bool BTSigTerm::isSymmetric (MPElement& cell) const {
+    // the same B on both sides: symmetric when the material tangent is
+    return cell.giveCrossSection()->isCharacteristicMtrxSymmetric(TangentStiffness);
+}
+
 void BTSigTerm::evaluate (FloatArray& answer, MPElement& cell, GaussPoint* gp, TimeStep* tstep) const  {
     FloatArray sig;
     FloatMatrix B;
