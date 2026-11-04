@@ -320,6 +320,8 @@ class OOFEM_EXPORT MPElement : public Element {
     }
 
     void integrateTerm_dw (FloatMatrix& answer, const Term& term, IntegrationRule* iRule, TimeStep* tstep) {
+        // the nodal unknowns are gathered once for all integration points (see UnknownGatherScope)
+        UnknownGatherScope gatherScope(*this);
         // need for integration domain and rule.
         // who should determine integration domain? Element or term? Term is just integrand, not integral
         // so integral type (surface, volume, etc) defined by element ---
@@ -332,6 +334,8 @@ class OOFEM_EXPORT MPElement : public Element {
     } 
 
     void integrateTerm_c (FloatArray& answer, const Term& term, IntegrationRule* iRule, TimeStep* tstep) {
+        // the nodal unknowns are gathered once for all integration points (see UnknownGatherScope)
+        UnknownGatherScope gatherScope(*this);
         // need for integration domain and rule.
         // who should determine integration domain? Element or term? Term is just integrand, not integral
         // so integral type (surface, volume, etc) defined by element ---
@@ -344,6 +348,8 @@ class OOFEM_EXPORT MPElement : public Element {
     } 
 
     void integrateSurfaceTerm_dw (FloatMatrix& answer, const Term& term, IntegrationRule* iRule, int isurf, TimeStep* tstep) {
+            // the nodal unknowns are gathered once for all integration points (see UnknownGatherScope)
+            UnknownGatherScope gatherScope(*this);
             // need for integration domain and rule.
             // who should determine integration domain? Element or term? Term is just integrand, not integral
             // so integral type (surface, volume, etc) defined by element ---
@@ -356,6 +362,8 @@ class OOFEM_EXPORT MPElement : public Element {
         } 
 
     void integrateSurfaceTerm_c (FloatArray& answer, const Term& term, IntegrationRule* iRule, int isurf, TimeStep* tstep) {
+            // the nodal unknowns are gathered once for all integration points (see UnknownGatherScope)
+            UnknownGatherScope gatherScope(*this);
             // need for integration domain and rule.
             // who should determine integration domain? Element or term? Term is just integrand, not integral
             // so integral type (surface, volume, etc) defined by element ---
@@ -368,6 +376,8 @@ class OOFEM_EXPORT MPElement : public Element {
         } 
 
     void integrateEdgeTerm_dw (FloatMatrix& answer, const Term& term, IntegrationRule* iRule, int iedge, TimeStep* tstep) {
+            // the nodal unknowns are gathered once for all integration points (see UnknownGatherScope)
+            UnknownGatherScope gatherScope(*this);
             // need for integration domain and rule.
             // who should determine integration domain? Element or term? Term is just integrand, not integral
             // so integral type (surface, volume, etc) defined by element ---
@@ -380,6 +390,8 @@ class OOFEM_EXPORT MPElement : public Element {
         } 
 
     void integrateEdgeTerm_c (FloatArray& answer, const Term& term, IntegrationRule* iRule, int iedge, TimeStep* tstep) {
+            // the nodal unknowns are gathered once for all integration points (see UnknownGatherScope)
+            UnknownGatherScope gatherScope(*this);
             // need for integration domain and rule.
             // who should determine integration domain? Element or term? Term is just integrand, not integral
             // so integral type (surface, volume, etc) defined by element ---
