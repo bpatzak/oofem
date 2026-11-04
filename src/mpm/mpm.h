@@ -500,6 +500,44 @@ class OOFEM_EXPORT MPElement : public Element {
      * @param tstep 
      */
     virtual const void getUnknownVector(FloatArray& answer, const Variable* field, ValueModeType mode, TimeStep* tstep) {
+        // Inside an UnknownGatherScope each (field, mode, time step) is gathered only once; terms evaluated at
+        // every integration point then reuse it.
+        if ( this->unknownGatherDepth > 0 ) {
+            for ( const auto &entry : this->unknownGatherMemo ) {
+                if ( entry.field == field && entry.mode == mode && entry.tstep == tstep ) {
+                    answer = entry.values;
+                    return;
+                }
+            }
+            this->gatherUnknownVector(answer, field, mode, tstep);
+            this->unknownGatherMemo.push_back({ field, mode, tstep, answer });
+            return;
+        }
+        this->gatherUnknownVector(answer, field, mode, tstep);
+    }
+
+    /**
+     * Scope in which getUnknownVector of the element gathers each (field, value mode, time step) only once.
+     * The nodal unknowns do not change while the element integrates its terms or pushes its state, so it is
+     * opened around such sweeps; the memo is dropped when the outermost scope ends (no invalidation needed).
+     */
+    class UnknownGatherScope
+    {
+        MPElement &elem;
+    public:
+        UnknownGatherScope(MPElement &e) : elem(e) { elem.unknownGatherDepth++; }
+        ~UnknownGatherScope() {
+            if ( --elem.unknownGatherDepth == 0 ) {
+                elem.unknownGatherMemo.clear();
+            }
+        }
+        UnknownGatherScope(const UnknownGatherScope &) = delete;
+        UnknownGatherScope &operator=(const UnknownGatherScope &) = delete;
+    };
+
+protected:
+    /// Gathers the nodal unknowns of field from the dof managers of the receiver (see getUnknownVector).
+    void gatherUnknownVector(FloatArray& answer, const Variable* field, ValueModeType mode, TimeStep* tstep) {
         IntArray nodes, internalNodes;
         field->interpolation->giveCellDofMans(nodes, internalNodes, this);
         const IntArray &dofs = field->getDofManDofIDs();
@@ -523,6 +561,19 @@ class OOFEM_EXPORT MPElement : public Element {
         }
         answer.resizeWithValues(k);
     }
+
+    /// Unknown vectors gathered inside the current UnknownGatherScope.
+    struct UnknownGatherEntry {
+        const Variable *field;
+        ValueModeType mode;
+        TimeStep *tstep;
+        FloatArray values;
+    };
+    std::vector< UnknownGatherEntry > unknownGatherMemo;
+    /// Nesting depth of UnknownGatherScope; the memo is used only when positive.
+    int unknownGatherDepth = 0;
+
+public:
 
     /**
      * Whether the geometry interpolation of the receiver is of higher order than the
