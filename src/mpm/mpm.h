@@ -170,6 +170,20 @@ class OOFEM_EXPORT Term {
     
     // evaluate linearized term contribution to weak form on given cell at given point 
     virtual void evaluate_lin (FloatMatrix& , MPElement& cell, GaussPoint* gp, TimeStep* tStep) const =0;
+    /**
+     * Adds factor times the linearized term (see evaluate_lin) to answer, which may be empty.
+     * Used by the integration of the element (factor is the integration weight times the jacobian); terms
+     * override it to accumulate directly, without the temporary matrix and the extra scaling pass of this
+     * default. When isSymmetric is true, only the upper triangle of the contribution has to be added: the
+     * integrating element mirrors it once the integration sweep is complete.
+     */
+    virtual void evaluate_lin_add (FloatMatrix& answer, double factor, MPElement& cell, GaussPoint* gp, TimeStep* tStep) const;
+    /**
+     * Whether the linearized term is a symmetric (square) matrix on given cell, so that evaluate_lin_add
+     * may accumulate only its upper triangle. Terms with a material matrix follow
+     * CrossSection::isCharacteristicMtrxSymmetric, as the structural elements do.
+     */
+    virtual bool isSymmetric (MPElement& cell) const { return false; }
     // evaluate contribution (all vars known) on given cell
     virtual void evaluate (FloatArray&, MPElement& cell, GaussPoint* gp, TimeStep* tStep) const =0;
     virtual void getDimensions(Element& cell) const =0;

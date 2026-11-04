@@ -124,6 +124,15 @@ Variable::postInitialize(EngngModel *problem)
 }
 
 void
+Term::evaluate_lin_add(FloatMatrix &answer, double factor, MPElement &cell, GaussPoint *gp, TimeStep *tStep) const
+{
+    // generic version through the full matrix of evaluate_lin
+    FloatMatrix contrib;
+    this->evaluate_lin(contrib, cell, gp, tStep);
+    answer.add(factor, contrib);
+}
+
+void
 Term::initializeFrom(const std::shared_ptr<InputRecord> &ir, EngngModel* problem)
 {
     // read field and test field ids (names)
