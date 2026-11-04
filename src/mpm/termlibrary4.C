@@ -48,6 +48,13 @@ void NTN::evaluate_lin (FloatMatrix& answer, MPElement& e, GaussPoint* gp, TimeS
     answer.beDyadicProductOf(Np, Np);
 }
 
+void NTN::evaluate_lin_add (FloatMatrix& answer, double factor, MPElement& e, GaussPoint* gp, TimeStep* tstep) const  {
+    // accumulates the upper triangle of factor N N^T directly (the term is symmetric)
+    FloatArray Np;
+    this->field->interpolation->evalN(Np, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(&e));
+    answer.plusDyadSymmUpper(Np, factor);
+}
+
 void NTN::evaluate (FloatArray& answer, MPElement& cell, GaussPoint* gp, TimeStep* tstep) const  {
     FloatArray p;
     FloatMatrix S;
