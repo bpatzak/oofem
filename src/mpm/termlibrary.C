@@ -295,6 +295,18 @@ void NTamTBTerm::evaluate_lin (FloatMatrix& answer, MPElement& e, GaussPoint* gp
     answer.beProductOf(Npm, mb);
 }
 
+void NTamTBTerm::evaluate_lin_add (FloatMatrix& answer, double factor, MPElement& e, GaussPoint* gp, TimeStep* tstep) const  {
+    // N a m^T B is the outer product of N and B^T m: accumulated directly, without the 1 x n matrix m^T B
+    FloatMatrix B;
+    FloatArray m=Vec6(1,1,1,0,0,0), Np, bm;
+    MaterialMode mmode = (mode==0)?gp->giveMaterialMode():mode;
+    this->testField->interpolation->evalN(Np, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(&e));
+    double a = e.giveCrossSection()->giveMaterial(gp)->giveCharacteristicValue(aType, gp, tstep);
+    this->grad(B, this->field, this->field->interpolation, e, gp->giveNaturalCoordinates(), mmode);
+    bm.beTProductOf(B, m);
+    answer.plusDyadUnsym(Np, bm, a * factor);
+}
+
 void NTamTBTerm::evaluate (FloatArray& answer, MPElement& cell, GaussPoint* gp, TimeStep* tstep) const  {
     // Q u with Q = N a m^T B (see evaluate_lin) is evaluated as N a (m^T (B u)): one B-vector product and
     // a dot product instead of forming Q
