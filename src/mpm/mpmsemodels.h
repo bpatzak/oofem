@@ -91,6 +91,15 @@ void mpmUpdateMaterialTempState(EngngModel *problem, TimeStep *tStep);
         IntArray lhsIntegrals;
         IntArray rhsIntegrals;
 
+        /// The integrals with given (1-based) indices as a group for Integral::assembleGroup_lhs/rhs.
+        std::vector< Integral::GroupMember > giveIntegralGroup(const IntArray &ids, FloatArray *eNorms = nullptr) const {
+            std::vector< Integral::GroupMember > group;
+            for ( int i : ids ) {
+                group.push_back({ this->integralList[i-1].get(), 1.0, eNorms });
+            }
+            return group;
+        }
+
     public:
         StationaryMPMSProblem(int i, EngngModel * _master) : EngngModel(i, _master), nMethod(nullptr) { ndomains = 1;}
 
@@ -139,11 +148,9 @@ void mpmUpdateMaterialTempState(EngngModel *problem, TimeStep *tStep);
                 effectiveMatrix->buildInternalStructure( this, 1, EModelDefaultEquationNumbering() );
                 if ( this->keepTangent ) {
                     this->effectiveMatrix->zero();
-                    // loop over lhs integrals
-                    for (auto i: lhsIntegrals) {
-                        Integral* integral = this->integralList[i-1].get();
-                        integral->assemble_lhs (*effectiveMatrix, EModelDefaultEquationNumbering(), tStep);
-                    }
+                    // lhs integrals, assembled element by element (see Integral::assembleGroup_lhs)
+                    Integral::assembleGroup_lhs(*effectiveMatrix, this->giveIntegralGroup(lhsIntegrals),
+                                                EModelDefaultEquationNumbering(), tStep);
                     // see updateComponent below
                     this->effectiveMatrix->assembleBegin();
                     this->effectiveMatrix->assembleEnd();
@@ -155,11 +162,8 @@ void mpmUpdateMaterialTempState(EngngModel *problem, TimeStep *tStep);
 
             // assemble rhs
             FloatArray rhs(this->giveNumberOfDomainEquations( 1, EModelDefaultEquationNumbering() ));
-            // loop over rhs integrals
-            for (auto i: rhsIntegrals) {
-                Integral* integral = this->integralList[i-1].get();
-                integral->assemble_rhs (rhs, EModelDefaultEquationNumbering(), tStep); 
-            }
+            // rhs integrals, assembled element by element (see Integral::assembleGroup_rhs)
+            Integral::assembleGroup_rhs(rhs, this->giveIntegralGroup(rhsIntegrals), EModelDefaultEquationNumbering(), tStep);
             // experimental: allow traditional BCs to contribute to rhs as well by treating them as integrals
             this->assembleVectorFromBC(rhs, tStep, ExternalForceAssembler(), VM_Total,
                                        EModelDefaultEquationNumbering(), this->giveDomain(1) );
@@ -193,21 +197,18 @@ void mpmUpdateMaterialTempState(EngngModel *problem, TimeStep *tStep);
                 int maxdofids = d->giveMaxDofID();
                 eNorm.resize(maxdofids);
                 eNorm.zero();
-                for (auto i: lhsIntegrals) {
-                    Integral* integral = this->integralList[i-1].get();
-                    integral->assemble_rhs (residualVector, EModelDefaultEquationNumbering(), tStep, &eNorm);
-                }
+                // lhs integrals, assembled element by element (see Integral::assembleGroup_rhs)
+                Integral::assembleGroup_rhs(residualVector, this->giveIntegralGroup(lhsIntegrals, &eNorm),
+                                            EModelDefaultEquationNumbering(), tStep);
                 this->updateSharedDofManagers(this->residualVector, EModelDefaultEquationNumbering(), InternalForcesExchangeTag);
                 return;
             } else if ( cmpn == NonLinearLhs ) {
                 if ( !this->keepTangent ) {
                     // Optimization for linear problems, we can keep the old matrix (which could save its factorization)
                     this->effectiveMatrix->zero();
-                    // loop over lhs integrals
-                    for (auto i: lhsIntegrals) {
-                        Integral* integral = this->integralList[i-1].get();
-                        integral->assemble_lhs (*effectiveMatrix, EModelDefaultEquationNumbering(), tStep);
-                    }
+                    // lhs integrals, assembled element by element (see Integral::assembleGroup_lhs)
+                    Integral::assembleGroup_lhs(*effectiveMatrix, this->giveIntegralGroup(lhsIntegrals),
+                                                EModelDefaultEquationNumbering(), tStep);
                     // Finalize the matrix. Assembling through the integrals bypasses
                     // EngngModel::assemble, which is the only other caller of these; without them
                     // a storage format that defers assembly -- PETSc, whose assembleEnd is
