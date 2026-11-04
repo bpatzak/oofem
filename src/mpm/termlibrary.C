@@ -207,6 +207,18 @@ void BTamNTerm::evaluate_lin (FloatMatrix& answer, MPElement& e, GaussPoint* gp,
     answer.beTProductOf(B, mn);
 }
 
+void BTamNTerm::evaluate_lin_add (FloatMatrix& answer, double factor, MPElement& e, GaussPoint* gp, TimeStep* tstep) const  {
+    // B^T m a N^T is the outer product of B^T m and N: accumulated directly, without the 6 x n matrix m N^T
+    FloatMatrix B;
+    FloatArray m=Vec6(1,1,1,0,0,0), Np, bm;
+    MaterialMode mmode = (mode==0)?gp->giveMaterialMode():mode;
+    this->field->interpolation->evalN(Np, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(&e));
+    double a = e.giveCrossSection()->giveMaterial(gp)->giveCharacteristicValue(aType, gp, tstep);
+    this->grad(B, this->testField, this->testField->interpolation, e, gp->giveNaturalCoordinates(), mmode);
+    bm.beTProductOf(B, m);
+    answer.plusDyadUnsym(bm, Np, a * factor);
+}
+
 void BTamNTerm::evaluate (FloatArray& answer, MPElement& cell, GaussPoint* gp, TimeStep* tstep) const  {
     // Q p with Q = B^T m a N^T (see evaluate_lin) is evaluated as B^T (m a (N p)): a dot product and one
     // B^T-vector product instead of forming Q
