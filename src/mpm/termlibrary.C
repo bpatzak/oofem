@@ -248,11 +248,16 @@ void NTamTBTerm::evaluate_lin (FloatMatrix& answer, MPElement& e, GaussPoint* gp
 }
 
 void NTamTBTerm::evaluate (FloatArray& answer, MPElement& cell, GaussPoint* gp, TimeStep* tstep) const  {
-    FloatArray ut;
-    FloatMatrix Q;
+    // Q u with Q = N a m^T B (see evaluate_lin) is evaluated as N a (m^T (B u)): one B-vector product and
+    // a dot product instead of forming Q
+    FloatArray ut, eps, m=Vec6(1,1,1,0,0,0);
+    FloatMatrix B;
+    MaterialMode mmode = (mode==0)?gp->giveMaterialMode():mode;
     cell.getUnknownVector(ut, this->field, unknownFieldVMT ,tstep);
-    this->evaluate_lin (Q, cell,gp, tstep);
-    answer.beProductOf(Q,ut);
+    this->grad(B, this->field, this->field->interpolation, cell, gp->giveNaturalCoordinates(), mmode);
+    eps.beProductOf(B, ut);
+    this->testField->interpolation->evalN(answer, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(&cell));
+    answer.times(cell.giveCrossSection()->giveMaterial(gp)->giveCharacteristicValue(aType, gp, tstep) * m.dotProduct(eps));
 }
 
 void NTamTBTerm::getDimensions(Element& cell) const  {
