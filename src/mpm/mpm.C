@@ -40,6 +40,7 @@
 #include "internalstatetype.h"
 #include "dofiditem.h"
 #include "unknownnumberingscheme.h"
+#include <algorithm>
 
 namespace oofem {
 
@@ -148,8 +149,35 @@ Term::initializeFrom(const std::shared_ptr<InputRecord> &ir, EngngModel* problem
 void
 MPElement::evaldNdx(FloatMatrix &answer, const FEInterpolation *interpol, const Element &cell, const FloatArray &lcoords)
 {
-    FEIElementGeometryWrapper cellgeo(&cell);
+    // Inside an evaluation scope of the cell the terms of one element evaluation share dN/dx: memoised per
+    // interpolation and point. The key compares the coordinate values, so any caller gets the result for the
+    // point it asks for (the geometry of the cell does not change within the scope).
     const MPElement *mpcell = dynamic_cast< const MPElement * >( &cell );
+    const int nlc = lcoords.giveSize();
+    if ( mpcell && mpcell->geometryMemoDepth > 0 && nlc <= 3 ) {
+        for ( const auto &entry : mpcell->dNdxMemo ) {
+            if ( entry.interpol == interpol && entry.nlcoords == nlc &&
+                 std::equal(lcoords.begin(), lcoords.end(), entry.lcoords.begin()) ) {
+                answer.resize(entry.rows, entry.cols);
+                std::copy_n(mpcell->dNdxPool.begin() + entry.offset, entry.rows * entry.cols, answer.givePointer());
+                return;
+            }
+        }
+        computeDNdx(answer, interpol, cell, mpcell, lcoords);
+        DNdxEntry entry { interpol, {}, nlc, answer.giveNumberOfRows(), answer.giveNumberOfColumns(), mpcell->dNdxPool.size() };
+        std::copy(lcoords.begin(), lcoords.end(), entry.lcoords.begin());
+        mpcell->dNdxPool.insert(mpcell->dNdxPool.end(), answer.givePointer(), answer.givePointer() + entry.rows * entry.cols);
+        mpcell->dNdxMemo.push_back(entry);
+        return;
+    }
+    computeDNdx(answer, interpol, cell, mpcell, lcoords);
+}
+
+
+void
+MPElement::computeDNdx(FloatMatrix &answer, const FEInterpolation *interpol, const Element &cell, const MPElement *mpcell, const FloatArray &lcoords)
+{
+    FEIElementGeometryWrapper cellgeo(&cell);
     if ( !mpcell || !mpcell->hasHigherOrderGeometry() || interpol->giveInterpolationOrder() == 0 ) {
         interpol->evaldNdx(answer, lcoords, cellgeo);
         return;

@@ -59,6 +59,7 @@
 #include "stateoperator.h"
 
 #include <map>
+#include <array>
 
 
 namespace oofem {
@@ -554,13 +555,25 @@ class OOFEM_EXPORT MPElement : public Element {
      * Scope of one evaluation of the element (its terms, its state push), in which getUnknownVector gathers each
      * (field, value mode, time step) only once. The nodal unknowns do not change during such an evaluation, so
      * it is opened around it; the memo is dropped when the outermost scope ends (no invalidation needed).
+     * With memoiseGeometry, also dN/dx (see evaldNdx) is memoised; that pays off only when several terms are
+     * evaluated within the scope (e.g. all terms of the element in one assembler call), as each term visits
+     * every point once.
      */
     class EvaluationScope
     {
         MPElement &elem;
+        bool geometry;
     public:
-        EvaluationScope(MPElement &e) : elem(e) { elem.evaluationDepth++; }
+        EvaluationScope(MPElement &e, bool memoiseGeometry = false) : elem(e), geometry(memoiseGeometry) {
+            elem.evaluationDepth++;
+            if ( geometry ) {
+                elem.geometryMemoDepth++;
+            }
+        }
         ~EvaluationScope() {
+            if ( geometry ) {
+                elem.geometryMemoDepth--;
+            }
             if ( --elem.evaluationDepth == 0 ) {
                 elem.releaseEvaluationMemos();
             }
@@ -606,9 +619,26 @@ protected:
     std::vector< UnknownGatherEntry > unknownGatherMemo;
     /// Nesting depth of EvaluationScope; the memo is used only when positive.
     int evaluationDepth = 0;
+    /// Nesting depth of EvaluationScopes memoising geometry; the dN/dx memo is used only when positive.
+    int geometryMemoDepth = 0;
+    /// dN/dx evaluated inside the current EvaluationScope, per interpolation and local coordinates (see evaldNdx);
+    /// the values are kept in dNdxPool (no allocation per entry).
+    struct DNdxEntry {
+        const FEInterpolation *interpol;
+        std::array< double, 3 > lcoords;
+        int nlcoords, rows, cols;
+        std::size_t offset;
+    };
+    mutable std::vector< DNdxEntry > dNdxMemo;
+    mutable std::vector< double > dNdxPool;
+    /// evaldNdx without the memo; mpcell is the cell as an MPElement (nullptr if it is not one).
+    static void computeDNdx(FloatMatrix &answer, const FEInterpolation *interpol, const Element &cell, const MPElement *mpcell, const FloatArray &lcoords);
+
     /// Frees the memos of the evaluation scope completely, so that no memory stays with the element between evaluations.
     void releaseEvaluationMemos() {
         std::vector< UnknownGatherEntry >().swap(this->unknownGatherMemo);
+        std::vector< DNdxEntry >().swap(this->dNdxMemo);
+        std::vector< double >().swap(this->dNdxPool);
     }
 
 public:
@@ -631,6 +661,8 @@ public:
      * @param interpol Interpolation of the field.
      * @param cell Cell.
      * @param lcoords Local coordinates of the point.
+     * Inside an EvaluationScope of the cell memoising geometry, the result is memoised per interpolation and point,
+     * so that the terms of one element evaluation share it.
      */
     static void evaldNdx(FloatMatrix &answer, const FEInterpolation *interpol, const Element &cell, const FloatArray &lcoords);
 
