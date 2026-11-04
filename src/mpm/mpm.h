@@ -500,22 +500,28 @@ class OOFEM_EXPORT MPElement : public Element {
      * @param tstep 
      */
     virtual const void getUnknownVector(FloatArray& answer, const Variable* field, ValueModeType mode, TimeStep* tstep) {
-        IntArray nodes, internalNodes, dofs;
+        IntArray nodes, internalNodes;
         field->interpolation->giveCellDofMans(nodes, internalNodes, this);
-        std::vector<double> ans;
-        for (int i : nodes) {
-            dofs=field->getDofManDofIDs();
-            FloatArray uloc;
-            this->giveDofManager(i)->giveUnknownVector(uloc, dofs, mode, tstep);
-            ans.insert(ans.end(),uloc.begin(),uloc.end());
+        const IntArray &dofs = field->getDofManDofIDs();
+        // Called for every integration point and term, so the values are written directly into answer
+        // (sized for all dofs) instead of collecting per-node temporaries. A dof manager may return fewer
+        // values than dofs requested (missing dofs), hence the explicit count k.
+        answer.resize( ( nodes.giveSize() + internalNodes.giveSize() ) * dofs.giveSize() );
+        FloatArray uloc;
+        int k = 0;
+        auto append = [&](DofManager *dman) {
+            dman->giveUnknownVector(uloc, dofs, mode, tstep);
+            for ( double v : uloc ) {
+                answer [ k++ ] = v;
+            }
+        };
+        for ( int i : nodes ) {
+            append( this->giveDofManager(i) );
         }
-        for (int i : internalNodes) {
-            dofs=field->getDofManDofIDs();
-            FloatArray uloc;
-            this->giveInternalDofManager(i)->giveUnknownVector(uloc, dofs, mode, tstep);
-            ans.insert(ans.end(),uloc.begin(),uloc.end());
+        for ( int i : internalNodes ) {
+            append( this->giveInternalDofManager(i) );
         }
-        answer = FloatArray::fromVector(ans);
+        answer.resizeWithValues(k);
     }
 
     /**
