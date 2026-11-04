@@ -333,18 +333,36 @@ class OOFEM_EXPORT MPElement : public Element {
         // loop over variables and allocate nodal dofs (for unknownFields)
     }
 
+    /**
+     * Integrates the linearized term over iRule, with the measure (weight times jacobian) given by dV(gp),
+     * through Term::evaluate_lin_add. A symmetric term accumulates only the upper triangle, into a local
+     * matrix mirrored after the sweep (answer may already hold contributions of other terms).
+     */
+    template< class Measure >
+    void integrateLin(FloatMatrix &answer, const Term &term, IntegrationRule *iRule, TimeStep *tstep, Measure dV) {
+        if ( term.isSymmetric(*this) ) {
+            FloatMatrix contrib;
+            for ( GaussPoint *igp : * iRule ) {
+                term.evaluate_lin_add(contrib, dV(igp), *this, igp, tstep);
+            }
+            if ( contrib.isNotEmpty() ) {
+                contrib.symmetrized();
+                answer.add(contrib);
+            }
+        } else {
+            for ( GaussPoint *igp : * iRule ) {
+                term.evaluate_lin_add(answer, dV(igp), *this, igp, tstep);
+            }
+        }
+    }
+
     void integrateTerm_dw (FloatMatrix& answer, const Term& term, IntegrationRule* iRule, TimeStep* tstep) {
         // the nodal unknowns are gathered once for all integration points (see UnknownGatherScope)
         UnknownGatherScope gatherScope(*this);
         // need for integration domain and rule.
         // who should determine integration domain? Element or term? Term is just integrand, not integral
         // so integral type (surface, volume, etc) defined by element ---
-        FloatMatrix dw;
-        for ( GaussPoint *igp : * iRule ) {
-            term.evaluate_lin(dw, *this, igp, tstep);
-            dw.times(this->computeVolumeAround(igp));
-            answer.add(dw);
-        }
+        this->integrateLin(answer, term, iRule, tstep, [&](GaussPoint *igp) { return this->computeVolumeAround(igp); });
     } 
 
     void integrateTerm_c (FloatArray& answer, const Term& term, IntegrationRule* iRule, TimeStep* tstep) {
@@ -367,12 +385,7 @@ class OOFEM_EXPORT MPElement : public Element {
             // need for integration domain and rule.
             // who should determine integration domain? Element or term? Term is just integrand, not integral
             // so integral type (surface, volume, etc) defined by element ---
-            FloatMatrix dw;
-            for ( GaussPoint *igp : * iRule ) {
-                term.evaluate_lin(dw, *this, igp, tstep);
-                dw.times(this->computeSurfaceVolumeAround(igp, isurf));
-                answer.add(dw);
-            }
+            this->integrateLin(answer, term, iRule, tstep, [&](GaussPoint *igp) { return this->computeSurfaceVolumeAround(igp, isurf); });
         } 
 
     void integrateSurfaceTerm_c (FloatArray& answer, const Term& term, IntegrationRule* iRule, int isurf, TimeStep* tstep) {
@@ -395,12 +408,7 @@ class OOFEM_EXPORT MPElement : public Element {
             // need for integration domain and rule.
             // who should determine integration domain? Element or term? Term is just integrand, not integral
             // so integral type (surface, volume, etc) defined by element ---
-            FloatMatrix dw;
-            for ( GaussPoint *igp : * iRule ) {
-                term.evaluate_lin(dw, *this, igp, tstep);
-                dw.times(this->computeEdgeVolumeAround(igp, iedge));
-                answer.add(dw);
-            }
+            this->integrateLin(answer, term, iRule, tstep, [&](GaussPoint *igp) { return this->computeEdgeVolumeAround(igp, iedge); });
         } 
 
     void integrateEdgeTerm_c (FloatArray& answer, const Term& term, IntegrationRule* iRule, int iedge, TimeStep* tstep) {
