@@ -60,6 +60,7 @@ PythonMaterialStatus::~PythonMaterialStatus()
 void PythonMaterialStatus::initTempStatus()
 {
     MaterialStatus::initTempStatus();
+    this->clearResponses();
 #ifdef _USE_NANOBIND
     nb::gil_scoped_acquire gil;
     if (stateDict.ptr() != nullptr) {
@@ -80,6 +81,7 @@ void PythonMaterialStatus::initTempStatus()
 void PythonMaterialStatus::updateYourself(TimeStep *tStep)
 {
     MaterialStatus::updateYourself(tStep);
+    this->clearResponses();
 #ifdef _USE_NANOBIND
     nb::gil_scoped_acquire gil;
     if (tempStateDict.ptr() != nullptr) {
@@ -344,6 +346,8 @@ void PythonMaterial::updateTempState(const FloatArray &stateVector, GaussPoint *
 {
 #if defined(_USE_NANOBIND) || defined(_PYBIND_BINDINGS)
     auto ms = static_cast<PythonMaterialStatus *>(this->giveStatus(gp));
+    // a new state invalidates the kept responses
+    ms->clearResponses();
 #endif
 
     // The material decomposes the state itself, into whatever entries of the temporary state

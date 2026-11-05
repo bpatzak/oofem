@@ -32,6 +32,24 @@ protected:
 #endif
 
 public:
+    /**
+     * Responses of the python material at this point for the current temporary state, kept when the material caches
+     * its responses (see PythonMaterial, cacheresponses), per MatResponseMode. They are valid for one pushed state in
+     * one time step: cleared by every state push, at the start and end of a step, and when the time step changes.
+     */
+    std::map< MatResponseMode, FloatMatrix > matrixResponses;
+    std::map< MatResponseMode, FloatArray > vectorResponses;
+    std::map< MatResponseMode, double > valueResponses;
+    /// Time step the kept responses belong to.
+    const TimeStep *responseStep = nullptr;
+    /// Drops the kept responses.
+    void clearResponses() {
+        matrixResponses.clear();
+        vectorResponses.clear();
+        valueResponses.clear();
+        responseStep = nullptr;
+    }
+
     PythonMaterialStatus(GaussPoint * gp);
     ~PythonMaterialStatus() override;
 
