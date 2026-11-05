@@ -19,6 +19,7 @@
 #define _IFT_PythonMaterial_Name "pythonmaterial"
 #define _IFT_PythonMaterial_module "module"
 #define _IFT_PythonMaterial_object "object"
+#define _IFT_PythonMaterial_cacheresponses "cacheresponses"
 
 namespace oofem {
 
@@ -99,6 +100,13 @@ protected:
     /// consumes in a mode, so it is queried once instead of at every integration point of every state push.
     mutable std::map< MaterialMode, StateVariableLayout > stateLayoutCache;
     mutable std::mutex stateLayoutMutex;
+    /**
+     * Keep the responses (giveCharacteristicMatrix/Vector/Value) per integration point and MatResponseMode for the
+     * current state and time step (input flag cacheresponses), so that the terms asking for the same response at the
+     * same state (e.g. the jacobian and the residual of an iteration) call python once. Valid only for materials whose
+     * responses depend on the pushed state and the time step only, not on the call history.
+     */
+    bool cacheResponses = false;
 
 public:
     PythonMaterial(int n, Domain *d);
