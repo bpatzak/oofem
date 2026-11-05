@@ -5,6 +5,7 @@
 #include "matstatus.h"
 #include <string>
 #include <memory>
+#include <map>
 
 #ifdef _USE_NANOBIND
     #include <nanobind/nanobind.h>
@@ -17,6 +18,7 @@
 #define _IFT_PythonMaterial_Name "pythonmaterial"
 #define _IFT_PythonMaterial_module "module"
 #define _IFT_PythonMaterial_object "object"
+#define _IFT_PythonMaterial_cacheresponses "cacheresponses"
 
 namespace oofem {
 
@@ -30,6 +32,24 @@ protected:
 #endif
 
 public:
+    /**
+     * Responses of the python material at this point for the current temporary state, kept when the material caches
+     * its responses (see PythonMaterial, cacheresponses), per MatResponseMode. They are valid for one pushed state in
+     * one time step: cleared by every state push, at the start and end of a step, and when the time step changes.
+     */
+    std::map< MatResponseMode, FloatMatrix > matrixResponses;
+    std::map< MatResponseMode, FloatArray > vectorResponses;
+    std::map< MatResponseMode, double > valueResponses;
+    /// Time step the kept responses belong to.
+    const TimeStep *responseStep = nullptr;
+    /// Drops the kept responses.
+    void clearResponses() {
+        matrixResponses.clear();
+        vectorResponses.clear();
+        valueResponses.clear();
+        responseStep = nullptr;
+    }
+
     PythonMaterialStatus(GaussPoint * gp);
     ~PythonMaterialStatus() override;
 
@@ -74,6 +94,14 @@ protected:
     py::object pyUpdateTempState;
     py::object pyGiveStateVariableIDs;
 #endif
+
+    /**
+     * Keep the responses (giveCharacteristicMatrix/Vector/Value) per integration point and MatResponseMode for the
+     * current state and time step (input flag cacheresponses), so that the terms asking for the same response at the
+     * same state (e.g. the jacobian and the residual of an iteration) call python once. Valid only for materials whose
+     * responses depend on the pushed state and the time step only, not on the call history.
+     */
+    bool cacheResponses = false;
 
 public:
     PythonMaterial(int n, Domain *d);

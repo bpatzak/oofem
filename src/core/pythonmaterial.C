@@ -60,6 +60,7 @@ PythonMaterialStatus::~PythonMaterialStatus()
 void PythonMaterialStatus::initTempStatus()
 {
     MaterialStatus::initTempStatus();
+    this->clearResponses();
 #ifdef _USE_NANOBIND
     nb::gil_scoped_acquire gil;
     if (stateDict.ptr() != nullptr) {
@@ -80,6 +81,7 @@ void PythonMaterialStatus::initTempStatus()
 void PythonMaterialStatus::updateYourself(TimeStep *tStep)
 {
     MaterialStatus::updateYourself(tStep);
+    this->clearResponses();
 #ifdef _USE_NANOBIND
     nb::gil_scoped_acquire gil;
     if (tempStateDict.ptr() != nullptr) {
@@ -134,6 +136,7 @@ void PythonMaterial::initializeFrom(const std::shared_ptr<InputRecord> &ir)
     Material::initializeFrom(ir);
     IR_GIVE_FIELD(ir, moduleName, _IFT_PythonMaterial_module);
     IR_GIVE_FIELD(ir, objectName, _IFT_PythonMaterial_object);
+    this->cacheResponses = ir->hasField(_IFT_PythonMaterial_cacheresponses);
 }
 
 void PythonMaterial::postInitialize()
@@ -306,16 +309,34 @@ void PythonMaterial::giveCharacteristicMatrix(FloatMatrix &answer, MatResponseMo
 {
 #if defined(_USE_NANOBIND) || defined(_PYBIND_BINDINGS)
     auto ms = static_cast<PythonMaterialStatus *>(this->giveStatus(gp));
+    if ( this->cacheResponses ) {
+        // the response kept for the current state, see cacheResponses
+        if ( ms->responseStep != tStep ) {
+            ms->clearResponses();
+            ms->responseStep = tStep;
+        }
+        auto kept = ms->matrixResponses.find(type);
+        if ( kept != ms->matrixResponses.end() ) {
+            answer = kept->second;
+            return;
+        }
+    }
 #endif
 
 #ifdef _USE_NANOBIND
     nb::gil_scoped_acquire gil;
     nb::object result = pyGiveCharacteristicMatrix(nb::cast(type), nb::cast(gp), nb::cast(tStep), ms->giveStateDictionary(), ms->giveTempStateDictionary());
     answer = nb::cast<FloatMatrix>(result);
+    if ( this->cacheResponses ) {
+        ms->matrixResponses [ type ] = answer;
+    }
 #elif defined(_PYBIND_BINDINGS)
     py::gil_scoped_acquire gil;
     py::object result = pyGiveCharacteristicMatrix(type, gp, tStep, ms->giveStateDictionary(), ms->giveTempStateDictionary());
     answer = result.cast<FloatMatrix>();
+    if ( this->cacheResponses ) {
+        ms->matrixResponses [ type ] = answer;
+    }
 #else
     OOFEM_ERROR("Not compiled with python support.");
 #endif
@@ -325,16 +346,34 @@ void PythonMaterial::giveCharacteristicVector(FloatArray &answer, MatResponseMod
 {
 #if defined(_USE_NANOBIND) || defined(_PYBIND_BINDINGS)
     auto ms = static_cast<PythonMaterialStatus *>(this->giveStatus(gp));
+    if ( this->cacheResponses ) {
+        // the response kept for the current state, see cacheResponses
+        if ( ms->responseStep != tStep ) {
+            ms->clearResponses();
+            ms->responseStep = tStep;
+        }
+        auto kept = ms->vectorResponses.find(type);
+        if ( kept != ms->vectorResponses.end() ) {
+            answer = kept->second;
+            return;
+        }
+    }
 #endif
 
 #ifdef _USE_NANOBIND
     nb::gil_scoped_acquire gil;
     nb::object result = pyGiveCharacteristicVector(nb::cast(type), nb::cast(gp), nb::cast(tStep), ms->giveStateDictionary(), ms->giveTempStateDictionary());
     answer = nb::cast<FloatArray>(result);
+    if ( this->cacheResponses ) {
+        ms->vectorResponses [ type ] = answer;
+    }
 #elif defined(_PYBIND_BINDINGS)
     py::gil_scoped_acquire gil;
     py::object result = pyGiveCharacteristicVector(type, gp, tStep, ms->giveStateDictionary(), ms->giveTempStateDictionary());
     answer = result.cast<FloatArray>();
+    if ( this->cacheResponses ) {
+        ms->vectorResponses [ type ] = answer;
+    }
 #else
     OOFEM_ERROR("Not compiled with python support.");
 #endif
@@ -344,6 +383,8 @@ void PythonMaterial::updateTempState(const FloatArray &stateVector, GaussPoint *
 {
 #if defined(_USE_NANOBIND) || defined(_PYBIND_BINDINGS)
     auto ms = static_cast<PythonMaterialStatus *>(this->giveStatus(gp));
+    // a new state invalidates the kept responses
+    ms->clearResponses();
 #endif
 
     // The material decomposes the state itself, into whatever entries of the temporary state
@@ -407,16 +448,35 @@ double PythonMaterial::giveCharacteristicValue(MatResponseMode type, GaussPoint*
 {
 #if defined(_USE_NANOBIND) || defined(_PYBIND_BINDINGS)
     auto ms = static_cast<PythonMaterialStatus *>(this->giveStatus(gp));
+    if ( this->cacheResponses ) {
+        // the response kept for the current state, see cacheResponses
+        if ( ms->responseStep != tStep ) {
+            ms->clearResponses();
+            ms->responseStep = tStep;
+        }
+        auto kept = ms->valueResponses.find(type);
+        if ( kept != ms->valueResponses.end() ) {
+            return kept->second;
+        }
+    }
 #endif
 
 #ifdef _USE_NANOBIND
     nb::gil_scoped_acquire gil;
     nb::object result = pyGiveCharacteristicValue(nb::cast(type), nb::cast(gp), nb::cast(tStep), ms->giveStateDictionary(), ms->giveTempStateDictionary());
-    return nb::cast<double>(result);
+    double value = nb::cast<double>(result);
+    if ( this->cacheResponses ) {
+        ms->valueResponses [ type ] = value;
+    }
+    return value;
 #elif defined(_PYBIND_BINDINGS)
     py::gil_scoped_acquire gil;
     py::object result = pyGiveCharacteristicValue(type, gp, tStep, ms->giveStateDictionary(), ms->giveTempStateDictionary());
-    return result.cast<double>();
+    double value = result.cast<double>();
+    if ( this->cacheResponses ) {
+        ms->valueResponses [ type ] = value;
+    }
+    return value;
 #else
     OOFEM_ERROR("Not compiled with python support.");
     return 0.0;
