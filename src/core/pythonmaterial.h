@@ -6,7 +6,6 @@
 #include <string>
 #include <memory>
 #include <map>
-#include <mutex>
 
 #ifdef _USE_NANOBIND
     #include <nanobind/nanobind.h>
@@ -96,10 +95,6 @@ protected:
     py::object pyGiveStateVariableIDs;
 #endif
 
-    /// Layouts returned by the python giveStateVariableIDs per material mode: the layout describes what the material
-    /// consumes in a mode, so it is queried once instead of at every integration point of every state push.
-    mutable std::map< MaterialMode, StateVariableLayout > stateLayoutCache;
-    mutable std::mutex stateLayoutMutex;
     /**
      * Keep the responses (giveCharacteristicMatrix/Vector/Value) per integration point and MatResponseMode for the
      * current state and time step (input flag cacheresponses), so that the terms asking for the same response at the

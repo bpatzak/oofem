@@ -405,14 +405,6 @@ StateVariableLayout PythonMaterial::giveStateVariableIDs(MaterialMode mmode) con
 {
 #if defined(_USE_NANOBIND) || defined(_PYBIND_BINDINGS)
     if ( pyGiveStateVariableIDs ) {
-        {
-            // queried once per mode, see stateLayoutCache
-            std::lock_guard< std::mutex > lock(stateLayoutMutex);
-            auto cached = stateLayoutCache.find(mmode);
-            if ( cached != stateLayoutCache.end() ) {
-                return cached->second;
-            }
-        }
 #ifdef _USE_NANOBIND
         nb::gil_scoped_acquire gil;
         nb::object result = pyGiveStateVariableIDs(nb::cast(mmode));
@@ -446,8 +438,6 @@ StateVariableLayout PythonMaterial::giveStateVariableIDs(MaterialMode mmode) con
             }
             layout.push_back(spec);
         }
-        std::lock_guard< std::mutex > lock(stateLayoutMutex);
-        stateLayoutCache.emplace(mmode, layout);
         return layout;
     }
 #endif
