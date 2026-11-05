@@ -5,6 +5,8 @@
 #include "matstatus.h"
 #include <string>
 #include <memory>
+#include <map>
+#include <mutex>
 
 #ifdef _USE_NANOBIND
     #include <nanobind/nanobind.h>
@@ -74,6 +76,11 @@ protected:
     py::object pyUpdateTempState;
     py::object pyGiveStateVariableIDs;
 #endif
+
+    /// Layouts returned by the python giveStateVariableIDs per material mode: the layout describes what the material
+    /// consumes in a mode, so it is queried once instead of at every integration point of every state push.
+    mutable std::map< MaterialMode, StateVariableLayout > stateLayoutCache;
+    mutable std::mutex stateLayoutMutex;
 
 public:
     PythonMaterial(int n, Domain *d);
