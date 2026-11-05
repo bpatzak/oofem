@@ -102,6 +102,8 @@ public:
                  double coefficient, double sign = 1.0, ValueModeType vm = VM_TotalIntrinsic);
 
     void evaluate_lin(FloatMatrix &answer, MPElement &cell, GaussPoint *gp, TimeStep *tStep) const override;
+    void evaluate_lin_add(FloatMatrix &answer, double factor, MPElement &cell, GaussPoint *gp, TimeStep *tStep) const override;
+    bool isSymmetric(MPElement &cell) const override;
     void evaluate(FloatArray &answer, MPElement &cell, GaussPoint *gp, TimeStep *tStep) const override;
     void getDimensions(Element &cell) const override { }
     void initializeFrom(const std::shared_ptr< InputRecord > &ir, EngngModel *problem) override;

@@ -228,11 +228,12 @@ void NonStationaryMPMSProblem :: solveYourselfAt(TimeStep *tStep)
     FloatArray externalForces(neq);
     externalForces.zero();
     if (this->problemType == "symbolic") {
-        // loop over rhs integrals
+        // rhs integrals, assembled element by element (see Integral::assembleGroup_rhs)
+        std::vector< Integral::GroupMember > group;
         for (auto i: rhsIntegrals) {
-            Integral* integral = this->integralList[i-1].get();
-            integral->assemble_rhs (externalForces, EModelDefaultEquationNumbering(), tStep); 
+            group.push_back({ this->integralList[i-1].get() });
         }
+        Integral::assembleGroup_rhs(externalForces, group, EModelDefaultEquationNumbering(), tStep);
         // experimental: allow traditional BCs to contribute to rhs as well by treating them as integrals
         this->assembleVectorFromBC(externalForces, tStep, ExternalForceAssembler(), VM_Total,
                                     EModelDefaultEquationNumbering(), this->giveDomain(1) );
@@ -318,14 +319,16 @@ NonStationaryMPMSProblem :: updateInternalRHS(FloatArray &answer, TimeStep *tSte
     } else if (this->problemType == "tm") {
       this->assembleVector(answer, tStep, TMResidualAssembler(this->alpha, tStep->giveTimeIncrement()), VM_Total, EModelDefaultEquationNumbering(), d, eNorm);
     } else if (this->problemType == "symbolic") {
+        // all lhs and lhsdot integrals assembled element by element, so that the terms of an element share
+        // its evaluation (see Integral::assembleGroup_rhs); only the lhsdot ones contribute to eNorm
+        std::vector< Integral::GroupMember > group;
         for (auto i: lhsIntegrals) {
-            Integral* integral = this->integralList[i-1].get();
-            integral->assemble_rhs (answer, EModelDefaultEquationNumbering(), tStep);
+            group.push_back({ this->integralList[i-1].get() });
         }
         for (auto i: lhsdotIntegrals) {
-            Integral* integral = this->integralList[i-1].get();
-            integral->assemble_rhs (answer, EModelDefaultEquationNumbering(), tStep, eNorm);
+            group.push_back({ this->integralList[i-1].get(), 1.0, eNorm });
         }
+        Integral::assembleGroup_rhs(answer, group, EModelDefaultEquationNumbering(), tStep);
     } else if (this->problemType == "element") {
         this->assembleVector(answer, tStep, MPMElementResidualAssembler(this->dofScale), VM_Total, EModelDefaultEquationNumbering(), d);
         if ( eNorm ) {
@@ -382,14 +385,16 @@ NonStationaryMPMSProblem :: updateMatrix(SparseMtrx &mat, TimeStep *tStep, Domai
             MPMElementLhsAssembler jacobianAssembler(this->alpha, tStep->giveTimeIncrement(), this->dofScale);
             this->assemble( mat, tStep, jacobianAssembler, EModelDefaultEquationNumbering(), d );
         } else if (this->problemType == "symbolic") {
+            // all lhs (factor alpha) and lhsdot (factor 1/dt) integrals assembled element by element, so that
+            // the terms of an element share its evaluation (see Integral::assembleGroup_lhs)
+            std::vector< Integral::GroupMember > group;
             for (auto i: lhsIntegrals) {
-                Integral* integral = this->integralList[i-1].get();
-                integral->assemble_lhs (mat, EModelDefaultEquationNumbering(), tStep, this->alpha);
+                group.push_back({ this->integralList[i-1].get(), this->alpha });
             }
             for (auto i: lhsdotIntegrals) {
-                Integral* integral = this->integralList[i-1].get();
-                integral->assemble_lhs (mat, EModelDefaultEquationNumbering(), tStep, 1.0/tStep->giveTimeIncrement());
+                group.push_back({ this->integralList[i-1].get(), 1.0/tStep->giveTimeIncrement() });
             }
+            Integral::assembleGroup_lhs(mat, group, EModelDefaultEquationNumbering(), tStep);
             // Finalize the matrix. Assembling through the integrals bypasses EngngModel::assemble,
             // which is the only other place these are called; without them a storage format that
             // defers its assembly -- PETSc, whose assembleEnd is MatAssemblyEnd -- is handed to the

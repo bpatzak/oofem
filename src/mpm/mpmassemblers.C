@@ -53,6 +53,8 @@
 #include "outputmanager.h"
 #include "mpm.h"
 
+#include <optional>
+
 namespace oofem {
 
 UPLhsAssembler :: UPLhsAssembler(double alpha, double deltaT) : 
@@ -65,6 +67,8 @@ void UPLhsAssembler :: matrixFromElement(FloatMatrix &answer, Element &el, TimeS
     FloatMatrix contrib;
     IntArray locu, locp;
     MPElement *e = dynamic_cast<MPElement*>(&el);
+    // all terms of the element are evaluated below; they share the gathered unknowns, dN/dx and dV
+    MPElement::EvaluationScope evalScope(*e, true);
     int ndofs = e->giveNumberOfDofs();
     answer.resize(ndofs, ndofs);
     answer.zero();
@@ -95,6 +99,8 @@ void UPResidualAssembler :: vectorFromElement(FloatArray &vec, Element &element,
     FloatArray contrib;
     IntArray locu, locp;
     MPElement *e = dynamic_cast<MPElement*>(&element);
+    // all terms of the element are evaluated below; they share the gathered unknowns, dN/dx and dV
+    MPElement::EvaluationScope evalScope(*e, true);
     int ndofs = e->giveNumberOfDofs();
     vec.resize(ndofs);
     vec.zero();
@@ -132,6 +138,8 @@ void TMLhsAssembler :: matrixFromElement(FloatMatrix &answer, Element &el, TimeS
     FloatMatrix contrib;
     IntArray locu, loct;
     MPElement *e = dynamic_cast<MPElement*>(&el);
+    // all terms of the element are evaluated below; they share the gathered unknowns, dN/dx and dV
+    MPElement::EvaluationScope evalScope(*e, true);
     int ndofs = e->giveNumberOfDofs();
     answer.resize(ndofs, ndofs);
     answer.zero();
@@ -187,6 +195,8 @@ void TMResidualAssembler :: vectorFromElement(FloatArray &vec, Element &element,
     FloatArray contrib;
     IntArray locu, loct;
     MPElement *e = dynamic_cast<MPElement*>(&element);
+    // all terms of the element are evaluated below; they share the gathered unknowns, dN/dx and dV
+    MPElement::EvaluationScope evalScope(*e, true);
     int ndofs = e->giveNumberOfDofs();
     vec.resize(ndofs);
     vec.zero();
@@ -264,6 +274,11 @@ void
 MPMElementLhsAssembler :: matrixFromElement(FloatMatrix &answer, Element &el, TimeStep *tStep) const
 {
     FloatMatrix contrib;
+    // both matrices of the element are evaluated below; they share the gathered unknowns, dN/dx and dV
+    std::optional< MPElement::EvaluationScope > evalScope;
+    if ( auto *e = dynamic_cast< MPElement * >( &el ) ) {
+        evalScope.emplace(*e, true);
+    }
     el.giveCharacteristicMatrix(answer, MPM_LhsMatrix, tStep);
     answer.times(this->alpha);
     el.giveCharacteristicMatrix(contrib, MPM_LhsDotMatrix, tStep);
@@ -275,6 +290,11 @@ MPMElementLhsAssembler :: matrixFromElement(FloatMatrix &answer, Element &el, Ti
 void
 MPMElementResidualAssembler :: vectorFromElement(FloatArray &vec, Element &element, TimeStep *tStep, ValueModeType mode) const
 {
+    // the terms of the element residual share the gathered unknowns, dN/dx and dV
+    std::optional< MPElement::EvaluationScope > evalScope;
+    if ( auto *e = dynamic_cast< MPElement * >( &element ) ) {
+        evalScope.emplace(*e, true);
+    }
     element.giveCharacteristicVector(vec, MPM_InternalResidual, mode, tStep);
     mpmScaleElementRows(vec, element, this->dofScale);
 }

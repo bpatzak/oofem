@@ -59,6 +59,7 @@
 #include "stateoperator.h"
 
 #include <map>
+#include <array>
 
 
 namespace oofem {
@@ -170,6 +171,20 @@ class OOFEM_EXPORT Term {
     
     // evaluate linearized term contribution to weak form on given cell at given point 
     virtual void evaluate_lin (FloatMatrix& , MPElement& cell, GaussPoint* gp, TimeStep* tStep) const =0;
+    /**
+     * Adds factor times the linearized term (see evaluate_lin) to answer, which may be empty.
+     * Used by the integration of the element (factor is the integration weight times the jacobian); terms
+     * override it to accumulate directly, without the temporary matrix and the extra scaling pass of this
+     * default. When isSymmetric is true, only the upper triangle of the contribution has to be added: the
+     * integrating element mirrors it once the integration sweep is complete.
+     */
+    virtual void evaluate_lin_add (FloatMatrix& answer, double factor, MPElement& cell, GaussPoint* gp, TimeStep* tStep) const;
+    /**
+     * Whether the linearized term is a symmetric (square) matrix on given cell, so that evaluate_lin_add
+     * may accumulate only its upper triangle. Terms with a material matrix follow
+     * CrossSection::isCharacteristicMtrxSymmetric, as the structural elements do.
+     */
+    virtual bool isSymmetric (MPElement& cell) const { return false; }
     // evaluate contribution (all vars known) on given cell
     virtual void evaluate (FloatArray&, MPElement& cell, GaussPoint* gp, TimeStep* tStep) const =0;
     virtual void getDimensions(Element& cell) const =0;
@@ -319,19 +334,41 @@ class OOFEM_EXPORT MPElement : public Element {
         // loop over variables and allocate nodal dofs (for unknownFields)
     }
 
+    /**
+     * Integrates the linearized term over iRule, with the measure (weight times jacobian) given by dV(gp),
+     * through Term::evaluate_lin_add. A symmetric term accumulates only the upper triangle, into a local
+     * matrix mirrored after the sweep (answer may already hold contributions of other terms).
+     */
+    template< class Measure >
+    void integrateLin(FloatMatrix &answer, const Term &term, IntegrationRule *iRule, TimeStep *tstep, Measure dV) {
+        if ( term.isSymmetric(*this) ) {
+            FloatMatrix contrib;
+            for ( GaussPoint *igp : * iRule ) {
+                term.evaluate_lin_add(contrib, dV(igp), *this, igp, tstep);
+            }
+            if ( contrib.isNotEmpty() ) {
+                contrib.symmetrized();
+                answer.add(contrib);
+            }
+        } else {
+            for ( GaussPoint *igp : * iRule ) {
+                term.evaluate_lin_add(answer, dV(igp), *this, igp, tstep);
+            }
+        }
+    }
+
     void integrateTerm_dw (FloatMatrix& answer, const Term& term, IntegrationRule* iRule, TimeStep* tstep) {
+        // the nodal unknowns are gathered once for all integration points (see EvaluationScope)
+        EvaluationScope evalScope(*this);
         // need for integration domain and rule.
         // who should determine integration domain? Element or term? Term is just integrand, not integral
         // so integral type (surface, volume, etc) defined by element ---
-        FloatMatrix dw;
-        for ( GaussPoint *igp : * iRule ) {
-            term.evaluate_lin(dw, *this, igp, tstep);
-            dw.times(this->computeVolumeAround(igp));
-            answer.add(dw);
-        }
+        this->integrateLin(answer, term, iRule, tstep, [&](GaussPoint *igp) { return this->computeVolumeAround(igp); });
     } 
 
     void integrateTerm_c (FloatArray& answer, const Term& term, IntegrationRule* iRule, TimeStep* tstep) {
+        // the nodal unknowns are gathered once for all integration points (see EvaluationScope)
+        EvaluationScope evalScope(*this);
         // need for integration domain and rule.
         // who should determine integration domain? Element or term? Term is just integrand, not integral
         // so integral type (surface, volume, etc) defined by element ---
@@ -344,18 +381,17 @@ class OOFEM_EXPORT MPElement : public Element {
     } 
 
     void integrateSurfaceTerm_dw (FloatMatrix& answer, const Term& term, IntegrationRule* iRule, int isurf, TimeStep* tstep) {
+            // the nodal unknowns are gathered once for all integration points (see EvaluationScope)
+            EvaluationScope evalScope(*this);
             // need for integration domain and rule.
             // who should determine integration domain? Element or term? Term is just integrand, not integral
             // so integral type (surface, volume, etc) defined by element ---
-            FloatMatrix dw;
-            for ( GaussPoint *igp : * iRule ) {
-                term.evaluate_lin(dw, *this, igp, tstep);
-                dw.times(this->computeSurfaceVolumeAround(igp, isurf));
-                answer.add(dw);
-            }
+            this->integrateLin(answer, term, iRule, tstep, [&](GaussPoint *igp) { return this->computeSurfaceVolumeAround(igp, isurf); });
         } 
 
     void integrateSurfaceTerm_c (FloatArray& answer, const Term& term, IntegrationRule* iRule, int isurf, TimeStep* tstep) {
+            // the nodal unknowns are gathered once for all integration points (see EvaluationScope)
+            EvaluationScope evalScope(*this);
             // need for integration domain and rule.
             // who should determine integration domain? Element or term? Term is just integrand, not integral
             // so integral type (surface, volume, etc) defined by element ---
@@ -368,18 +404,17 @@ class OOFEM_EXPORT MPElement : public Element {
         } 
 
     void integrateEdgeTerm_dw (FloatMatrix& answer, const Term& term, IntegrationRule* iRule, int iedge, TimeStep* tstep) {
+            // the nodal unknowns are gathered once for all integration points (see EvaluationScope)
+            EvaluationScope evalScope(*this);
             // need for integration domain and rule.
             // who should determine integration domain? Element or term? Term is just integrand, not integral
             // so integral type (surface, volume, etc) defined by element ---
-            FloatMatrix dw;
-            for ( GaussPoint *igp : * iRule ) {
-                term.evaluate_lin(dw, *this, igp, tstep);
-                dw.times(this->computeEdgeVolumeAround(igp, iedge));
-                answer.add(dw);
-            }
+            this->integrateLin(answer, term, iRule, tstep, [&](GaussPoint *igp) { return this->computeEdgeVolumeAround(igp, iedge); });
         } 
 
     void integrateEdgeTerm_c (FloatArray& answer, const Term& term, IntegrationRule* iRule, int iedge, TimeStep* tstep) {
+            // the nodal unknowns are gathered once for all integration points (see EvaluationScope)
+            EvaluationScope evalScope(*this);
             // need for integration domain and rule.
             // who should determine integration domain? Element or term? Term is just integrand, not integral
             // so integral type (surface, volume, etc) defined by element ---
@@ -500,23 +535,116 @@ class OOFEM_EXPORT MPElement : public Element {
      * @param tstep 
      */
     virtual const void getUnknownVector(FloatArray& answer, const Variable* field, ValueModeType mode, TimeStep* tstep) {
-        IntArray nodes, internalNodes, dofs;
-        field->interpolation->giveCellDofMans(nodes, internalNodes, this);
-        std::vector<double> ans;
-        for (int i : nodes) {
-            dofs=field->getDofManDofIDs();
-            FloatArray uloc;
-            this->giveDofManager(i)->giveUnknownVector(uloc, dofs, mode, tstep);
-            ans.insert(ans.end(),uloc.begin(),uloc.end());
+        // Inside an EvaluationScope each (field, mode, time step) is gathered only once; terms evaluated at
+        // every integration point then reuse it.
+        if ( this->evaluationDepth > 0 ) {
+            for ( const auto &entry : this->unknownGatherMemo ) {
+                if ( entry.field == field && entry.mode == mode && entry.tstep == tstep ) {
+                    answer = entry.values;
+                    return;
+                }
+            }
+            this->gatherUnknownVector(answer, field, mode, tstep);
+            this->unknownGatherMemo.push_back({ field, mode, tstep, answer });
+            return;
         }
-        for (int i : internalNodes) {
-            dofs=field->getDofManDofIDs();
-            FloatArray uloc;
-            this->giveInternalDofManager(i)->giveUnknownVector(uloc, dofs, mode, tstep);
-            ans.insert(ans.end(),uloc.begin(),uloc.end());
-        }
-        answer = FloatArray::fromVector(ans);
+        this->gatherUnknownVector(answer, field, mode, tstep);
     }
+
+    /**
+     * Scope of one evaluation of the element (its terms, its state push), in which getUnknownVector gathers each
+     * (field, value mode, time step) only once. The nodal unknowns do not change during such an evaluation, so
+     * it is opened around it; the memo is dropped when the outermost scope ends (no invalidation needed).
+     * With memoiseGeometry, also dN/dx (see evaldNdx) and the volume measure (computeVolumeAround) are memoised;
+     * that pays off only when several terms are evaluated within the scope (e.g. all terms of the element in one
+     * assembler call), as each term visits every point once.
+     */
+    class EvaluationScope
+    {
+        MPElement &elem;
+        bool geometry;
+    public:
+        EvaluationScope(MPElement &e, bool memoiseGeometry = false) : elem(e), geometry(memoiseGeometry) {
+            elem.evaluationDepth++;
+            if ( geometry ) {
+                elem.geometryMemoDepth++;
+            }
+        }
+        ~EvaluationScope() {
+            if ( geometry ) {
+                elem.geometryMemoDepth--;
+            }
+            if ( --elem.evaluationDepth == 0 ) {
+                elem.releaseEvaluationMemos();
+            }
+        }
+        EvaluationScope(const EvaluationScope &) = delete;
+        EvaluationScope &operator=(const EvaluationScope &) = delete;
+    };
+
+protected:
+    /// Gathers the nodal unknowns of field from the dof managers of the receiver (see getUnknownVector).
+    void gatherUnknownVector(FloatArray& answer, const Variable* field, ValueModeType mode, TimeStep* tstep) {
+        IntArray nodes, internalNodes;
+        field->interpolation->giveCellDofMans(nodes, internalNodes, this);
+        const IntArray &dofs = field->getDofManDofIDs();
+        // Called for every integration point and term, so the values are written directly into answer
+        // (sized for all dofs) instead of collecting per-node temporaries. A dof manager may return fewer
+        // values than dofs requested (missing dofs), hence the explicit count k.
+        answer.resize( ( nodes.giveSize() + internalNodes.giveSize() ) * dofs.giveSize() );
+        FloatArray uloc;
+        int k = 0;
+        auto append = [&](DofManager *dman) {
+            dman->giveUnknownVector(uloc, dofs, mode, tstep);
+            for ( double v : uloc ) {
+                answer [ k++ ] = v;
+            }
+        };
+        for ( int i : nodes ) {
+            append( this->giveDofManager(i) );
+        }
+        for ( int i : internalNodes ) {
+            append( this->giveInternalDofManager(i) );
+        }
+        answer.resizeWithValues(k);
+    }
+
+    /// Unknown vectors gathered inside the current EvaluationScope.
+    struct UnknownGatherEntry {
+        const Variable *field;
+        ValueModeType mode;
+        TimeStep *tstep;
+        FloatArray values;
+    };
+    std::vector< UnknownGatherEntry > unknownGatherMemo;
+    /// Nesting depth of EvaluationScope; the memo is used only when positive.
+    int evaluationDepth = 0;
+    /// Nesting depth of EvaluationScopes memoising geometry; the dN/dx memo is used only when positive.
+    int geometryMemoDepth = 0;
+    /// dN/dx evaluated inside the current EvaluationScope, per interpolation and local coordinates (see evaldNdx);
+    /// the values are kept in dNdxPool (no allocation per entry).
+    struct DNdxEntry {
+        const FEInterpolation *interpol;
+        std::array< double, 3 > lcoords;
+        int nlcoords, rows, cols;
+        std::size_t offset;
+    };
+    mutable std::vector< DNdxEntry > dNdxMemo;
+    mutable std::vector< double > dNdxPool;
+    /// Volume measure (computeVolumeAround) per integration point, inside the current EvaluationScope memoising geometry.
+    std::vector< std::pair< GaussPoint *, double > > volumeMemo;
+    /// evaldNdx without the memo; mpcell is the cell as an MPElement (nullptr if it is not one).
+    static void computeDNdx(FloatMatrix &answer, const FEInterpolation *interpol, const Element &cell, const MPElement *mpcell, const FloatArray &lcoords);
+
+    /// Frees the memos of the evaluation scope completely, so that no memory stays with the element between evaluations.
+    void releaseEvaluationMemos() {
+        std::vector< UnknownGatherEntry >().swap(this->unknownGatherMemo);
+        std::vector< DNdxEntry >().swap(this->dNdxMemo);
+        std::vector< double >().swap(this->dNdxPool);
+        std::vector< std::pair< GaussPoint *, double > >().swap(this->volumeMemo);
+    }
+
+public:
 
     /**
      * Whether the geometry interpolation of the receiver is of higher order than the
@@ -536,6 +664,8 @@ class OOFEM_EXPORT MPElement : public Element {
      * @param interpol Interpolation of the field.
      * @param cell Cell.
      * @param lcoords Local coordinates of the point.
+     * Inside an EvaluationScope of the cell memoising geometry, the result is memoised per interpolation and point,
+     * so that the terms of one element evaluation share it.
      */
     static void evaldNdx(FloatMatrix &answer, const FEInterpolation *interpol, const Element &cell, const FloatArray &lcoords);
 
@@ -557,6 +687,12 @@ class OOFEM_EXPORT MPElement : public Element {
     void computeDivMatrixAt(FloatMatrix &answer, const Variable *v, GaussPoint *gp) const;
     /// Dispatches to the operator named by @p op.
     void computeStateOperatorAt(FloatMatrix &answer, StateOperator op, const Variable *v, GaussPoint *gp) const;
+    /**
+     * Applies the operator named by @p op to the nodal values @p u of the field, i.e. the product of
+     * computeStateOperatorAt and @p u, without forming the operator matrix (mostly zeros for gradients).
+     * Gives the same result, summed in the same order; unsupported cases use the matrix.
+     */
+    void applyStateOperatorAt(FloatArray &answer, StateOperator op, const Variable *v, GaussPoint *gp, const FloatArray &u) const;
     //@}
 
     /// Maps a field, by what it physically is, onto the Variable supplying it.
@@ -614,7 +750,22 @@ public:
   virtual double computeEdgeVolumeAround(GaussPoint* igp, int iEdge) 
   {return igp->giveWeight()*this->getGeometryInterpolation()->boundaryEdgeGiveTransformationJacobian(iEdge, igp->giveNaturalCoordinates(), FEIElementGeometryWrapper(this));}
   virtual double computeVolumeAround(GaussPoint* igp) override
-  {return igp->giveWeight()*this->getGeometryInterpolation()->giveTransformationJacobian(igp->giveNaturalCoordinates(), FEIElementGeometryWrapper(this));}
+  {
+      // memoised per integration point inside an EvaluationScope memoising geometry, where several terms of the
+      // element are integrated with the same points
+      if ( this->geometryMemoDepth > 0 ) {
+          for ( const auto &entry : this->volumeMemo ) {
+              if ( entry.first == igp ) {
+                  return entry.second;
+              }
+          }
+      }
+      double dV = igp->giveWeight()*this->getGeometryInterpolation()->giveTransformationJacobian(igp->giveNaturalCoordinates(), FEIElementGeometryWrapper(this));
+      if ( this->geometryMemoDepth > 0 ) {
+          this->volumeMemo.emplace_back(igp, dV);
+      }
+      return dV;
+  }
   
    //const FEInterpolation& getGeometryInterpolation () const override = 0;
    FEInterpolation *giveInterpolation() const override { return const_cast<FEInterpolation*>( this->getGeometryInterpolation()); }

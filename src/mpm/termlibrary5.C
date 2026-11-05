@@ -99,6 +99,44 @@ OperatorTerm::evaluate_lin(FloatMatrix &answer, MPElement &cell, GaussPoint *gp,
 
 
 void
+OperatorTerm::evaluate_lin_add(FloatMatrix &answer, double factor, MPElement &cell, GaussPoint *gp, TimeStep *tStep) const
+{
+    // sign A^T D B (or sign c A^T B) accumulated directly; only its upper triangle when the term is symmetric
+    if ( !this->hasLhs ) {
+        return;
+    }
+    FloatMatrix a, b, db;
+    cell.computeStateOperatorAt(a, this->testOp, this->testField, gp);
+    cell.computeStateOperatorAt(b, this->op, this->field, gp);
+    double f = this->sign * factor;
+    if ( this->lhsFromMaterial ) {
+        FloatMatrix d;
+        giveMaterial(cell, gp)->giveCharacteristicMatrix(d, this->lhsMode, gp, tStep);
+        db.beProductOf(d, b);
+    } else {
+        db = b;
+        f *= this->coefficient;
+    }
+    if ( this->isSymmetric(cell) ) {
+        answer.plusProductSymmUpper(a, db, f);
+    } else {
+        answer.plusProductUnsym(a, db, f);
+    }
+}
+
+
+bool
+OperatorTerm::isSymmetric(MPElement &cell) const
+{
+    // A^T D B is symmetric when A and B are the same operator on the same interpolation (they are then the
+    // same matrix) and the coefficient D is symmetric
+    return this->hasLhs && this->testOp == this->op && this->testField->interpolation == this->field->interpolation &&
+           this->testField->size == this->field->size &&
+           ( !this->lhsFromMaterial || cell.giveCrossSection()->isCharacteristicMtrxSymmetric(this->lhsMode) );
+}
+
+
+void
 OperatorTerm::evaluate(FloatArray &answer, MPElement &cell, GaussPoint *gp, TimeStep *tStep) const
 {
     if ( !this->hasRhs ) {

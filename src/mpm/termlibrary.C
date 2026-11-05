@@ -60,6 +60,24 @@ void BTSigTerm::evaluate_lin (FloatMatrix& answer, MPElement& e, GaussPoint* gp,
     answer.beTProductOf(B,DB);
 }
 
+void BTSigTerm::evaluate_lin_add (FloatMatrix& answer, double factor, MPElement& e, GaussPoint* gp, TimeStep* tstep) const {
+    // accumulates factor B^T D B directly; only its upper triangle when the term is symmetric (see Term::isSymmetric)
+    FloatMatrix D, B, DB;
+    e.giveCrossSection()->giveMaterial(gp)->giveCharacteristicMatrix(D, TangentStiffness, gp, tstep);
+    this->grad(B, this->field, this->field->interpolation, e, gp->giveNaturalCoordinates(), gp->giveMaterialMode());
+    DB.beProductOf(D, B);
+    if ( this->isSymmetric(e) ) {
+        answer.plusProductSymmUpper(B, DB, factor);
+    } else {
+        answer.plusProductUnsym(B, DB, factor);
+    }
+}
+
+bool BTSigTerm::isSymmetric (MPElement& cell) const {
+    // the same B on both sides: symmetric when the material tangent is
+    return cell.giveCrossSection()->isCharacteristicMtrxSymmetric(TangentStiffness);
+}
+
 void BTSigTerm::evaluate (FloatArray& answer, MPElement& cell, GaussPoint* gp, TimeStep* tstep) const  {
     FloatArray sig;
     FloatMatrix B;
@@ -132,6 +150,24 @@ void gNTfTerm::evaluate_lin (FloatMatrix& answer, MPElement& e, GaussPoint* gp, 
     answer.beTProductOf(B, DB);
 }
 
+void gNTfTerm::evaluate_lin_add (FloatMatrix& answer, double factor, MPElement& e, GaussPoint* gp, TimeStep* tstep) const  {
+    // accumulates factor B^T D B directly; only its upper triangle when the term is symmetric (see Term::isSymmetric)
+    FloatMatrix D, B, DB;
+    e.giveCrossSection()->giveMaterial(gp)->giveCharacteristicMatrix(D, lhsType, gp, tstep);
+    this->grad(B, this->field, this->field->interpolation, e, gp->giveNaturalCoordinates());
+    DB.beProductOf(D, B);
+    if ( this->isSymmetric(e) ) {
+        answer.plusProductSymmUpper(B, DB, factor);
+    } else {
+        answer.plusProductUnsym(B, DB, factor);
+    }
+}
+
+bool gNTfTerm::isSymmetric (MPElement& cell) const {
+    // the same gradient on both sides: symmetric when the material matrix (e.g. permeability) is
+    return cell.giveCrossSection()->isCharacteristicMtrxSymmetric(lhsType);
+}
+
 void gNTfTerm::evaluate (FloatArray& answer, MPElement& cell, GaussPoint* gp, TimeStep* tstep) const  {
     FloatArray fp;
     FloatMatrix B;
@@ -171,12 +207,29 @@ void BTamNTerm::evaluate_lin (FloatMatrix& answer, MPElement& e, GaussPoint* gp,
     answer.beTProductOf(B, mn);
 }
 
+void BTamNTerm::evaluate_lin_add (FloatMatrix& answer, double factor, MPElement& e, GaussPoint* gp, TimeStep* tstep) const  {
+    // B^T m a N^T is the outer product of B^T m and N: accumulated directly, without the 6 x n matrix m N^T
+    FloatMatrix B;
+    FloatArray m=Vec6(1,1,1,0,0,0), Np, bm;
+    MaterialMode mmode = (mode==0)?gp->giveMaterialMode():mode;
+    this->field->interpolation->evalN(Np, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(&e));
+    double a = e.giveCrossSection()->giveMaterial(gp)->giveCharacteristicValue(aType, gp, tstep);
+    this->grad(B, this->testField, this->testField->interpolation, e, gp->giveNaturalCoordinates(), mmode);
+    bm.beTProductOf(B, m);
+    answer.plusDyadUnsym(bm, Np, a * factor);
+}
+
 void BTamNTerm::evaluate (FloatArray& answer, MPElement& cell, GaussPoint* gp, TimeStep* tstep) const  {
-    FloatArray p;
-    FloatMatrix Q;
+    // Q p with Q = B^T m a N^T (see evaluate_lin) is evaluated as B^T (m a (N p)): a dot product and one
+    // B^T-vector product instead of forming Q
+    FloatArray p, Np, m=Vec6(1,1,1,0,0,0);
+    FloatMatrix B;
+    MaterialMode mmode = (mode==0)?gp->giveMaterialMode():mode;
     cell.getUnknownVector(p, this->field, VM_TotalIntrinsic, tstep);
-    this->evaluate_lin (Q, cell,gp, tstep);
-    answer.beProductOf(Q,p);
+    this->field->interpolation->evalN(Np, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(&cell));
+    m.times(cell.giveCrossSection()->giveMaterial(gp)->giveCharacteristicValue(aType, gp, tstep) * Np.dotProduct(p));
+    this->grad(B, this->testField, this->testField->interpolation, cell, gp->giveNaturalCoordinates(), mmode);
+    answer.beTProductOf(B, m);
 }
 
 void BTamNTerm::getDimensions(Element& cell) const  {
@@ -242,12 +295,29 @@ void NTamTBTerm::evaluate_lin (FloatMatrix& answer, MPElement& e, GaussPoint* gp
     answer.beProductOf(Npm, mb);
 }
 
+void NTamTBTerm::evaluate_lin_add (FloatMatrix& answer, double factor, MPElement& e, GaussPoint* gp, TimeStep* tstep) const  {
+    // N a m^T B is the outer product of N and B^T m: accumulated directly, without the 1 x n matrix m^T B
+    FloatMatrix B;
+    FloatArray m=Vec6(1,1,1,0,0,0), Np, bm;
+    MaterialMode mmode = (mode==0)?gp->giveMaterialMode():mode;
+    this->testField->interpolation->evalN(Np, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(&e));
+    double a = e.giveCrossSection()->giveMaterial(gp)->giveCharacteristicValue(aType, gp, tstep);
+    this->grad(B, this->field, this->field->interpolation, e, gp->giveNaturalCoordinates(), mmode);
+    bm.beTProductOf(B, m);
+    answer.plusDyadUnsym(Np, bm, a * factor);
+}
+
 void NTamTBTerm::evaluate (FloatArray& answer, MPElement& cell, GaussPoint* gp, TimeStep* tstep) const  {
-    FloatArray ut;
-    FloatMatrix Q;
+    // Q u with Q = N a m^T B (see evaluate_lin) is evaluated as N a (m^T (B u)): one B-vector product and
+    // a dot product instead of forming Q
+    FloatArray ut, eps, m=Vec6(1,1,1,0,0,0);
+    FloatMatrix B;
+    MaterialMode mmode = (mode==0)?gp->giveMaterialMode():mode;
     cell.getUnknownVector(ut, this->field, unknownFieldVMT ,tstep);
-    this->evaluate_lin (Q, cell,gp, tstep);
-    answer.beProductOf(Q,ut);
+    this->grad(B, this->field, this->field->interpolation, cell, gp->giveNaturalCoordinates(), mmode);
+    eps.beProductOf(B, ut);
+    this->testField->interpolation->evalN(answer, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(&cell));
+    answer.times(cell.giveCrossSection()->giveMaterial(gp)->giveCharacteristicValue(aType, gp, tstep) * m.dotProduct(eps));
 }
 
 void NTamTBTerm::getDimensions(Element& cell) const  {
@@ -309,12 +379,19 @@ void NTcN::evaluate_lin (FloatMatrix& answer, MPElement& e, GaussPoint* gp, Time
     answer.times(e.giveCrossSection()->giveMaterial(gp)->giveCharacteristicValue(ctype, gp, tstep));
 }
 
+void NTcN::evaluate_lin_add (FloatMatrix& answer, double factor, MPElement& e, GaussPoint* gp, TimeStep* tstep) const  {
+    // accumulates the upper triangle of factor c N N^T directly (the term is symmetric)
+    FloatArray Np;
+    this->field->interpolation->evalN(Np, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(&e));
+    answer.plusDyadSymmUpper(Np, factor * e.giveCrossSection()->giveMaterial(gp)->giveCharacteristicValue(ctype, gp, tstep));
+}
+
 void NTcN::evaluate (FloatArray& answer, MPElement& cell, GaussPoint* gp, TimeStep* tstep) const  {
+    // S p with S = c N N^T (see evaluate_lin) is evaluated as N c (N p): a dot product instead of forming S
     FloatArray p;
-    FloatMatrix S;
     cell.getUnknownVector(p, this->field, unknownFieldVMT, tstep);
-    this->evaluate_lin (S, cell,gp, tstep);
-    answer.beProductOf(S,p);
+    this->field->interpolation->evalN(answer, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(&cell));
+    answer.times(cell.giveCrossSection()->giveMaterial(gp)->giveCharacteristicValue(ctype, gp, tstep) * answer.dotProduct(p));
 }
 
 void NTcN::getDimensions(Element& cell) const  {

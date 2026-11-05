@@ -40,6 +40,7 @@
 #include "internalstatetype.h"
 #include "dofiditem.h"
 #include "unknownnumberingscheme.h"
+#include <algorithm>
 
 namespace oofem {
 
@@ -124,6 +125,15 @@ Variable::postInitialize(EngngModel *problem)
 }
 
 void
+Term::evaluate_lin_add(FloatMatrix &answer, double factor, MPElement &cell, GaussPoint *gp, TimeStep *tStep) const
+{
+    // generic version through the full matrix of evaluate_lin
+    FloatMatrix contrib;
+    this->evaluate_lin(contrib, cell, gp, tStep);
+    answer.add(factor, contrib);
+}
+
+void
 Term::initializeFrom(const std::shared_ptr<InputRecord> &ir, EngngModel* problem)
 {
     // read field and test field ids (names)
@@ -139,8 +149,35 @@ Term::initializeFrom(const std::shared_ptr<InputRecord> &ir, EngngModel* problem
 void
 MPElement::evaldNdx(FloatMatrix &answer, const FEInterpolation *interpol, const Element &cell, const FloatArray &lcoords)
 {
-    FEIElementGeometryWrapper cellgeo(&cell);
+    // Inside an evaluation scope of the cell the terms of one element evaluation share dN/dx: memoised per
+    // interpolation and point. The key compares the coordinate values, so any caller gets the result for the
+    // point it asks for (the geometry of the cell does not change within the scope).
     const MPElement *mpcell = dynamic_cast< const MPElement * >( &cell );
+    const int nlc = lcoords.giveSize();
+    if ( mpcell && mpcell->geometryMemoDepth > 0 && nlc <= 3 ) {
+        for ( const auto &entry : mpcell->dNdxMemo ) {
+            if ( entry.interpol == interpol && entry.nlcoords == nlc &&
+                 std::equal(lcoords.begin(), lcoords.end(), entry.lcoords.begin()) ) {
+                answer.resize(entry.rows, entry.cols);
+                std::copy_n(mpcell->dNdxPool.begin() + entry.offset, entry.rows * entry.cols, answer.givePointer());
+                return;
+            }
+        }
+        computeDNdx(answer, interpol, cell, mpcell, lcoords);
+        DNdxEntry entry { interpol, {}, nlc, answer.giveNumberOfRows(), answer.giveNumberOfColumns(), mpcell->dNdxPool.size() };
+        std::copy(lcoords.begin(), lcoords.end(), entry.lcoords.begin());
+        mpcell->dNdxPool.insert(mpcell->dNdxPool.end(), answer.givePointer(), answer.givePointer() + entry.rows * entry.cols);
+        mpcell->dNdxMemo.push_back(entry);
+        return;
+    }
+    computeDNdx(answer, interpol, cell, mpcell, lcoords);
+}
+
+
+void
+MPElement::computeDNdx(FloatMatrix &answer, const FEInterpolation *interpol, const Element &cell, const MPElement *mpcell, const FloatArray &lcoords)
+{
+    FEIElementGeometryWrapper cellgeo(&cell);
     if ( !mpcell || !mpcell->hasHigherOrderGeometry() || interpol->giveInterpolationOrder() == 0 ) {
         interpol->evaldNdx(answer, lcoords, cellgeo);
         return;
@@ -335,6 +372,127 @@ MPElement::computeStateOperatorAt(FloatMatrix &answer, StateOperator op, const V
 
 
 void
+MPElement::applyStateOperatorAt(FloatArray &answer, StateOperator op, const Variable *v, GaussPoint *gp, const FloatArray &u) const
+{
+    // The operators of compute*MatrixAt applied directly to u: only their non-zero entries are visited,
+    // accumulated row by row in the column order of the matrix-vector product, so the result is the same.
+    const MaterialMode mmode = gp->giveMaterialMode();
+    const int nd = v->size;
+    const int nnodes = v->interpolation->giveNumberOfNodes( this->giveGeometryType() );
+    const int nsd = 1 * mmodeIs1D(mmode) + 2 * mmodeIs2D(mmode) + 3 * mmodeIs3D(mmode);
+
+    bool done = false;
+    if ( u.giveSize() == nnodes * nd ) {
+        if ( op == SO_Value ) {
+            // N u: component k is sum_i N_i u_ik
+            FloatArray nvec;
+            v->interpolation->evalN( nvec, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(this) );
+            if ( nvec.giveSize() == nnodes ) {
+                answer.resize(nd);
+                for ( int k = 0; k < nd; k++ ) {
+                    double sum = 0.;
+                    for ( int i = 0; i < nnodes; i++ ) {
+                        sum += nvec [ i ] * u [ i * nd + k ];
+                    }
+                    answer [ k ] = sum;
+                }
+                done = true;
+            }
+        } else {
+            FloatMatrix dndx;
+            MPElement::evaldNdx( dndx, v->interpolation, *this, gp->giveNaturalCoordinates() );
+            // derivative of component k along direction j, summed over the nodes
+            auto du = [&](int k, int j) {
+                double sum = 0.;
+                for ( int i = 0; i < nnodes; i++ ) {
+                    sum += dndx(i, j) * u [ i * nd + k ];
+                }
+                return sum;
+            };
+            // shear component (dk/dj + dl/di), summed node by node in the column order of the matrix
+            auto shear = [&](int k, int j, int l, int m) {
+                double sum = 0.;
+                for ( int i = 0; i < nnodes; i++ ) {
+                    if ( k < l ) {
+                        sum += dndx(i, j) * u [ i * nd + k ];
+                        sum += dndx(i, m) * u [ i * nd + l ];
+                    } else {
+                        sum += dndx(i, m) * u [ i * nd + l ];
+                        sum += dndx(i, j) * u [ i * nd + k ];
+                    }
+                }
+                return sum;
+            };
+            if ( op == SO_Gradient && nd == 1 ) {
+                answer.resize(nsd);
+                for ( int j = 0; j < nsd; j++ ) {
+                    answer [ j ] = du(0, j);
+                }
+                done = true;
+            } else if ( op == SO_Divergence && nd >= nsd ) {
+                double sum = 0.;
+                for ( int i = 0; i < nnodes; i++ ) {
+                    for ( int j = 0; j < nsd; j++ ) {
+                        sum += dndx(i, j) * u [ i * nd + j ];
+                    }
+                }
+                answer.resize(1);
+                answer [ 0 ] = sum;
+                done = true;
+            } else if ( op == SO_SymmetricGradient ) {
+                // layouts of computeGradSymMatrixAt
+                if ( ( mmode == _3dUP || mmode == _3dUPV || mmode == _3dMat ) && nd >= 3 ) {
+                    answer.resize(6);
+                    answer [ 0 ] = du(0, 0);
+                    answer [ 1 ] = du(1, 1);
+                    answer [ 2 ] = du(2, 2);
+                    answer [ 3 ] = shear(1, 2, 2, 1);
+                    answer [ 4 ] = shear(0, 2, 2, 0);
+                    answer [ 5 ] = shear(0, 1, 1, 0);
+                    done = true;
+                } else if ( ( mmode == _2dUP || mmode == _2dUPV ) && nd >= 2 ) {
+                    answer.resize(6);
+                    answer.zero();
+                    answer [ 0 ] = du(0, 0);
+                    answer [ 1 ] = du(1, 1);
+                    answer [ 5 ] = shear(0, 1, 1, 0);
+                    done = true;
+                } else if ( mmode == _PlaneStress && nd >= 2 ) {
+                    answer.resize(3);
+                    answer [ 0 ] = du(0, 0);
+                    answer [ 1 ] = du(1, 1);
+                    answer [ 2 ] = shear(0, 1, 1, 0);
+                    done = true;
+                } else if ( mmode == _PlaneStrain && nd >= 2 ) {
+                    answer.resize(4);
+                    answer.zero();
+                    answer [ 0 ] = du(0, 0);
+                    answer [ 1 ] = du(1, 1);
+                    answer [ 3 ] = shear(0, 1, 1, 0);
+                    done = true;
+                } else if ( mmode == _1dUP ) {
+                    answer.resize(6);
+                    answer.zero();
+                    answer [ 0 ] = du(0, 0);
+                    done = true;
+                } else if ( mmode == _1dMat ) {
+                    answer.resize(1);
+                    answer [ 0 ] = du(0, 0);
+                    done = true;
+                }
+            }
+        }
+    }
+    if ( !done ) {
+        // anything else (and the error checks of the operators) through the operator matrix
+        FloatMatrix opm;
+        this->computeStateOperatorAt(opm, op, v, gp);
+        answer.beProductOf(opm, u);
+    }
+}
+
+
+void
 MPElement::registerStateVariable(const Variable *v)
 {
     if ( v == nullptr ) {
@@ -361,6 +519,8 @@ MPElement::assembleStateVector(FloatArray &answer, const StateVariableLayout &la
 {
     answer.clear();
     int offset = 1;
+    // buffers reused by all entries of the layout (called for every integration point)
+    FloatArray u, contribution;
 
     for ( const StateVariableSpec &spec : layout ) {
         const Variable *v = this->giveStateVariableSource(spec.field);
@@ -369,12 +529,9 @@ MPElement::assembleStateVector(FloatArray &answer, const StateVariableLayout &la
                          "element %d", __FieldTypeToString(spec.field), this->giveNumber() );
         }
 
-        FloatArray u, contribution;
-        FloatMatrix op;
         this->getUnknownVector(u, v, spec.mode, tStep);
-        this->computeStateOperatorAt(op, spec.op, v, gp);
-
-        contribution.beProductOf(op, u);
+        // operator applied directly, without forming its (mostly zero) matrix
+        this->applyStateOperatorAt(contribution, spec.op, v, gp, u);
         answer.copySubVector(contribution, offset);
         offset += contribution.giveSize();
     }
@@ -391,6 +548,9 @@ MPElement::updateTempState(TimeStep *tStep)
     }
 
     FloatArray state;
+    // assembleStateVector gathers the nodal unknowns of each field at every integration point; they are
+    // the same for all of them, so they are gathered once for the whole sweep (see EvaluationScope)
+    EvaluationScope evalScope(*this);
 
     for ( auto &iRule : this->integrationRulesArray ) {
         for ( GaussPoint *gp : *iRule ) {

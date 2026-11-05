@@ -118,6 +118,23 @@ void BDalphaPiTerm::evaluate_lin (FloatMatrix& answer, MPElement& e, GaussPoint*
 
 }
 
+void BDalphaPiTerm::evaluate_lin_add (FloatMatrix& answer, double factor, MPElement& e, GaussPoint* gp, TimeStep* tstep) const {
+    // B^T D (-alpha Pi) N^T is the outer product of B^T D (-alpha Pi) and N: accumulated directly
+    FloatMatrix D, B;
+    FloatArray alphaPi(6), DaPI, BDaPI, Nt;
+    e.giveCrossSection()->giveMaterial(gp)->giveCharacteristicMatrix(D, Conductivity, gp, tstep);  // 3x3 in 3D
+    alphaPi.zero();
+    alphaPi(0) = -D(0,0);
+    alphaPi(1) = -D(1,1);
+    alphaPi(2) = -D(2,2);
+    e.giveCrossSection()->giveMaterial(gp)->giveCharacteristicMatrix(D, TangentStiffness, gp, tstep);
+    evalB(B, this->testField, this->testField->interpolation, e, gp->giveNaturalCoordinates(), gp->giveMaterialMode());
+    this->field->interpolation->evalN(Nt, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(&e));
+    DaPI.beProductOf(D, alphaPi);
+    BDaPI.beTProductOf(B, DaPI);
+    answer.plusDyadUnsym(BDaPI, Nt, factor);
+}
+
 void BDalphaPiTerm::evaluate (FloatArray& answer, MPElement& cell, GaussPoint* gp, TimeStep* tstep) const  {
     // this is a partial linearization of BtSigma term with respect to temperature
     // thus the residual (rhs) contribution should come from BtSigma term
@@ -145,6 +162,18 @@ void BTdSigmadT::evaluate_lin (FloatMatrix& answer, MPElement& e, GaussPoint* gp
     answer.beTProductOf(B,DB);
 }
 
+void BTdSigmadT::evaluate_lin_add (FloatMatrix& answer, double factor, MPElement& e, GaussPoint* gp, TimeStep* tstep) const {
+    // dSigma/dT is a single column d, so B^T d N^T is the outer product of B^T d and N: accumulated directly
+    FloatMatrix D, B;
+    FloatArray d, Bd, Nt;
+    e.giveCrossSection()->giveMaterial(gp)->giveCharacteristicMatrix(D, DSigmaDT, gp, tstep);
+    this->field->interpolation->evalN(Nt, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(&e));
+    evalB(B, this->testField, this->testField->interpolation, e, gp->giveNaturalCoordinates(), gp->giveMaterialMode());
+    D.copyColumn(d, 1);
+    Bd.beTProductOf(B, d);
+    answer.plusDyadUnsym(Bd, Nt, factor);
+}
+
 void BTdSigmadT::evaluate (FloatArray& answer, MPElement& cell, GaussPoint* gp, TimeStep* tstep) const  {
     // this is a partial linearization of BtSigma term with respect to temperature
     // thus the residual (rhs) contribution should come from BtSigma term
@@ -167,6 +196,17 @@ void NTaTmTe::evaluate_lin (FloatMatrix& answer, MPElement& e, GaussPoint* gp, T
     answer.resize(Nt.giveSize(), Nt.giveSize());
     answer.zero();
     answer.plusDyadUnsym(Nt, Nt, this->bl->giveProperty('a', tstep));
+}
+
+void NTaTmTe::evaluate_lin_add (FloatMatrix& answer, double factor, MPElement& e, GaussPoint* gp, TimeStep* tstep) const {
+    // accumulates the upper triangle of factor a N N^T directly (the term is symmetric)
+    FloatArray Nt;
+    if (boundaryType == 's') {
+        this->testField->interpolation->boundarySurfaceEvalN(Nt, boundaryID, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(&e));
+    } else {
+        this->testField->interpolation->boundaryEdgeEvalN(Nt, boundaryID, gp->giveNaturalCoordinates(), FEIElementGeometryWrapper(&e));
+    }
+    answer.plusDyadSymmUpper(Nt, factor * this->bl->giveProperty('a', tstep));
 }
 
 void NTaTmTe::evaluate (FloatArray& answer, MPElement& e, GaussPoint* gp, TimeStep* tstep) const  {

@@ -40,6 +40,9 @@
 #include "domain.h"
 #include "sparsemtrx.h"
 
+#include <vector>
+#include <unordered_map>
+
 namespace oofem {
 
     /**
@@ -89,56 +92,115 @@ namespace oofem {
         }
         // evaluate term contribution to weak form on given cell at given point 
         void assemble_lhs (SparseMtrx& dest, const UnknownNumberingScheme &s, TimeStep* tStep, double factor2 = 1.0) const {
-            IntArray locr, locc;
-
             for (auto i: this->set->giveElementList()) { // loop over elements
                 MPElement *e = dynamic_cast<MPElement*>(this->domain->giveElement(i));
                 if (e) {
-                    FloatMatrix contrib;
-                    this->getElementTermCodeNumbers(locr, locc, e, *this->term, s);
-                    // determine integration rule (this has to be set up on element, as we need to track history there)
-                    // the IR is created by term.initialize, we just need mechanism to get this IR
-                    // specific terms can have specific integration requirements (reduced integration, etc)
-                    // at the same time same rules should be shared between terms->
-                    // ->need to querry/store/identify element IR based on NIP.
-                    IntegrationRule* ir =  this->term->giveElementIntegrationRule(e);
-                    e->integrateTerm_dw(contrib, *this->term, ir, tStep); // @todo IR 
-                    if (contrib.isNotEmpty()) {
-                        contrib.times(this->factor * factor2);
-                        // assemble
-                        dest.assemble (locr, locc, contrib);
-                    }
+                    this->assembleElement_lhs(dest, e, s, tStep, factor2);
                 }
             }
         }
         // evaluate contribution (all vars known) on given cell
         void assemble_rhs (FloatArray& dest, const UnknownNumberingScheme &s, TimeStep* tstep, FloatArray* eNorms=NULL, double factor2 = 1.0) const {
-            IntArray locr, locc, dofIDs;
-
             for (auto i: this->set->giveElementList()) { // loop over elements
                 MPElement *e = dynamic_cast<MPElement*>(this->domain->giveElement(i));
                 if (e) {
-                    FloatArray contrib;
-                    this->getElementTermCodeNumbers(locr, locc, e, *this->term, s, &dofIDs);
-                    // determine integration rule (this has to be set up on element, as we need to track history there)
-                    // the IR is created by term.initialize, we just need mechanism to get this IR
-                    // specific terms can have specific integration requirements (reduced integration, etc)
-                    // at the same time same rules should be shared between terms->
-                    // ->need to querry/store/identify element IR based on NIP.
-                    IntegrationRule* ir =  this->term->giveElementIntegrationRule(e);
-                    e->integrateTerm_c(contrib, *this->term, ir, tstep); // @todo IR
-                    contrib.times(this->factor * factor2);
-                    // assemble
-                    if (contrib.isNotEmpty()) {
-                        dest.assemble (contrib, locr);
-                    }
-                    if ( eNorms ) {
-                        eNorms->assembleSquared(contrib, dofIDs);
+                    this->assembleElement_rhs(dest, e, s, tstep, eNorms, factor2);
+                }
+            }
+        }
+        /// Assembles the contribution of the term on one element of the integration domain to dest (see assemble_lhs).
+        void assembleElement_lhs (SparseMtrx& dest, MPElement *e, const UnknownNumberingScheme &s, TimeStep* tStep, double factor2 = 1.0) const {
+            IntArray locr, locc;
+            FloatMatrix contrib;
+            this->getElementTermCodeNumbers(locr, locc, e, *this->term, s);
+            // determine integration rule (this has to be set up on element, as we need to track history there)
+            // the IR is created by term.initialize, we just need mechanism to get this IR
+            // specific terms can have specific integration requirements (reduced integration, etc)
+            // at the same time same rules should be shared between terms->
+            // ->need to querry/store/identify element IR based on NIP.
+            IntegrationRule* ir =  this->term->giveElementIntegrationRule(e);
+            e->integrateTerm_dw(contrib, *this->term, ir, tStep); // @todo IR 
+            if (contrib.isNotEmpty()) {
+                contrib.times(this->factor * factor2);
+                // assemble
+                dest.assemble (locr, locc, contrib);
+            }
+        }
+        /// Assembles the contribution of the term on one element of the integration domain to dest (see assemble_rhs).
+        void assembleElement_rhs (FloatArray& dest, MPElement *e, const UnknownNumberingScheme &s, TimeStep* tstep, FloatArray* eNorms=NULL, double factor2 = 1.0) const {
+            IntArray locr, locc, dofIDs;
+            FloatArray contrib;
+            this->getElementTermCodeNumbers(locr, locc, e, *this->term, s, &dofIDs);
+            // determine integration rule (this has to be set up on element, as we need to track history there)
+            // the IR is created by term.initialize, we just need mechanism to get this IR
+            // specific terms can have specific integration requirements (reduced integration, etc)
+            // at the same time same rules should be shared between terms->
+            // ->need to querry/store/identify element IR based on NIP.
+            IntegrationRule* ir =  this->term->giveElementIntegrationRule(e);
+            e->integrateTerm_c(contrib, *this->term, ir, tstep); // @todo IR
+            contrib.times(this->factor * factor2);
+            // assemble
+            if (contrib.isNotEmpty()) {
+                dest.assemble (contrib, locr);
+            }
+            if ( eNorms ) {
+                eNorms->assembleSquared(contrib, dofIDs);
+            }
+        }
+        /// A member of a group of integrals assembled element by element (see assembleGroup_lhs/rhs): the integral,
+        /// its additional factor and, for the rhs, the vector of element contribution norms (or nullptr).
+        struct GroupMember {
+            const Integral *integral;
+            double factor2 = 1.0;
+            FloatArray *eNorms = nullptr;
+        };
+        /**
+         * Assembles several integrals element by element. Each element of their integration domains evaluates all
+         * integrals acting on it within one MPElement::EvaluationScope, so that their terms share the gathered
+         * unknowns, dN/dx and the volume measure, instead of every integral sweeping over all elements. The same as
+         * assemble_lhs of each member (with its factor2), up to the order in which contributions are summed.
+         */
+        static void assembleGroup_lhs (SparseMtrx& dest, const std::vector<GroupMember> &group, const UnknownNumberingScheme &s, TimeStep* tStep) {
+            for ( const auto &[elem, members] : groupByElement(group) ) {
+                if ( MPElement *e = dynamic_cast<MPElement*>(elem) ) {
+                    MPElement::EvaluationScope evalScope(*e, true);
+                    for ( int m : members ) {
+                        group[m].integral->assembleElement_lhs(dest, e, s, tStep, group[m].factor2);
                     }
                 }
             }
-           
-
+        }
+        /// The rhs counterpart of assembleGroup_lhs (see assemble_rhs).
+        static void assembleGroup_rhs (FloatArray& dest, const std::vector<GroupMember> &group, const UnknownNumberingScheme &s, TimeStep* tstep) {
+            for ( const auto &[elem, members] : groupByElement(group) ) {
+                if ( MPElement *e = dynamic_cast<MPElement*>(elem) ) {
+                    MPElement::EvaluationScope evalScope(*e, true);
+                    for ( int m : members ) {
+                        group[m].integral->assembleElement_rhs(dest, e, s, tstep, group[m].eNorms, group[m].factor2);
+                    }
+                }
+            }
+        }
+        /**
+         * Elements of the integration domains of group, in the order of their first appearance, each with the indices
+         * of the members acting on it in the order of group (an element listed repeatedly in a set keeps its repeats).
+         */
+        static std::vector< std::pair< Element*, std::vector<int> > > groupByElement (const std::vector<GroupMember> &group) {
+            std::vector< std::pair< Element*, std::vector<int> > > answer;
+            std::unordered_map< Element*, std::size_t > position;
+            for ( std::size_t m = 0; m < group.size(); m++ ) {
+                const Integral *integral = group[m].integral;
+                for ( int i : integral->set->giveElementList() ) {
+                    Element *elem = integral->domain->giveElement(i);
+                    auto it = position.find(elem);
+                    if ( it == position.end() ) {
+                        it = position.emplace(elem, answer.size()).first;
+                        answer.push_back({ elem, {} });
+                    }
+                    answer[ it->second ].second.push_back( (int) m );
+                }
+            }
+            return answer;
         }
         void getElementTermCodeNumbers (IntArray &locr, IntArray &locc, Element* e, const Term& t, const UnknownNumberingScheme &s, IntArray* rowDofIDs=NULL) const {
             IntArray nodes, internalDofMans, loc, masterDofIDs;
