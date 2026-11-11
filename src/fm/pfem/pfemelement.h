@@ -87,6 +87,8 @@ public:
 
     void updateInternalState(TimeStep *tStep) override;
     void printOutputAt(FILE *file, TimeStep *tStep) override;
+    /// Reports the text of printOutputAt (no structured output yet).
+    void reportOutput(OutputWriter &writer, TimeStep *tStep) override { this->reportLegacyOutput(writer, tStep); }
     int checkConsistency() override;
 
     /// Returns the interpolation for velocity

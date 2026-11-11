@@ -59,6 +59,8 @@ public:
     void initializeFrom(const std::shared_ptr<InputRecord> &ir, int priority) override;
 
     void printOutputAt(FILE *file, TimeStep *tStep) override;
+    /// Reports the text of printOutputAt (no structured output yet).
+    void reportOutput(OutputWriter &writer, TimeStep *tStep) override { this->reportLegacyOutput(writer, tStep); }
 
     /**
      * Returns the cross-sectional area of the lattice element.

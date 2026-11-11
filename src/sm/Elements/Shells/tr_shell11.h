@@ -108,6 +108,8 @@ public:
   double giveCharacteristicLength(const FloatArray &normalToCrackPlane) override;
   
   void printOutputAt(FILE *file, TimeStep *tStep) override;
+  /// Reports the text of printOutputAt (no structured output yet).
+  void reportOutput(OutputWriter &writer, TimeStep *tStep) override { this->reportLegacyOutput(writer, tStep); }
 
   Element_Geometry_Type giveGeometryType() const override { return EGT_triangle_1; }
   integrationDomain giveIntegrationDomain() const override { return _Triangle; }

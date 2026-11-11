@@ -110,6 +110,8 @@ public:
     ClonedDofManager(int i, Domain * d, int master) : DofManager(i, d), master(master) { }
     int giveMasterNumber() { return master; }
     void printOutputAt(FILE *file, TimeStep *tStep) override;
+    /// Reports the text of printOutputAt (no structured output yet).
+    void reportOutput(OutputWriter &writer, TimeStep *tStep) override { this->reportLegacyOutput(writer, tStep); }
     const char *giveClassName() const override { return "ClonedDofManager"; }
     const char *giveInputRecordName() const override { return NULL; }
     bool isDofTypeCompatible(dofType type) const override { return ( type == DT_master || type == DT_simpleSlave || type == DT_active ); }

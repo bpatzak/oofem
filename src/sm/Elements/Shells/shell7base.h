@@ -81,6 +81,8 @@ public:
     int checkConsistency() override;
     void postInitialize() override;
     void printOutputAt(FILE *file, TimeStep *tStep) override;
+    /// Reports the text of printOutputAt (no structured output yet).
+    void reportOutput(OutputWriter &writer, TimeStep *tStep) override { this->reportLegacyOutput(writer, tStep); }
 
     // Definition & identification
     const char *giveClassName() const override { return "Shell7Base"; }

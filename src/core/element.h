@@ -1224,6 +1224,15 @@ public:
     const char *giveClassName() const override { return "Element"; }
 
     void printOutputAt(FILE *file, TimeStep *tStep) override;
+    /**
+     * Reports the output of the receiver (structured output): internal dof managers
+     * ("internal_dofmans"), activity flag ("active") and the list of integration points
+     * ("gps"), each reporting the integration rule number ("ir"), its number and
+     * its statuses (see GaussPoint::reportOutput).
+     * Elements overriding printOutputAt should override this service as well; until they
+     * report structured data, they should report the text of printOutputAt using reportLegacyOutput.
+     */
+    void reportOutput(OutputWriter &writer, TimeStep *tStep) override;
 
     virtual const IntArray giveLocation() {IntArray answer(0); return answer;}
     virtual void recalculateCoordinates(int nodeNumber, FloatArray &coords){;}

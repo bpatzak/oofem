@@ -62,6 +62,7 @@
 #include "parametermanager.h"
 #include "cltypes.h"
 #include "paramkey.h"
+#include "outputwriter.h"
 
 #ifdef __OOFEG
  #include "oofeggraphiccontext.h"
@@ -816,6 +817,41 @@ Element :: printOutputAt(FILE *file, TimeStep *tStep)
         }
     } else {
         fprintf(file, "is not active in current time step\n");
+    }
+}
+
+
+void
+Element :: reportOutput(OutputWriter &writer, TimeStep *tStep)
+{
+    if ( this->giveNumberOfInternalDofManagers() ) {
+        writer.beginList("internal_dofmans");
+        for ( int i = 1; i <= this->giveNumberOfInternalDofManagers(); ++i ) {
+            DofManager *dman = this->giveInternalDofManager(i);
+            writer.beginGroup();
+            writer.field( "number", dman->giveNumber() );
+            writer.field( "class", dman->giveClassName() );
+            dman->reportOutput(writer, tStep);
+            writer.endGroup();
+        }
+        writer.endList();
+    }
+
+    bool active = this->isActivated(tStep);
+    writer.field("active", active ? 1 : 0);
+    if ( active ) {
+        writer.beginList("gps");
+        for ( auto &iRule: integrationRulesArray ) {
+            for ( auto &gp: *iRule ) {
+                writer.beginGroup();
+                writer.field( "ir", iRule->giveNumber() );
+                writer.field( "number", gp->giveNumber() );
+                writer.field( "natural_coords", gp->giveNaturalCoordinates() );
+                gp->reportOutput(writer, tStep);
+                writer.endGroup();
+            }
+        }
+        writer.endList();
     }
 }
 

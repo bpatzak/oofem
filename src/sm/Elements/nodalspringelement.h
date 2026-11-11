@@ -94,6 +94,8 @@ public:
     void updateYourself(TimeStep *tStep) override { }
     int checkConsistency() override { return 1; }
     void printOutputAt(FILE *file, TimeStep *tStep) override;
+    /// Reports the text of printOutputAt (no structured output yet).
+    void reportOutput(OutputWriter &writer, TimeStep *tStep) override { this->reportLegacyOutput(writer, tStep); }
 
 #ifdef __OOFEG
     //void drawRawGeometry(oofegGraphicContext &gc, TimeStep *tStep);

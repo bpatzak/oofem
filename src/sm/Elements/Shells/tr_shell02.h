@@ -94,6 +94,8 @@ public:
     void updateYourself(TimeStep *tStep) override;
     void updateInternalState(TimeStep *tStep) override;
     void printOutputAt(FILE *file, TimeStep *tStep) override;
+    /// Reports the text of printOutputAt (no structured output yet).
+    void reportOutput(OutputWriter &writer, TimeStep *tStep) override { this->reportLegacyOutput(writer, tStep); }
     void saveContext(DataStream &stream, ContextMode mode) override;
     void restoreContext(DataStream &stream, ContextMode mode) override;
     void postInitialize() override;
