@@ -37,6 +37,10 @@
 
 #include "modulemanager.h"
 #include "exportmodule.h"
+#include "outputmodule.h"
+
+#include <vector>
+#include <memory>
 
 namespace oofem {
 class EngngModel;
@@ -47,26 +51,49 @@ class EngngModel;
  */
 class OOFEM_EXPORT ExportModuleManager : public ModuleManager< ExportModule >
 {
+protected:
+    /**
+     * List of output modules (modules reporting the full state of the model, see OutputModule).
+     * Output modules are kept separately from export modules (stored in moduleList),
+     * so that numbering of export modules is not affected by them and they can be processed first.
+     */
+    std :: vector< std :: unique_ptr< OutputModule > >outputModuleList;
+
 public:
     ExportModuleManager(EngngModel * emodel);
     virtual ~ExportModuleManager();
 
     std::unique_ptr<ExportModule> CreateModule(const char *name, int num, EngngModel *emodel) override;
+    /**
+     * Registers the module. Output modules (derived from OutputModule) are stored
+     * in the list of output modules, the others in the list of export modules.
+     */
+    void registerModule(std :: unique_ptr< ExportModule > &module) override;
 
     /**
-     * Writes the output. Loops over all modules and calls corresponding doOutput module service.
+     * Writes the output. Output modules are processed first, followed by export modules.
      * @param tStep Time step.
-     * @param substepFlag is set to true, only the modules with substepFlag set to true will be processed.
+     * @param substepFlag If true, only modules requesting substep output are processed.
      */
     void doOutput(TimeStep *tStep, bool substepFlag = false);
+    /// Writes the output of output modules only.
+    void doOutputModulesOutput(TimeStep *tStep, bool substepFlag = false);
+    /// Writes the output of export modules only.
+    void doExportModulesOutput(TimeStep *tStep, bool substepFlag = false);
     /**
-     * Initializes output manager. The corresponding initialize module services are called.
+     * Initializes output modules.
      */
     void initialize();
     /**
      * Terminates the receiver, the corresponding terminate module services are called.
      */
     void terminate();
+
+    /// Returns number of output modules.
+    int giveNumberOfOutputModules() const { return (int)outputModuleList.size(); }
+    /// Returns the i-th output module (1-based).
+    OutputModule *giveOutputModule(int i);
+
     const char *giveClassName() const override { return "ExportModuleManager"; }
 };
 } // end namespace oofem

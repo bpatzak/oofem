@@ -47,7 +47,7 @@
 namespace oofem {
 REGISTER_ExportModule(OutputExportModule)
 
-OutputExportModule :: OutputExportModule(int n, EngngModel *e) : ExportModule(n, e), outputStream(NULL)
+OutputExportModule :: OutputExportModule(int n, EngngModel *e) : OutputModule(n, e), outputStream(NULL)
 {
 }
 
@@ -59,7 +59,7 @@ OutputExportModule :: initializeFrom(const std::shared_ptr<InputRecord> &ir)
     elementSets.clear();
     IR_GIVE_OPTIONAL_FIELD(ir, elementSets, _IFT_OutputExportModule_elementSets);
 
-    ExportModule :: initializeFrom(ir);
+    OutputModule :: initializeFrom(ir);
 
     auto *file = giveOutputStream();
 

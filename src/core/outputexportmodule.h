@@ -37,7 +37,7 @@
 
 #include <vector>
 
-#include "exportmodule.h"
+#include "outputmodule.h"
 
 ///@name Input fields for OutputExportModule
 //@{
@@ -57,7 +57,7 @@ class DofManager;
  *
  * @author Mikael Öhman
  */
-class OOFEM_EXPORT OutputExportModule : public ExportModule
+class OOFEM_EXPORT OutputExportModule : public OutputModule
 {
 protected:
     FILE *outputStream;

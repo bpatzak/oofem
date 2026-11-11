@@ -36,6 +36,7 @@
 #include "modulemanager.h"
 #include "exportmodule.h"
 #include "classfactory.h"
+#include "error.h"
 
 namespace oofem {
 ExportModuleManager :: ExportModuleManager(EngngModel *emodel) : ModuleManager< ExportModule >(emodel)
@@ -50,22 +51,62 @@ std::unique_ptr<ExportModule> ExportModuleManager :: CreateModule(const char *na
 }
 
 void
+ExportModuleManager :: registerModule(std :: unique_ptr< ExportModule > &module)
+{
+    if ( dynamic_cast< OutputModule * >( module.get() ) ) {
+        outputModuleList.emplace_back( static_cast< OutputModule * >( module.release() ) );
+    } else {
+        ModuleManager< ExportModule > :: registerModule(module);
+    }
+}
+
+
+OutputModule *
+ExportModuleManager :: giveOutputModule(int i)
+{
+    if ( i < 1 || i > (int)outputModuleList.size() ) {
+        OOFEM_ERROR("No output module no. %d defined", i);
+    }
+    return outputModuleList [ i - 1 ].get();
+}
+
+
+void
 ExportModuleManager :: doOutput(TimeStep *tStep, bool substepFlag)
 {
-    for ( auto &module: moduleList ) {
-        if ( substepFlag ) {
-            if ( module->testSubStepOutput() ) {
-                module->doOutput(tStep);
-            }
-        } else {
+    this->doOutputModulesOutput(tStep, substepFlag);
+    this->doExportModulesOutput(tStep, substepFlag);
+}
+
+
+void
+ExportModuleManager :: doOutputModulesOutput(TimeStep *tStep, bool substepFlag)
+{
+    for ( auto &module: outputModuleList ) {
+        if ( !substepFlag || module->testSubStepOutput() ) {
             module->doOutput(tStep);
         }
     }
 }
 
+
+void
+ExportModuleManager :: doExportModulesOutput(TimeStep *tStep, bool substepFlag)
+{
+    for ( auto &module: moduleList ) {
+        if ( !substepFlag || module->testSubStepOutput() ) {
+            module->doOutput(tStep);
+        }
+    }
+}
+
+
 void
 ExportModuleManager :: initialize()
 {
+    for ( auto &module: outputModuleList ) {
+        module->initialize();
+    }
     for ( auto &module: moduleList ) {
         module->initialize();
     }
@@ -75,6 +116,9 @@ ExportModuleManager :: initialize()
 void
 ExportModuleManager :: terminate()
 {
+    for ( auto &module: outputModuleList ) {
+        module->terminate();
+    }
     for ( auto &module: moduleList ) {
         module->terminate();
     }
