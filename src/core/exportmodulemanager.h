@@ -44,6 +44,7 @@
 
 namespace oofem {
 class EngngModel;
+class TextOutputModule;
 
 /**
  * Class representing and implementing ExportModuleManager. It is attribute of EngngModel.
@@ -67,6 +68,8 @@ public:
     /**
      * Registers the module. Output modules (derived from OutputModule) are stored
      * in the list of output modules, the others in the list of export modules.
+     * A text output module replaces the implicit (default) text output module,
+     * if present; only one text output module can be defined.
      */
     void registerModule(std :: unique_ptr< ExportModule > &module) override;
 
@@ -93,6 +96,8 @@ public:
     int giveNumberOfOutputModules() const { return (int)outputModuleList.size(); }
     /// Returns the i-th output module (1-based).
     OutputModule *giveOutputModule(int i);
+    /// Returns the standard text output module, or nullptr if there is none.
+    TextOutputModule *giveTextOutputModule();
 
     const char *giveClassName() const override { return "ExportModuleManager"; }
 };

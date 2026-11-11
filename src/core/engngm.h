@@ -248,8 +248,6 @@ protected:
     std :: string dataOutputFileName;
     /// String with core output file name
     std :: string coreOutputFileName;
-    /// Output stream.
-    FILE *outputStream;
     /// String with reference file name
     std :: string referenceFileName;
     /// Domain context output mode.
@@ -377,8 +375,14 @@ public:
         domainNeqs.at(id) = neq;
     }
     // input / output
-    /// Returns file descriptor of output file.
+    /**
+     * Returns file descriptor of the standard (text) output file.
+     * The file is managed by the TextOutputModule of the receiver (see giveExportModuleManager);
+     * it is an error to request the stream when there is no text output (output suppressed).
+     */
     FILE *giveOutputStream();
+    /// Returns true if the receiver has the standard text output (a TextOutputModule is defined).
+    bool hasTextOutput();
     /**
      * Returns base output file name
      * to which extensions, like .out .vtu .osf should be added.
@@ -652,6 +656,13 @@ public:
      * belonging to receiver. Receiver may use value-name extracting functions
      * to extract particular field from record.*/
     virtual void initializeFrom(const std::shared_ptr<InputRecord> &ir);
+    /**
+     * Creates the default (implicit) standard text output module (TextOutputModule),
+     * unless a text output module already exists. Should be called from initializeFrom
+     * when the output is not suppressed. A text output module declared explicitly
+     * in the list of export modules replaces the implicit one.
+     */
+    void createDefaultOutputModule();
     /// Instanciate problem domains by calling their instanciateYourself() service
     int instanciateDomains(DataReader &dr);
     /// Instanciate problem meta steps by calling their instanciateYourself() service

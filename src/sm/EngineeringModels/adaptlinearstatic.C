@@ -113,7 +113,7 @@ AdaptiveLinearStatic :: solveYourself()
         this->terminate(tStep);
 
         OOFEM_LOG_INFO("EngngModel info: user time consumed by solution step %d: %.2fs\n", tStep->giveNumber(), steptime);
-        if ( !suppressOutput ) {
+        if ( this->hasTextOutput() ) {
             fprintf(this->giveOutputStream(), "\nUser time consumed by solution step %d: %.3f [s]\n\n", tStep->giveNumber(), steptime);
         }
 

@@ -37,6 +37,7 @@
 #include "exportmodule.h"
 #include "classfactory.h"
 #include "error.h"
+#include "textoutputmodule.h"
 
 namespace oofem {
 ExportModuleManager :: ExportModuleManager(EngngModel *emodel) : ModuleManager< ExportModule >(emodel)
@@ -54,6 +55,21 @@ void
 ExportModuleManager :: registerModule(std :: unique_ptr< ExportModule > &module)
 {
     if ( dynamic_cast< OutputModule * >( module.get() ) ) {
+        if ( dynamic_cast< TextOutputModule * >( module.get() ) ) {
+            auto *existing = this->giveTextOutputModule();
+            if ( existing ) {
+                if ( !existing->isImplicit() ) {
+                    OOFEM_ERROR("Only one text output module can be defined");
+                }
+                // explicit module replaces the implicit (default) one
+                for ( auto it = outputModuleList.begin(); it != outputModuleList.end(); ++it ) {
+                    if ( it->get() == existing ) {
+                        outputModuleList.erase(it);
+                        break;
+                    }
+                }
+            }
+        }
         outputModuleList.emplace_back( static_cast< OutputModule * >( module.release() ) );
     } else {
         ModuleManager< ExportModule > :: registerModule(module);
@@ -68,6 +84,18 @@ ExportModuleManager :: giveOutputModule(int i)
         OOFEM_ERROR("No output module no. %d defined", i);
     }
     return outputModuleList [ i - 1 ].get();
+}
+
+
+TextOutputModule *
+ExportModuleManager :: giveTextOutputModule()
+{
+    for ( auto &module: outputModuleList ) {
+        if ( auto *tom = dynamic_cast< TextOutputModule * >( module.get() ) ) {
+            return tom;
+        }
+    }
+    return nullptr;
 }
 
 

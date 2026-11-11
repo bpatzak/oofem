@@ -64,6 +64,7 @@
 #include "contextioerr.h"
 #include "outputmanager.h"
 #include "exportmodulemanager.h"
+#include "textoutputmodule.h"
 #include "initmodulemanager.h"
 #include "feinterpol3d.h"
 #include "classfactory.h"
@@ -116,7 +117,6 @@ EngngModel :: EngngModel(int i, EngngModel *_master) : domainNeqs(), domainPresc
     profileOpt = false;
     nonLinFormulation = UNKNOWN;
 
-    outputStream          = NULL;
 
     referenceFileName     = "";
 
@@ -159,10 +159,6 @@ EngngModel :: ~EngngModel()
         delete context;
     }
 
-    //fclose (inputStream) ;
-    if ( outputStream ) {
-        fclose(outputStream);
-    }
 
 #ifdef __MPI_PARALLEL_MODE
     delete communicator;
@@ -347,20 +343,7 @@ EngngModel :: initializeFrom(const std::shared_ptr<InputRecord> &ir)
         //printf("Suppressing output.\n");
     }
     else {
-
-        if ( ( outputStream = fopen(this->dataOutputFileName.c_str(), "w") ) == NULL ) {
-            OOFEM_ERROR("Can't open output file %s", this->dataOutputFileName.c_str());
-        }
-
-        fprintf(outputStream, "%s", PRG_HEADER);
-        fprintf(outputStream, "\nStarting analysis on: %s\n", ctime(& this->startTime) );
-        fprintf(outputStream, "%s\n", simulationDescription.c_str());
-
-#ifdef __MPI_PARALLEL_MODE
-        if ( this->isParallel() ) {
-            fprintf(outputStream, "Problem rank is %d/%d on %s\n\n", this->rank, this->numProcs, this->processor_name);
-        }
-#endif
+        this->createDefaultOutputModule();
     }
 }
 
@@ -673,7 +656,7 @@ EngngModel :: solveYourself()
                             this->giveCurrentStep()->giveNumber(), _steptime);
 
 
-            if ( !suppressOutput ) {
+            if ( this->hasTextOutput() ) {
                 fprintf(this->giveOutputStream(), "\nUser time consumed by solution step %d: %.3f [s]\n\n",
                         this->giveCurrentStep()->giveNumber(), _steptime);
             }
@@ -766,7 +749,6 @@ EngngModel :: terminate(TimeStep *tStep)
 {
     if ( !suppressOutput ) {
         this->doStepOutput(tStep);
-        fflush( this->giveOutputStream() );
     } else {
         exportModuleManager.doOutput(tStep);
     }
@@ -779,12 +761,7 @@ EngngModel :: terminate(TimeStep *tStep)
 void
 EngngModel :: doStepOutput(TimeStep *tStep)
 {
-    if ( !suppressOutput ) {
-        this->printOutputAt(this->giveOutputStream(), tStep);
-        fflush( this->giveOutputStream() );
-    }
-
-    // export using export manager
+    // output using output modules (standard text output, ...) followed by export modules
     exportModuleManager.doOutput(tStep);
 }
 
@@ -2005,12 +1982,9 @@ EngngModel :: letOutputBaseFileNameBe(const std :: string &src)
 {
     this->dataOutputFileName = src;
 
-    if ( outputStream ) fclose(outputStream);
-
-    if ( !suppressOutput ) {
-        if ( ( outputStream = fopen(this->dataOutputFileName.c_str(), "w") ) == NULL ) {
-            OOFEM_ERROR("Can't open output file %s", this->dataOutputFileName.c_str());
-        }
+    // the text output is reopened (with the new name) on next request
+    if ( auto *tom = exportModuleManager.giveTextOutputModule() ) {
+        tom->closeOutputStream();
     }
 }
 
@@ -2018,11 +1992,29 @@ FILE *
 EngngModel :: giveOutputStream()
 // Returns an output stream on the data file of the receiver.
 {
-    if ( !outputStream ) {
+    auto *tom = exportModuleManager.giveTextOutputModule();
+    if ( !tom ) {
         OOFEM_ERROR("No output stream opened!");
     }
 
-    return outputStream;
+    return tom->giveOutputStream();
+}
+
+
+bool
+EngngModel :: hasTextOutput()
+{
+    return exportModuleManager.giveTextOutputModule() != nullptr;
+}
+
+
+void
+EngngModel :: createDefaultOutputModule()
+{
+    if ( !exportModuleManager.giveTextOutputModule() ) {
+        std :: unique_ptr< ExportModule > module = std :: make_unique< TextOutputModule >(0, this, true);
+        exportModuleManager.registerModule(module);
+    }
 }
 
 double
@@ -2047,19 +2039,11 @@ EngngModel :: terminateAnalysis()
 {
     int rsec = 0, rmin = 0, rhrs = 0;
     int usec = 0, umin = 0, uhrs = 0;
-    time_t endTime = time(NULL);
     this->timer.stopTimer(EngngModelTimer :: EMTT_AnalysisTimer);
 
 
     // compute real time consumed
     this->giveAnalysisTime(rhrs, rmin, rsec, uhrs, umin, usec);
-
-    if(!suppressOutput) {
-        FILE *out = this->giveOutputStream();
-        fprintf(out, "\nFinishing analysis on: %s\n", ctime(& endTime) );
-        fprintf(out, "Real time consumed: %03dh:%02dm:%02ds\n", rhrs, rmin, rsec);
-        fprintf(out, "User time consumed: %03dh:%02dm:%02ds\n\n\n", uhrs, umin, usec);
-    }
 
     OOFEM_LOG_FORCED("\n\nANALYSIS FINISHED\n\n\n");
     OOFEM_LOG_FORCED("Real time consumed: %03dh:%02dm:%02ds\n", rhrs, rmin, rsec);
