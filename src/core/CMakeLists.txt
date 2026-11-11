@@ -193,6 +193,7 @@ set (core_export
     exportregion.C
     textoutputmodule.C
     outputwriter.C
+    jsonoutputmodule.C
     errorcheckingexportmodule.C
     vtkexportmodule.C
     vtkbaseexportmodule.C
