@@ -7,7 +7,10 @@
 #  - DOF values of dof managers reported in the JSON file must match the values
 #    in the "Node output" sections of the text output (for each reported step).
 #
-# Usage: jsonl_check.py output.jsonl output.out [--tol 1e-6]
+# Usage: jsonl_check.py output.jsonl [output.out] [--tol 1e-6] [--validate-only]
+#
+# With --validate-only (or without the text output file), only the validity of the
+# JSON Lines file is checked (e.g. for the output of the json export module).
 #
 import argparse
 import json
@@ -62,11 +65,18 @@ def read_out(name):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('jsonl')
-    parser.add_argument('out')
+    parser.add_argument('out', nargs='?')
     parser.add_argument('--tol', type=float, default=1.e-6)
+    parser.add_argument('--validate-only', action='store_true')
     args = parser.parse_args()
 
     records = read_jsonl(args.jsonl)
+    if args.validate_only or not args.out:
+        nsteps = sum(1 for r in records if r['kind'] == 'step')
+        if nsteps == 0:
+            sys.exit('no step records')
+        print(f'OK: {len(records)} valid records, {nsteps} steps')
+        return
     text_steps = read_out(args.out)
 
     json_steps = []

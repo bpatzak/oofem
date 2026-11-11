@@ -194,6 +194,7 @@ set (core_export
     textoutputmodule.C
     outputwriter.C
     jsonoutputmodule.C
+    jsonexportmodule.C
     errorcheckingexportmodule.C
     vtkexportmodule.C
     vtkbaseexportmodule.C
