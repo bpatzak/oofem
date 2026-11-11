@@ -56,7 +56,8 @@ TEST_CASE("JsonLinesWriter escapes strings and numbers", "[outputwriter]")
 {
     REQUIRE(JsonLinesWriter :: escape("a\"b\\c\nd\t") == "\"a\\\"b\\\\c\\nd\\t\"");
     REQUIRE(JsonLinesWriter :: number(1.0 / 0.0) == "null");
-    REQUIRE(JsonLinesWriter :: number(-2.5) == "-2.5000000000e+00");
+    REQUIRE(JsonLinesWriter :: number(-2.5) == "-2.5000000000000000e+00");
+    REQUIRE(std :: stod(JsonLinesWriter :: number(0.1)) == 0.1);
 }
 
 TEST_CASE("JsonLinesWriter writes one line per record", "[outputwriter]")
@@ -92,11 +93,11 @@ TEST_CASE("JsonLinesWriter writes one line per record", "[outputwriter]")
         w.beginRecord("reaction", 0, 0);
         w.endRecord();
     });
-    std :: string e = "1.0000000000e+00", z = "0.0000000000e+00";
+    std :: string e = "1.0000000000000000e+00", z = "0.0000000000000000e+00", two = "2.0000000000000000e+00";
     REQUIRE(text ==
             "{\"kind\":\"element\",\"domain\":1,\"number\":3,\"label\":7,\"class\":\"Truss1d\","
-            "\"i\":2,\"s\":\"x\",\"a\":[" + e + ",2.0000000000e+00],\"ia\":[4,5],"
-            "\"m\":[[" + e + "," + z + "],[" + z + ",2.0000000000e+00]],"
+            "\"i\":2,\"s\":\"x\",\"a\":[" + e + "," + two + "],\"ia\":[4,5],"
+            "\"m\":[[" + e + "," + z + "],[" + z + "," + two + "]],"
             "\"gp\":[{\"number\":1},{\"number\":2,\"text\":\"t\"}],\"g\":{}}\n"
             "{\"kind\":\"reaction\"}\n");
 }

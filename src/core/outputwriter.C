@@ -107,7 +107,7 @@ JsonLinesWriter :: number(double value)
         return "null";
     }
     char buf [ 32 ];
-    snprintf(buf, sizeof( buf ), "%.10e", value);
+    snprintf(buf, sizeof( buf ), "%.16e", value); // 17 significant digits: exact round trip of double
     return buf;
 }
 

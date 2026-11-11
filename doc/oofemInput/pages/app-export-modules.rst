@@ -202,7 +202,10 @@ standard output in the member ``text``.
 
 .. code-block:: none
 
-   {"kind":"dofman","step":1,"time":1.0000000000e+00,"domain":1,"number":2,"label":2,"class":"Node","coords":[2.4e+00,0.0e+00,0.0e+00],"dofs":[{"id":1,"name":"D_u","d":-1.3717249500e-03}, ...]}
+   {"kind":"dofman","step":1,"time":1.0000000000000000e+00,"domain":1,"number":2,"label":2,"class":"Node","coords":[2.3999999999999999e+00,0.0000000000000000e+00,0.0000000000000000e+00],"dofs":[{"id":1,"name":"D_u","d":-1.3717249464529331e-03}, ...]}
+
+Real numbers are written with 17 significant digits, so the values read from
+the file are exactly the values computed by OOFEM.
 
 The displacements of node 2 in all steps can be extracted, for example, by
 

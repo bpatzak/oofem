@@ -250,8 +250,12 @@ line is a single JSON object (record). Every record carries its ``kind``
 
 .. code-block:: none
 
-    {"kind":"step","step":1,"time":1.0000000000e+00,"metastep":1,"solution_time":5.2690000000e-03}
-    {"kind":"dofman","step":1,"time":1.0000000000e+00,"domain":1,"number":1,"label":1,"class":"Node","coords":[0.0e+00,0.0e+00,0.0e+00],"dofs":[{"id":1,"name":"D_u","d":-1.3717249500e-03},{"id":3,"name":"D_w","d":0.0000000000e+00},{"id":5,"name":"R_v","d":-2.3878780200e-05}]}
+    {"kind":"step","step":1,"time":1.0000000000000000e+00,"metastep":1,"solution_time":1.1542999999999998e-02}
+    {"kind":"dofman","step":1,"time":1.0000000000000000e+00,"domain":1,"number":1,"label":1,"class":"Node","coords":[0.0000000000000000e+00,0.0000000000000000e+00,0.0000000000000000e+00],"dofs":[{"id":1,"name":"D_u","d":-1.3717249464529331e-03},{"id":3,"name":"D_w","d":0.0000000000000000e+00},{"id":5,"name":"R_v","d":-2.3878780160615039e-05}]}
+
+Unlike the text output, real numbers are written with full precision (17
+significant digits), so the values read from the file are exactly the computed
+ones.
 
 Elements report the list of their integration points (``gps``), each with the
 list of material ``statuses``; structural statuses report ``strains`` and
