@@ -7,6 +7,23 @@ Export modules write the computed data for post-processing by external
 software.  The number of export module records is declared by :param:`nmodules`
 in the analysis record; see :ref:`AnalysisRecord`.
 
+Two kinds of modules are distinguished:
+
+* **Output modules** report the *full state* of the model: every dof manager,
+  element, integration point and material status reports everything it knows.
+  The module selects only the solution steps, dof managers and elements to
+  report and the format of the output.  The standard text output (``output``,
+  the ``.out`` file) and the structured JSON output (``jsonoutput``) are output
+  modules; see :ref:`OutputModulesSec`.
+* **Export modules** export a *selection* of quantities chosen by the user
+  (primary variables, internal state types, …), usually prepared for a
+  particular post-processing tool — VTK, Matlab, gnuplot, JSON (``json``) and
+  others.
+
+Both kinds are declared in the same way and counted together in
+:param:`nmodules`.  In every solution step the output modules are processed
+first, followed by the export modules in the order of their records.
+
 .. record:: Record syntax common to all export modules
 
    :descitem:`EntType` :optelemparam:`tstep_all{}`
@@ -75,6 +92,123 @@ Other common parameters
 
 :optparam:`pythonexport{}`
     A flag enabling the export of the module's data to the Python interface.
+
+.. _OutputModulesSec:
+
+Output modules
+--------------
+
+output
+~~~~~~
+
+The standard text output, written into the output file named on the first line
+of the input file (the ``.out`` file).
+
+Unless the output is suppressed by the :param:`suppress_output` flag of the
+analysis record, the problem creates this module implicitly.  The implicit
+module selects the solution steps, dof managers and elements by the
+``OutputManager`` record of each domain (see :ref:`OutputManagerRecord`), so no
+module record is needed for the standard output.
+
+The module can also be declared explicitly.  The explicit record replaces the
+implicit module; the solution steps are then selected by the common export
+module parameters (:param:`tstep_all`, :param:`tstep_step`, …) and the dof
+managers and elements by optional sets.  Only one ``output`` module can be
+defined.
+
+.. record::
+
+   :descitem:`output` :optelemparam:`node_sets{ia}`
+   :optelemparam:`element_sets{ia}`
+
+**Parameters**
+
+:optparam:`node_sets{ia}`
+    For each domain, the number of the set of nodes to output; ``0`` (the
+    default) outputs all dof managers of the domain.
+
+:optparam:`element_sets{ia}`
+    For each domain, the number of the set of elements to output; ``0`` (the
+    default) outputs all elements of the domain.
+
+jsonoutput
+~~~~~~~~~~
+
+Structured output of the full state of the model in the `JSON Lines
+<https://jsonlines.org>`_ format: every record is a single JSON object on a
+separate line.  The module reports the same information as the standard text
+output, in a form that can be processed by tools like ``jq`` or by a few lines
+of Python.
+
+The output is written into a single file, ``<output file>.m<n>.jsonl`` by
+default, where ``<n>`` is the number of the module record (starting from 0).
+
+.. record::
+
+   :descitem:`jsonoutput` :optelemparam:`node_sets{ia}`
+   :optelemparam:`element_sets{ia}` :optelemparam:`filename{s}`
+
+**Parameters**
+
+``node_sets``, ``element_sets``
+    As for the ``output`` module.
+
+:optparam:`filename{s}`
+    Name of the output file, replacing the default one.
+
+**Output format**
+
+Each record has the member ``kind`` giving the record type, and the members
+``step``, ``time`` and ``domain`` giving the context, so that each line can be
+filtered independently of the others:
+
+``header``
+    The first record: program version, problem class, description and the
+    start time of the analysis.
+
+``step``
+    Starts the output of a solution step: step number, time, metastep and the
+    time consumed by the solution of the step.
+
+``dofman``
+    A dof manager: ``number``, ``label``, ``class``, the coordinates
+    (``coords``, for nodes) and the list ``dofs``.  Each item of the list
+    contains the DOF identification (``id``, ``name``) and the unknowns of the
+    DOF, named as in the text output (``d`` for the total value of the
+    primary unknown; ``v``, ``a`` for velocity and acceleration in dynamic
+    problems, …).
+
+``element``
+    An element: ``number``, ``label``, ``class``, the activity flag
+    (``active``), the internal dof managers (``internal_dofmans``) and the list
+    of integration points ``gps``.  Each integration point contains the number
+    of its integration rule (``ir``), its ``number``, natural coordinates
+    (``natural_coords``) and the list of its material ``statuses``; layered
+    integration points contain the list of ``layers``.  Structural material
+    statuses report ``strains`` and ``stresses`` (or ``F`` and ``P`` for large
+    deformations) in full vector form.
+
+``footer``
+    The last record: real and user time of the analysis in seconds.
+
+Components which do not report structured data yet report the text of their
+standard output in the member ``text``.
+
+**Example**
+
+.. code-block:: none
+
+   jsonoutput tstep_all
+
+.. code-block:: none
+
+   {"kind":"dofman","step":1,"time":1.0000000000e+00,"domain":1,"number":2,"label":2,"class":"Node","coords":[2.4e+00,0.0e+00,0.0e+00],"dofs":[{"id":1,"name":"D_u","d":-1.3717249500e-03}, ...]}
+
+The displacements of node 2 in all steps can be extracted, for example, by
+
+.. code-block:: bash
+
+   jq -c 'select(.kind=="dofman" and .number==2) | [.time, (.dofs[] | .d)]' beam2d.out.m0.jsonl
 
 VTK export modules
 ------------------
@@ -201,6 +335,50 @@ the XFEM manager's :param:`exportfields` parameter, see
 .. record::
 
    :descitem:`vtkxmlxfem`
+
+JSON export
+-----------
+
+Exports selected quantities in the JSON Lines format (one JSON object per
+line).  In contrast to the ``jsonoutput`` output module, only the quantities
+chosen by the user are exported: values of the selected DOFs at dof managers
+and values of the selected internal state types at the integration points of
+elements.  The records have the same structure as those of ``jsonoutput``
+(``header``, ``step``, ``dofman``, ``element``, ``footer``); the DOF values are
+reported as members named by the DOF (``D_u``, ``D_v``, ``T_f``, …), the
+internal variables as members of the integration point named by the internal
+state type (``IST_StressTensor``, …).
+
+The output is written into a single file, ``<output file>.m<n>.jsonl`` by
+default.  All domains are exported unless restricted by :param:`domain_mask`.
+
+.. record::
+
+   :descitem:`json` :optelemparam:`dofs{ia}` :optelemparam:`vars{ia}`
+   :optelemparam:`node_sets{ia}` :optelemparam:`element_sets{ia}`
+   :optelemparam:`filename{s}`
+
+**Parameters**
+
+:optparam:`dofs{ia}`
+    DOF identifiers to export, as defined in ``src/core/dofiditem.h``
+    (``1``, ``2``, ``3`` for the displacements ``D_u``, ``D_v``, ``D_w``, …).
+
+:optparam:`vars{ia}`
+    Internal state types to export at integration points, as defined in
+    ``src/core/internalstatetype.h``.
+
+``node_sets``, ``element_sets``, ``filename``
+    As for the ``jsonoutput`` module.
+
+**Example**
+
+.. code-block:: none
+
+   json tstep_all dofs 2 1 2 vars 2 1 4
+
+exports the displacements ``D_u`` and ``D_v`` of all nodes and the stress and
+strain tensors at all integration points in every step.
 
 Homogenization export
 ---------------------
@@ -434,8 +612,6 @@ The following export modules are registered but not documented here:
 
    * - Record keyword
      - Purpose
-   * - ``output``
-     - The standard text output module that writes the ``.out`` file.
    * - ``dm``
      - Dof manager export, tabulating selected dof manager values.
    * - ``poi``
