@@ -65,6 +65,7 @@
 #include "outputmanager.h"
 #include "exportmodulemanager.h"
 #include "textoutputmodule.h"
+#include "outputwriter.h"
 #include "initmodulemanager.h"
 #include "feinterpol3d.h"
 #include "classfactory.h"
@@ -88,6 +89,7 @@
 #endif
 
 #include <cstdio>
+#include <sstream>
 #include <cstdarg>
 #include <ctime>
 #ifdef _OPENMP
@@ -885,6 +887,97 @@ void EngngModel :: printYourself()
 void EngngModel :: printDofOutputAt(FILE *stream, Dof *iDof, TimeStep *tStep)
 {
     iDof->printSingleOutputAt(stream, tStep, 'd', VM_Total);
+}
+
+
+void EngngModel :: reportDofOutputAt(OutputWriter &writer, Dof *iDof, TimeStep *tStep)
+{
+    // Report the values printed by printDofOutputAt. The text is produced by Dof::print*OutputAt
+    // services, which write "dof <id>" followed by pairs "<unknown character> <value>".
+    std :: string text = captureOutput([this, iDof, tStep] (FILE *f) { this->printDofOutputAt(f, iDof, tStep); });
+    std :: vector< std :: pair< std :: string, double > >values;
+    bool ok = true;
+    std :: istringstream lines(text);
+    std :: string line;
+    while ( ok && std :: getline(lines, line) ) {
+        std :: istringstream tokens(line);
+        std :: string word, name;
+        int id;
+        if ( !( tokens >> word ) ) {
+            continue; // empty line
+        }
+        if ( word != "dof" || !( tokens >> id ) ) {
+            ok = false;
+            break;
+        }
+        while ( tokens >> name ) {
+            double value;
+            if ( !( tokens >> value ) ) {
+                ok = false;
+                break;
+            }
+            values.emplace_back(name, value);
+        }
+    }
+
+    if ( ok ) {
+        for ( auto &v : values ) {
+            writer.field(v.first.c_str(), v.second);
+        }
+    } else {
+        writer.legacyText(text);
+    }
+}
+
+
+void
+EngngModel :: reportOutputAt(OutputWriter &writer, TimeStep *tStep, const IntArray &nodeSets, const IntArray &elementSets)
+{
+    for ( auto &domain: domainList ) {
+        int dnum = domain->giveNumber();
+        int nset = nodeSets.giveSize() < dnum ? 0 : nodeSets.at(dnum);
+        int eset = elementSets.giveSize() < dnum ? 0 : elementSets.at(dnum);
+
+        writer.beginDomain(dnum);
+
+        auto reportDofManager = [&writer, tStep] (DofManager *dman) {
+            if ( dman->giveParallelMode() == DofManager_null ) {
+                return;
+            }
+            writer.beginRecord( "dofman", dman->giveNumber(), dman->giveLabel(), dman->giveClassName() );
+            dman->reportOutput(writer, tStep);
+            writer.endRecord();
+        };
+        if ( nset == 0 ) {
+            for ( auto &dman : domain->giveDofManagers() ) {
+                reportDofManager( dman.get() );
+            }
+        } else {
+            for ( int inode : domain->giveSet(nset)->giveNodeList() ) {
+                reportDofManager( domain->giveDofManager(inode) );
+            }
+        }
+
+        auto reportElement = [&writer, tStep] (Element *elem) {
+            if ( elem->giveParallelMode() == Element_remote ) {
+                return;
+            }
+            writer.beginRecord( "element", elem->giveNumber(), elem->giveLabel(), elem->giveClassName() );
+            elem->reportOutput(writer, tStep);
+            writer.endRecord();
+        };
+        if ( eset == 0 ) {
+            for ( auto &elem : domain->giveElements() ) {
+                reportElement( elem.get() );
+            }
+        } else {
+            for ( int ielem : domain->giveSet(eset)->giveElementList() ) {
+                reportElement( domain->giveElement(ielem) );
+            }
+        }
+
+        writer.endDomain();
+    }
 }
 
 void EngngModel :: assemble(SparseMtrx &answer, TimeStep *tStep, const MatrixAssembler &ma,

@@ -52,6 +52,7 @@
 
 namespace oofem {
 class DataStream;
+class OutputWriter;
 class Domain;
 class Interface;
 class TimeStep;
@@ -172,6 +173,20 @@ public:
      * @param tStep Time step to write for.
      */
     virtual void printOutputAt(FILE *file, TimeStep *tStep) { }
+    /**
+     * Reports the output of the receiver for given time step using given writer.
+     * This is used by output modules producing structured output (e.g. JSON).
+     * The caller is responsible for opening and closing the record of the receiver
+     * (OutputWriter::beginRecord / endRecord); the receiver reports its fields.
+     * The default implementation reports the text produced by printOutputAt
+     * (see reportLegacyOutput); derived classes should override this service
+     * to report structured data.
+     * @param writer Output writer.
+     * @param tStep Time step to write for.
+     */
+    virtual void reportOutput(OutputWriter &writer, TimeStep *tStep);
+    /// Reports the text produced by printOutputAt (fallback for classes without structured output).
+    void reportLegacyOutput(OutputWriter &writer, TimeStep *tStep);
     /// Prints receiver state on stdout. Useful for debugging.
     virtual void printYourself() { }
     /**

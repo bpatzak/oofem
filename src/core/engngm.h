@@ -109,6 +109,7 @@ class SparseMtrx;
 class NumericalMethod;
 class InitModuleManager;
 class ExportModuleManager;
+class OutputWriter;
 class FloatMatrix;
 class FloatArray;
 class LoadBalancer;
@@ -1127,6 +1128,17 @@ public:
     virtual void printOutputAt(FILE *file, TimeStep *tStep);
     virtual void printOutputAt(FILE *file, TimeStep *tStep, const IntArray &nodeSets, const IntArray &elementSets);
     /**
+     * Reports the output of the receiver for given time step using given writer
+     * (structured output of output modules). For each domain, the dof managers
+     * and elements (optionally limited to given sets) report their output as
+     * records "dofman" and "element".
+     * @param writer Output writer.
+     * @param tStep Solution step.
+     * @param nodeSets Set of nodes to report for each domain (0 or missing value = all).
+     * @param elementSets Set of elements to report for each domain (0 or missing value = all).
+     */
+    virtual void reportOutputAt(OutputWriter &writer, TimeStep *tStep, const IntArray &nodeSets, const IntArray &elementSets);
+    /**
      * Outputs all nodes in the given set.
      * @param file Output stream.
      * @param domain Domain.
@@ -1156,6 +1168,17 @@ public:
      * @param tStep solution step
      */
     virtual void printDofOutputAt(FILE *stream, Dof *iDof, TimeStep *tStep);
+    /**
+     * DOF reporting routine for structured output (output modules using OutputWriter).
+     * The receiver reports the unknowns of given DOF as fields of the current group.
+     * The default implementation reports the values printed by printDofOutputAt,
+     * one field per printed unknown, named by the unknown character used in the text
+     * output (e.g. 'd', 'v', 'a'), so it works for all problems overriding printDofOutputAt.
+     * @param writer Output writer.
+     * @param iDof DOF to be processed.
+     * @param tStep Solution step.
+     */
+    virtual void reportDofOutputAt(OutputWriter &writer, Dof *iDof, TimeStep *tStep);
 
 
     // identification

@@ -57,6 +57,7 @@
 #include "domain.h"
 #include "engngm.h"
 #include "paramkey.h"
+#include "outputwriter.h"
 
 #ifdef __OOFEG
  #include "oofeggraphiccontext.h"
@@ -189,6 +190,18 @@ Node :: computeLoadVector(FloatArray &answer, Load *load, CharType type, TimeSte
             answer.rotatedWith(L2G, 't');
         }
     }
+}
+
+
+void
+Node :: reportOutput(OutputWriter &writer, TimeStep *tStep)
+{
+    FloatArray coords(3);
+    for ( int i = 1; i <= 3; ++i ) {
+        coords.at(i) = this->coordinates.at(i);
+    }
+    writer.field("coords", coords);
+    DofManager :: reportOutput(writer, tStep);
 }
 
 

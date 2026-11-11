@@ -429,6 +429,7 @@ public:
     //@}
 
     void printOutputAt(FILE *file, TimeStep *tStep) override;
+    void reportOutput(OutputWriter &writer, TimeStep *tStep) override;
     /**
      * Updates receiver after equilibrium in time step has been reached.
      * @param tStep Active time step.

@@ -172,6 +172,7 @@ public:
      void initializeFinish() override;
     void giveInputRecord(DynamicInputRecord &input) override;
     void printYourself() override;
+    void reportOutput(OutputWriter &writer, TimeStep *tStep) override;
     int checkConsistency() override;
     bool isDofTypeCompatible(dofType type) const override { return ( type == DT_master || type == DT_simpleSlave || type == DT_active ); }
     virtual int giveQcNodeType() { return 0; }

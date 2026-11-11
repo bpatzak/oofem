@@ -42,6 +42,7 @@
 #include "datastream.h"
 #include "contextioerr.h"
 #include "dynamicinputrecord.h"
+#include "outputwriter.h"
 
 #include <cstdarg>
 
@@ -89,6 +90,23 @@ void FEMComponent :: initializeFrom(const std::shared_ptr<InputRecord> &ir)
 int FEMComponent :: checkConsistency()
 {
     return 1;
+}
+
+
+void
+FEMComponent :: reportOutput(OutputWriter &writer, TimeStep *tStep)
+{
+    this->reportLegacyOutput(writer, tStep);
+}
+
+
+void
+FEMComponent :: reportLegacyOutput(OutputWriter &writer, TimeStep *tStep)
+{
+    std :: string text = captureOutput([this, tStep] (FILE *f) { this->printOutputAt(f, tStep); });
+    if ( !text.empty() ) {
+        writer.legacyText(text);
+    }
 }
 
 } // end namespace oofem
