@@ -191,7 +191,7 @@ set (core_export
     exportmodule.C
     exportmodulemanager.C
     exportregion.C
-    outputexportmodule.C
+    textoutputmodule.C
     errorcheckingexportmodule.C
     vtkexportmodule.C
     vtkbaseexportmodule.C

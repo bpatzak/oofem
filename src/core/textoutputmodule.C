@@ -32,56 +32,93 @@
  *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include <vector>
 #include <cstdio>
+#include <ctime>
 
 #include "oofemcfg.h"
-#include "outputexportmodule.h"
+#include "textoutputmodule.h"
 #include "engngm.h"
-#include "domain.h"
-#include "node.h"
-#include "element.h"
 #include "timestep.h"
 #include "classfactory.h"
 
 namespace oofem {
-REGISTER_ExportModule(OutputExportModule)
+REGISTER_ExportModule(TextOutputModule)
 
-OutputExportModule :: OutputExportModule(int n, EngngModel *e) : OutputModule(n, e), outputStream(NULL)
+TextOutputModule :: TextOutputModule(int n, EngngModel *e, bool implicit) : OutputModule(n, e),
+    outputStream(nullptr), implicit(implicit)
+{ }
+
+
+TextOutputModule :: ~TextOutputModule()
 {
+    this->closeOutputStream();
 }
+
 
 void
-OutputExportModule :: initializeFrom(const std::shared_ptr<InputRecord> &ir)
+TextOutputModule :: initializeFrom(const std::shared_ptr<InputRecord> &ir)
 {
     nodeSets.clear();
-    IR_GIVE_OPTIONAL_FIELD(ir, nodeSets, _IFT_OutputExportModule_nodeSets);
+    IR_GIVE_OPTIONAL_FIELD(ir, nodeSets, _IFT_TextOutputModule_nodeSets);
     elementSets.clear();
-    IR_GIVE_OPTIONAL_FIELD(ir, elementSets, _IFT_OutputExportModule_elementSets);
+    IR_GIVE_OPTIONAL_FIELD(ir, elementSets, _IFT_TextOutputModule_elementSets);
 
     OutputModule :: initializeFrom(ir);
-
-    auto *file = giveOutputStream();
-
-    fprintf(file, "%s", PRG_HEADER);
-    fprintf(file, "\nStarting analysis on: %s\n", ctime(& emodel->giveStartTime()) );
-    fprintf(file, "%s\n", emodel->giveDescription().c_str());
 }
 
+
 FILE *
-OutputExportModule :: giveOutputStream()
+TextOutputModule :: giveOutputStream()
 {
-    if ( this->outputStream ) return this->outputStream;
+    if ( this->outputStream ) {
+        return this->outputStream;
+    }
+
     this->outputStream = fopen(emodel->giveOutputBaseFileName().c_str(), "w");
     if ( !this->outputStream ) {
         OOFEM_ERROR("Can't open output file %s", emodel->giveOutputBaseFileName().c_str());
     }
+    this->printHeader(this->outputStream);
     return this->outputStream;
 }
 
+
 void
-OutputExportModule :: doOutput(TimeStep *tStep, bool forcedOutput)
+TextOutputModule :: closeOutputStream()
 {
+    if ( this->outputStream ) {
+        fclose(this->outputStream);
+        this->outputStream = nullptr;
+    }
+}
+
+
+void
+TextOutputModule :: printHeader(FILE *file)
+{
+    fprintf(file, "%s", PRG_HEADER);
+    fprintf(file, "\nStarting analysis on: %s\n", ctime(& emodel->giveStartTime()) );
+    fprintf(file, "%s\n", emodel->giveDescription().c_str());
+
+#ifdef __MPI_PARALLEL_MODE
+    if ( emodel->isParallel() ) {
+        fprintf(file, "Problem rank is %d/%d on %s\n\n", emodel->giveRank(), emodel->giveNumberOfProcesses(), emodel->giveProcessorName());
+    }
+#endif
+}
+
+
+void
+TextOutputModule :: doOutput(TimeStep *tStep, bool forcedOutput)
+{
+    if ( this->implicit ) {
+        // traditional output, steps, nodes and elements are selected by the output managers of domains
+        FILE *file = this->giveOutputStream();
+        emodel->printOutputAt(file, tStep);
+        fflush(file);
+        return;
+    }
+
     if ( !( testTimeStepOutput(tStep) || forcedOutput ) ) {
         return;
     }
@@ -93,12 +130,12 @@ OutputExportModule :: doOutput(TimeStep *tStep, bool forcedOutput)
     fprintf(file, "\n==============================================================\n");
 
     emodel->printOutputAt(file, tStep, nodeSets, elementSets);
-
-    fprintf(file, "\nUser time consumed by solution step %d: %.3f [s]\n\n", tStep->giveNumber(), emodel->giveSolutionStepTime());
+    fflush(file);
 }
 
+
 void
-OutputExportModule :: terminate()
+TextOutputModule :: terminate()
 {
     FILE *out = this->giveOutputStream();
     int rhrs, rmin, rsec, uhrs, umin, usec;
@@ -109,6 +146,6 @@ OutputExportModule :: terminate()
     fprintf(out, "\nFinishing analysis on: %s\n", ctime(& endTime) );
     fprintf(out, "Real time consumed: %03dh:%02dm:%02ds\n", rhrs, rmin, rsec);
     fprintf(out, "User time consumed: %03dh:%02dm:%02ds\n\n\n", uhrs, umin, usec);
+    fflush(out);
 }
-
 } // end namespace oofem

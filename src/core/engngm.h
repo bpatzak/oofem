@@ -1158,6 +1158,10 @@ public:
     int giveRank() const { return rank; }
     /// Returns the number of collaborating processes.
     int giveNumberOfProcesses() const { return numProcs; }
+#ifdef __MPI_PARALLEL_MODE
+    /// Returns the name of the processor the receiver runs on.
+    const char *giveProcessorName() const { return processor_name; }
+#endif
 
 
     /**
