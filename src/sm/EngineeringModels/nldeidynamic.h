@@ -58,6 +58,7 @@
 //@}
 
 namespace oofem {
+class OutputWriter;
 /**
  * This class implements NonLinear (- may be changed) solution of dynamic
  * problems using Direct Explicit Integration scheme - Central Difference
@@ -150,6 +151,7 @@ public:
     void printOutputAt(FILE *file, TimeStep *tStep) override;
 
     void printDofOutputAt(FILE *stream, Dof *iDof, TimeStep *tStep) override;
+    void reportDofOutputAt(OutputWriter &writer, Dof *iDof, TimeStep *tStep) override;
 
     // identification
     const char *giveInputRecordName() const { return _IFT_NlDEIDynamic_Name; }

@@ -60,14 +60,29 @@ services:
 * ``FEMComponent::reportOutput`` reports the fields of a component,
 * ``GaussPoint::reportOutput`` and ``IntegrationPointStatus::reportOutput``
   report integration point data,
-* ``EngngModel::reportDofOutputAt`` reports the unknowns of a DOF.
+* ``EngngModel::reportDofOutputAt`` reports the unknowns of a DOF
+  (``Dof::reportOutputAt``).
 
 The default implementations of ``FEMComponent::reportOutput`` and
 ``IntegrationPointStatus::reportOutput`` report the text produced by the
 ``printOutputAt`` service (``reportLegacyOutput``, field ``text``), so every
 class supports structured output from the beginning and classes can be
-migrated one by one. ``EngngModel::reportDofOutputAt`` reports the values
-printed by ``printDofOutputAt`` as named fields, so it works for all problems.
+migrated one by one.
+
+``EngngModel::reportDofOutputAt`` is the structured counterpart of
+``printDofOutputAt``: the default implementation reports the total value of the
+unknown as the field ``d``. A problem overriding ``printDofOutputAt`` must
+override ``reportDofOutputAt`` as well, reporting the same unknowns under the
+names used in the text output, for example for a dynamic problem:
+
+.. code-block:: cpp
+
+    void MyDynamicProblem :: reportDofOutputAt(OutputWriter &writer, Dof *iDof, TimeStep *tStep)
+    {
+        iDof->reportOutputAt(writer, tStep, "d", VM_Total);
+        iDof->reportOutputAt(writer, tStep, "v", VM_Velocity);
+        iDof->reportOutputAt(writer, tStep, "a", VM_Acceleration);
+    }
 
 When implementing a new class:
 

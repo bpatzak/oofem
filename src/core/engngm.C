@@ -89,7 +89,6 @@
 #endif
 
 #include <cstdio>
-#include <sstream>
 #include <cstdarg>
 #include <ctime>
 #ifdef _OPENMP
@@ -892,41 +891,7 @@ void EngngModel :: printDofOutputAt(FILE *stream, Dof *iDof, TimeStep *tStep)
 
 void EngngModel :: reportDofOutputAt(OutputWriter &writer, Dof *iDof, TimeStep *tStep)
 {
-    // Report the values printed by printDofOutputAt. The text is produced by Dof::print*OutputAt
-    // services, which write "dof <id>" followed by pairs "<unknown character> <value>".
-    std :: string text = captureOutput([this, iDof, tStep] (FILE *f) { this->printDofOutputAt(f, iDof, tStep); });
-    std :: vector< std :: pair< std :: string, double > >values;
-    bool ok = true;
-    std :: istringstream lines(text);
-    std :: string line;
-    while ( ok && std :: getline(lines, line) ) {
-        std :: istringstream tokens(line);
-        std :: string word, name;
-        int id;
-        if ( !( tokens >> word ) ) {
-            continue; // empty line
-        }
-        if ( word != "dof" || !( tokens >> id ) ) {
-            ok = false;
-            break;
-        }
-        while ( tokens >> name ) {
-            double value;
-            if ( !( tokens >> value ) ) {
-                ok = false;
-                break;
-            }
-            values.emplace_back(name, value);
-        }
-    }
-
-    if ( ok ) {
-        for ( auto &v : values ) {
-            writer.field(v.first.c_str(), v.second);
-        }
-    } else {
-        writer.legacyText(text);
-    }
+    iDof->reportOutputAt(writer, tStep, "d", VM_Total);
 }
 
 

@@ -1170,10 +1170,11 @@ public:
     virtual void printDofOutputAt(FILE *stream, Dof *iDof, TimeStep *tStep);
     /**
      * DOF reporting routine for structured output (output modules using OutputWriter).
-     * The receiver reports the unknowns of given DOF as fields of the current group.
-     * The default implementation reports the values printed by printDofOutputAt,
-     * one field per printed unknown, named by the unknown character used in the text
-     * output (e.g. 'd', 'v', 'a'), so it works for all problems overriding printDofOutputAt.
+     * The receiver reports the unknowns of given DOF as fields of the current group
+     * (see Dof::reportOutputAt), named by the unknown character used in the text output
+     * (e.g. 'd', 'v', 'a'). The default implementation reports the total value ("d"),
+     * as the default printDofOutputAt does. Problems overriding printDofOutputAt must
+     * override this service as well, reporting the same unknowns under the same names.
      * @param writer Output writer.
      * @param iDof DOF to be processed.
      * @param tStep Solution step.

@@ -56,6 +56,7 @@
 //@}
 
 namespace oofem {
+class OutputWriter;
 
 /**
  * This class implements nonlinear dynamic engineering problem.
@@ -120,6 +121,7 @@ public:
 
     void printOutputAt(FILE *file, TimeStep *tStep) override;
     void printDofOutputAt(FILE *stream, Dof *iDof, TimeStep *tStep) override;
+    void reportDofOutputAt(OutputWriter &writer, Dof *iDof, TimeStep *tStep) override;
 
     void updateYourself(TimeStep *tStep) override;
     void updateComponent(TimeStep *tStep, NumericalCmpn, Domain *d) override;

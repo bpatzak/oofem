@@ -33,6 +33,7 @@
  */
 
 #include "dof.h"
+#include "outputwriter.h"
 #include "dofmanager.h"
 #include "timestep.h"
 #include "boundarycondition.h"
@@ -101,6 +102,12 @@ void Dof :: printMultipleOutputAt(FILE *File, TimeStep *tStep, char *ch,
     }
 
     fprintf(File, "\n");
+}
+
+
+void Dof :: reportOutputAt(OutputWriter &writer, TimeStep *tStep, const char *name, ValueModeType mode, double scale)
+{
+    writer.field(name, scale * this->giveUnknown(mode, tStep));
 }
 
 
