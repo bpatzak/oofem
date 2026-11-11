@@ -41,7 +41,8 @@
 
 
 namespace oofem {
-ExportModule :: ExportModule(int n, EngngModel *e) : tsteps_out(), domainMask(), regionSets(), defaultElementSet( 0, e->giveDomain(1) )
+ExportModule :: ExportModule(int n, EngngModel *e) : tstep_all_out_flag(false), tstep_step_out(0), tsteps_out(),
+    tstep_substeps_out_flag(false), domain_all_flag(false), domainMask(), regionSets(), defaultElementSet(0, nullptr)
 {
     this->number = n;
     emodel = e;
