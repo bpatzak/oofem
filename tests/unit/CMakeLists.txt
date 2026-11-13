@@ -47,3 +47,13 @@ catch_discover_tests(test_feinterpol
         ENVIRONMENT "PATH=$<TARGET_FILE_DIR:liboofem>;$ENV{PATH}"
         LABELS "unit"
 )
+
+# Parsing of arrays and matrices in text and XML input records
+add_executable(test_inputrecord test_inputrecord.C)
+target_link_libraries(test_inputrecord PRIVATE Catch2::Catch2WithMain liboofem)
+catch_discover_tests(test_inputrecord
+    TEST_LIST inputrecord_tests
+    PROPERTIES
+        ENVIRONMENT "PATH=$<TARGET_FILE_DIR:liboofem>;$ENV{PATH}"
+        LABELS "unit"
+)
