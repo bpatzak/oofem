@@ -543,6 +543,20 @@ OOFEMTXTInputRecord :: giveField(Dictionary &answer, InputFieldType id)
     traceField(id,"Dictionary");
     int indx = this->giveKeywordIndx(id);
     if ( indx ) {
+        const char *value = tokenizer.giveToken(indx + 1);
+        if ( value != nullptr && value [ 0 ] == '{' ) {
+            // Python/JSON-like literal "{a: 0.8, e: 0.5}", number of pairs given by the contents
+            std :: string error;
+            if ( !parseDictionaryLiteral(value, answer, error) ) {
+                OOFEM_WARNING("%s", error.c_str() );
+                throw BadFormatInputException(shared_from_this(), id, lineNumber);
+            }
+            setReadFlag(indx);
+            setReadFlag(indx + 1);
+            return;
+        }
+
+        // "size key1 value1 ... keysize valuesize"
         setReadFlag(indx);
         int size;
         auto ptr = scanInteger(tokenizer.giveToken(++indx), size);
