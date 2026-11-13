@@ -200,30 +200,41 @@ displacement, ``t`` for temperature, and so on.
       val3 t
 
 **ia** — integer array, written as ``size val(1) ... val(size)``, where all
-entries are integers separated by one or more spaces.  For the array attribute
-``nodes``\ :math:`=\{1,4,23\}`:
+entries are integers separated by one or more spaces.  Alternatively, the
+Matlab-style form ``[val(1) ... val(size)]`` can be used, where the size is
+given by the number of entries; entries are separated by spaces and/or commas
+and ``[]`` denotes an empty array.  For the array attribute
+``nodes``\ :math:`=\{1,4,23\}` all of the following are equivalent:
 
    .. code-block:: none
 
       nodes 3 1 4 23
+      nodes [1 4 23]
+      nodes [1, 4, 23]
 
 **ra** — real array, written as ``size val(1) ... val(size)``, where *size* is
-an integer and the values are reals separated by one or more spaces.  For the
+an integer and the values are reals separated by one or more spaces, or in the
+Matlab-style form ``[val(1) ... val(size)]`` as for integer arrays.  For the
 array attribute ``coords``\ :math:`=\{1.0,2.0,3.0\}`:
 
    .. code-block:: none
 
       coords 3 1.0 2.0 3.0
+      coords [1.0 2.0 3.0]
 
 **rm** — real matrix, written as
 ``rows columns {val(1,1) val(1,2) ...; val(2,1) ...}``, where *rows* and
 *columns* are integers and the values are reals.  Columns are separated by a
-space or a comma, rows by a semicolon.  For the matrix attribute
+space or a comma, rows by a semicolon.  Alternatively, the Matlab-style form
+``[val(1,1) val(1,2) ...; val(2,1) ...]`` can be used, where the dimensions are
+given by the contents (all rows must have the same number of columns).  For the
+matrix attribute
 :math:`\texttt{mat1}=\left[\begin{array}{ccc}1.0&-1.0&0.0\\2.0&2.5&5.0\end{array}\right]`:
 
    .. code-block:: none
 
       mat1 2 3 {1.0 -1.0 0.0; 2.0 2.5 5.0}
+      mat1 [1.0 -1.0 0.0; 2.0 2.5 5.0]
 
 **dc** — dictionary.  A dictionary consists of pairs, each pair having a
 single-character key and an associated real value.  It is written as
