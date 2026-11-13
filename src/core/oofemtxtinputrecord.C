@@ -47,9 +47,119 @@
 #include <cctype>
 #include <ostream>
 #include <sstream>
+#include <vector>
 
 
 namespace oofem {
+
+namespace {
+/// Strict conversion of a complete entry to int; fails on empty input or trailing characters.
+bool toNumber(const std :: string &s, int &value)
+{
+    char *endptr;
+    value = (int) strtol(s.c_str(), & endptr, 10);
+    return endptr != s.c_str() && *endptr == 0;
+}
+
+/// Strict conversion of a complete entry to double; fails on empty input or trailing characters.
+bool toNumber(const std :: string &s, double &value)
+{
+    char *endptr;
+    value = strtod(s.c_str(), & endptr);
+    return endptr != s.c_str() && *endptr == 0;
+}
+
+/**
+ * Parses a list value enclosed in a pair of brackets, e.g. "[1 2, 3; 4 5 6]" or "{1 2; 3 4}".
+ * Rows are separated by ';', entries within a row by whitespace and/or a single ','
+ * (Matlab style). A trailing ';' is accepted, "[]" yields no rows.
+ * @param tok Token to parse; it must start with @a open and end with @a close.
+ * @param rows Parsed values, one vector per row (rows may differ in length; callers check).
+ * @return False if the token is malformed (missing brackets, empty row or entry, bad number).
+ */
+template< class T >
+bool parseList(const char *tok, char open, char close, std :: vector< std :: vector< T > > &rows)
+{
+    rows.clear();
+    if ( tok == nullptr ) {
+        return false;
+    }
+
+    std :: string s(tok);
+    auto first = s.find_first_not_of(" \t\r\n");
+    auto last = s.find_last_not_of(" \t\r\n");
+    if ( first == std :: string :: npos || last == first || s [ first ] != open || s [ last ] != close ) {
+        return false;
+    }
+
+    std :: string body = s.substr(first + 1, last - first - 1);
+    auto bodyEnd = body.find_last_not_of(" \t\r\n");
+    if ( bodyEnd == std :: string :: npos ) {
+        return true; // empty list
+    }
+    if ( body [ bodyEnd ] == ';' ) {
+        bodyEnd--; // accept a single trailing row separator, as Matlab does: "[1 2; 3 4;]"
+    }
+    body.resize(bodyEnd + 1);
+
+    std :: istringstream rowStream(body);
+    std :: string rowStr;
+    while ( std :: getline(rowStream, rowStr, ';') ) {
+        std :: vector< T >row;
+        bool pendingComma = false; // a ',' must be followed by an entry
+        std :: size_t i = 0, n = rowStr.size();
+        while ( i < n ) {
+            char c = rowStr [ i ];
+            if ( isspace( ( unsigned char ) c ) ) {
+                i++;
+            } else if ( c == ',' ) {
+                if ( row.empty() || pendingComma ) {
+                    return false; // leading or doubled comma
+                }
+                pendingComma = true;
+                i++;
+            } else {
+                std :: size_t j = i;
+                while ( j < n && rowStr [ j ] != ',' && !isspace( ( unsigned char ) rowStr [ j ] ) ) {
+                    j++;
+                }
+                T value;
+                if ( !toNumber(rowStr.substr(i, j - i), value) ) {
+                    return false;
+                }
+                row.push_back(value);
+                pendingComma = false;
+                i = j;
+            }
+        }
+
+        if ( pendingComma || row.empty() ) {
+            return false; // trailing comma or empty row
+        }
+        rows.push_back(std :: move(row) );
+    }
+
+    return true;
+}
+
+/// Parses a Matlab-style array value "[v1 v2 ...]"; returns false if malformed or if it has more than one row.
+template< class T >
+bool parseBracketArray(const char *tok, std :: vector< T > &values)
+{
+    std :: vector< std :: vector< T > >rows;
+    if ( !parseList(tok, '[', ']', rows) || rows.size() > 1 ) {
+        return false;
+    }
+    values = rows.empty() ? std :: vector< T >() : std :: move(rows [ 0 ]);
+    return true;
+}
+
+/// True if the token is a Matlab-style bracketed value.
+bool isBracketValue(const char *tok)
+{
+    return tok != nullptr && tok [ 0 ] == '[';
+}
+} // end anonymous namespace
 
 OOFEMTXTInputRecord :: OOFEMTXTInputRecord() : tokenizer(), record()
 { }
@@ -240,6 +350,22 @@ OOFEMTXTInputRecord :: giveField(IntArray &answer, InputFieldType id)
     traceField(id,"IntArray");
     int indx = this->giveKeywordIndx(id);
     if ( indx ) {
+        if ( isBracketValue(tokenizer.giveToken(indx + 1) ) ) {
+            // Matlab-style "[1 2 3]", size given by the number of entries
+            std :: vector< int >values;
+            if ( !parseBracketArray(tokenizer.giveToken(indx + 1), values) ) {
+                throw BadFormatInputException(shared_from_this(), id, lineNumber);
+            }
+            answer.resize( ( int ) values.size() );
+            for ( std :: size_t i = 0; i < values.size(); i++ ) {
+                answer [ i ] = values [ i ];
+            }
+            setReadFlag(indx);
+            setReadFlag(indx + 1);
+            return;
+        }
+
+        // "size v1 v2 ... vsize"
         int size;
         setReadFlag(indx);
         auto ptr = scanInteger(tokenizer.giveToken(++indx), size);
@@ -272,6 +398,22 @@ OOFEMTXTInputRecord :: giveField(FloatArray &answer, InputFieldType id)
     traceField(id,"FloatArray");
     int indx = this->giveKeywordIndx(id);
     if ( indx ) {
+        if ( isBracketValue(tokenizer.giveToken(indx + 1) ) ) {
+            // Matlab-style "[1.0 2.0 3.0]", size given by the number of entries
+            std :: vector< double >values;
+            if ( !parseBracketArray(tokenizer.giveToken(indx + 1), values) ) {
+                throw BadFormatInputException(shared_from_this(), id, lineNumber);
+            }
+            answer.resize( ( int ) values.size() );
+            for ( std :: size_t i = 0; i < values.size(); i++ ) {
+                answer [ i ] = values [ i ];
+            }
+            setReadFlag(indx);
+            setReadFlag(indx + 1);
+            return;
+        }
+
+        // "size v1 v2 ... vsize"
         int size;
         setReadFlag(indx);
         auto ptr = scanInteger(tokenizer.giveToken(++indx), size);
