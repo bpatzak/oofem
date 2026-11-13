@@ -237,14 +237,18 @@ matrix attribute
       mat1 [1.0 -1.0 0.0; 2.0 2.5 5.0]
 
 **dc** — dictionary.  A dictionary consists of pairs, each pair having a
-single-character key and an associated real value.  It is written as
-``size key(1) val(1) ... key(size) val(size)``, where *size* is an integer,
+single-character (or integer) key and an associated real value.  It is written
+as ``size key(1) val(1) ... key(size) val(size)``, where *size* is an integer,
 the keys are single characters, and the values are reals separated by one or
-more spaces.
+more spaces.  Alternatively, a Python/JSON-like form
+``{key(1): val(1), ..., key(size): val(size)}`` can be used, where the number of
+pairs is given by the contents; the commas are optional, a key may be quoted
+(``'a'``) and ``{}`` denotes an empty dictionary.  The following are equivalent:
 
    .. code-block:: none
 
       dict1 2 a 1.0 v 0.0
+      dict1 {a: 1.0, v: 0.0}
 
 **rl** — range list, representing a list of integer values.  The syntax is
 ``{ number1 .. numberN (start1 end1) (start2 end2) }`` and the enclosing braces
