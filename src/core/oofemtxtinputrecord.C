@@ -463,6 +463,30 @@ OOFEMTXTInputRecord :: giveField(FloatMatrix &answer, InputFieldType id)
     traceField(id,"FloatMatrix");
     int indx = this->giveKeywordIndx(id);
     if ( indx ) {
+        if ( isBracketValue(tokenizer.giveToken(indx + 1) ) ) {
+            // Matlab-style "[a11 a12; a21 a22]", dimensions given by the contents
+            std :: vector< std :: vector< double > >rows;
+            if ( !parseList(tokenizer.giveToken(indx + 1), '[', ']', rows) ) {
+                throw BadFormatInputException(shared_from_this(), id, lineNumber);
+            }
+            int nrows = ( int ) rows.size();
+            int ncols = nrows ? ( int ) rows [ 0 ].size() : 0;
+            answer.resize(nrows, ncols);
+            for ( int i = 0; i < nrows; i++ ) {
+                if ( ( int ) rows [ i ].size() != ncols ) {
+                    OOFEM_WARNING("row %d has %d columns, expected %d", i + 1, ( int ) rows [ i ].size(), ncols);
+                    throw BadFormatInputException(shared_from_this(), id, lineNumber);
+                }
+                for ( int j = 0; j < ncols; j++ ) {
+                    answer(i, j) = rows [ i ] [ j ];
+                }
+            }
+            setReadFlag(indx);
+            setReadFlag(indx + 1);
+            return;
+        }
+
+        // "nrows ncols {a11 a12; a21 a22}"
         int nrows, ncols;
         setReadFlag(indx);
 
@@ -791,59 +815,33 @@ OOFEMTXTInputRecord :: readRange(const char **helpSource, int &li, int &hi)
 int
 OOFEMTXTInputRecord :: readMatrix(const char *helpSource, int r, int c, FloatMatrix &ans)
 {
-    const char *endptr = helpSource;
+    // "{a11 a12 ...; a21 a22 ...}": rows separated by ';', columns by whitespace or ','
+    std :: vector< std :: vector< double > >rows;
+    if ( !parseList(helpSource, '{', '}', rows) ) {
+        OOFEM_WARNING("malformed matrix value, expected {a11 a12 ...; a21 a22 ...}");
+        ans.clear();
+        return 0;
+    }
 
-    if ( helpSource == NULL ) {
+    if ( ( int ) rows.size() != r ) {
+        OOFEM_WARNING("matrix value has %d rows, %d declared", ( int ) rows.size(), r);
         ans.clear();
         return 0;
     }
 
     ans.resize(r, c);
-    // skip whitespaces
-    while ( isspace(* endptr) ) {
-        ( endptr )++;
-    }
-
-    if ( * endptr == '{' ) {
-        // range left parenthesis found
-        ( endptr )++;
-        // read row by row separated by semicolon
-        for ( int i = 1; i <= r; i++ ) {
-            for ( int j = 1; j <= c; j++ ) {
-                endptr = scanDouble( endptr, ans.at(i, j) );
-            }
-
-            if ( i < r ) {
-                // skip whitespaces
-                while ( isspace(* endptr) ) {
-                    ( endptr )++;
-                }
-
-                // test for row terminating semicolon
-                if ( * endptr == ';' ) {
-                    ( endptr )++;
-                } else {
-                    OOFEM_WARNING("missing row terminating semicolon");
-                    return 0;
-                }
-            }
-        }
-
-        // skip whitespaces
-        while ( isspace(* endptr) ) {
-            ( endptr )++;
-        }
-
-        // test for enclosing bracket
-        if ( * endptr == '}' ) {
-            return 1;
-        } else {
-            OOFEM_WARNING("end '}' missing while parsing matrix value");
+    for ( int i = 0; i < r; i++ ) {
+        if ( ( int ) rows [ i ].size() != c ) {
+            OOFEM_WARNING("matrix row %d has %d columns, %d declared", i + 1, ( int ) rows [ i ].size(), c);
+            ans.clear();
             return 0;
         }
-    } else {
-        return 0;
+        for ( int j = 0; j < c; j++ ) {
+            ans(i, j) = rows [ i ] [ j ];
+        }
     }
+
+    return 1;
 }
 
 #ifdef _USE_TRACE_FIELDS
