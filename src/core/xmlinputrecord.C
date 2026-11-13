@@ -327,9 +327,18 @@ namespace oofem {
     void XMLInputRecord::giveField(Dictionary &answer, InputFieldType id){
         std::string s; pugi::xml_node n;
         std::tie(s,n)=_attr_traced_read_with_node(id);
-        Tokens items(id,this,"\\s*;\\s*");
+        answer.clear();
+        std::string trimmed(s); _trim(trimmed);
+        if(!trimmed.empty() && trimmed[0]=='{'){
+            // Python/JSON-like literal "{a: 0.8, e: 0.5}"
+            std::string error;
+            if(!parseDictionaryLiteral(trimmed,answer,error)) OOFEM_ERROR("%s: attribute %s: %s",loc(n).c_str(),id,error.c_str());
+            return;
+        }
+        // "key1 value1; key2 value2" (the attribute is read only once, above)
+        Tokens items(id,s,[this,n](){ return this->loc(n); },"\\s*;\\s*");
         for(const std::string& tok: items.toks){
-            Tokens kv(id,tok,[this,items](){ return this->loc(items.node); },/*sep_regex*/"\\s+");
+            Tokens kv(id,tok,[this,n](){ return this->loc(n); },/*sep_regex*/"\\s+");
             if(kv.size()!=2) OOFEM_ERROR("%s: dictionary items must have 2 whitespace-separated fields (%d tokens found)",loc(n).c_str(),(int)kv.size());
             int key;
             if(std::regex_match(kv.toks[0],std::regex("[0-9]+"))){ key=std::atoi(kv.toks[0].c_str()); }
