@@ -76,8 +76,13 @@ namespace oofem {
         return reader->loc(node);
     }
 
-    // trim string from both sides
+    // trim string from the left side
     std::string _lrtrim(std::string &s) { s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](int c) {return !std::isspace(c);})); return s; }
+    // trim string from both sides
+    std::string _trim(std::string &s) { s.erase(std::find_if(s.rbegin(), s.rend(), [](int c) {return !std::isspace(c);}).base(), s.end()); return _lrtrim(s); }
+
+    // separator of numeric array items and matrix columns: whitespace and/or a comma (Matlab style)
+    static const char* NumSep="\\s*,\\s*|\\s+";
 
     struct Tokens{
         std::string attr;
@@ -85,15 +90,28 @@ namespace oofem {
         pugi::xml_node node;
         std::vector<std::string> toks;
         std::function<std::string()> loc;
-        Tokens(const std::string& attr_, XMLInputRecord* rec, const char* sep_regex="\\s+"): attr(attr_) {
+        /**
+         * Reads attribute attr_ of rec and splits it with sep_regex.
+         * If brackets is true, the value may be enclosed in Matlab-style brackets,
+         * e.g. "[1 2 3]" or "[1 2; 3 4]", which are stripped before splitting.
+         */
+        Tokens(const std::string& attr_, XMLInputRecord* rec, const char* sep_regex="\\s+", bool brackets=false): attr(attr_) {
             std::tie(str,node)=rec->_attr_traced_read_with_node(attr.c_str());
             //std::cerr<<"attr_="<<attr_<<", attr="<<attr<<", offset="<<node.offset_debug()<<std::endl;
             loc=[rec,this](){ return rec->loc(this->node); };
+            if(brackets) _stripBrackets();
             _makeToks(sep_regex);
         };
         Tokens(const std::string& attr_, const std::string& str_, std::function<std::string()> loc_, const char* sep_regex="\\s+"): attr(attr_), str(str_), loc(loc_){
             str=_lrtrim(str);
             _makeToks(sep_regex);
+        }
+        void _stripBrackets(){
+            _trim(str);
+            if(str.empty() || str.front()!='[') return;
+            if(str.back()!=']') OOFEM_ERROR("%s: attribute %s: missing closing ']' in '%s'",loc().c_str(),attr.c_str(),str.c_str());
+            str=str.substr(1,str.size()-2);
+            _trim(str);
         }
         void _makeToks(const char* sep_regex){
             if(str.empty()) return; // this would create spurious empty token, stay on zero size instead
@@ -238,7 +256,7 @@ namespace oofem {
         _XML_DEBUG(loc(node)<<": "<<node.name()<<"::"<<id<<"="<<answer);
     }
     void XMLInputRecord::giveField(FloatArray &answer, InputFieldType id){
-        Tokens tt(id,this);
+        Tokens tt(id,this,NumSep,/*brackets*/true);
         // std::cerr<<id<<": FloatArray from '"<<tt.str<<"' ("<<tt.size()<<" items)"<<std::endl;
         answer.resize(tt.size());
         for(size_t i=0; i<tt.size(); i++) answer[i]=tt.as<double>(i);
@@ -251,7 +269,7 @@ namespace oofem {
         _XML_DEBUG(tt.loc()<<": parsed attribute "<<id<<" as std::vector<std::string>");
     }
     void XMLInputRecord::giveField(Coordinates &answer, InputFieldType id){
-        Tokens tt(id,this);
+        Tokens tt(id,this,NumSep,/*brackets*/true);
         // std::cerr<<id<<": FloatArray from '"<<tt.str<<"' ("<<tt.size()<<" items)"<<std::endl;
         answer.zero();
         if ((int) tt.size()>answer.size()) 
@@ -260,18 +278,19 @@ namespace oofem {
         _XML_DEBUG(tt.loc()<<": parsed attribute "<<id<<" as "<<answer);
     }
     void XMLInputRecord::giveField(FloatMatrix &answer, InputFieldType id){
-        Tokens trows(id,this,"\\s*;\\s*");
+        Tokens trows(id,this,"\\s*;\\s*",/*brackets*/true);
         int rows=trows.size();
+        answer.clear(); // empty value ("" or "[]") gives 0x0 matrix
         for(int row=0; row<rows; row++){
-            Tokens tcols(id,trows.toks[row],[this,trows](){ return this->loc(trows.node); },"\\s+");
+            Tokens tcols(id,trows.toks[row],[this,trows](){ return this->loc(trows.node); },NumSep);
             if(row==0){ answer.resize(rows,tcols.size()); }
-            else if((int)answer.cols()!=(int)tcols.size()) OOFEM_ERROR("%s: row %d has inconsistent number of columns (%d != %d)",loc().c_str(),rows,(int)answer.cols(),(int)tcols.size());
+            else if((int)answer.cols()!=(int)tcols.size()) OOFEM_ERROR("%s: row %d has inconsistent number of columns (%d != %d)",loc().c_str(),row+1,(int)answer.cols(),(int)tcols.size());
             for(int col=0; col<answer.cols(); col++){ answer(row,col)=tcols.as<double>(col); }
         }
         _XML_DEBUG(tt.loc()<<": parsed attribute "<<id<<" as "<<answer);
     }
     void XMLInputRecord::giveField(IntArray &answer, InputFieldType id){
-        Tokens tt(id,this);
+        Tokens tt(id,this,NumSep,/*brackets*/true);
         //std::cerr<<id<<": IntArray from '"<<tt.str<<" ("<<tt.size()<<" items"<<std::endl;
         answer.resize(tt.size());
         for(size_t i=0; i<tt.size(); i++) answer[i]=tt.as<int>(i);
