@@ -8,6 +8,7 @@
 #include "intarray.h"
 #include "floatarray.h"
 #include "floatmatrix.h"
+#include "dictionary.h"
 #include "error.h"
 #ifdef _USE_XML
  #include "xmldatareader.h"
@@ -195,6 +196,68 @@ TEST_CASE("txt: brackets inside quoted strings are not array tokens", "[inputrec
 }
 
 
+TEST_CASE("txt: dictionary literal equals size-prefixed dictionary", "[inputrecord][txt]")
+{
+    for ( const char *line : { "Load 1 properties 2 a 0.8 e 0.5",
+                               "Load 1 properties {a: 0.8, e: 0.5}",
+                               "Load 1 properties {a: 0.8 e: 0.5}",
+                               "Load 1 properties { a :0.8 ,e: 0.5, }",
+                               "Load 1 properties {'a': 0.8, \"e\": 0.5}" } ) {
+        INFO(line);
+        Dictionary d;
+        txt(line)->giveField(d, "properties");
+        CHECK(d.giveSize() == 2);
+        CHECK(d.at('a') == 0.8);
+        CHECK(d.at('e') == 0.5);
+    }
+}
+
+TEST_CASE("txt: dictionary literal keys and values", "[inputrecord][txt]")
+{
+    Dictionary d;
+    txt("Rec 1 d {1: 2.5, u: -1e-3}")->giveField(d, "d");
+    CHECK(d.giveSize() == 2);
+    CHECK(d.at(1) == 2.5);
+    CHECK(d.at('u') == -1e-3);
+
+    Dictionary empty;
+    txt("Rec 1 d {}")->giveField(empty, "d");
+    CHECK(empty.giveSize() == 0);
+}
+
+TEST_CASE("txt: fields after a dictionary literal are found", "[inputrecord][txt]")
+{
+    auto ir = txt("BoundaryLoad 1 properties {a: 0.8} loadtype 3 set 2");
+    Dictionary d;
+    int loadtype = 0, set = 0;
+    ir->giveField(d, "properties");
+    ir->giveField(loadtype, "loadtype");
+    ir->giveField(set, "set");
+    std::string kwd;
+    int num;
+    ir->giveRecordKeywordField(kwd, num);
+    CHECK(d.at('a') == 0.8);
+    CHECK(loadtype == 3);
+    CHECK(set == 2);
+    CHECK_NOTHROW(ir->finish(true) );
+}
+
+TEST_CASE("txt: malformed dictionary literals are rejected", "[inputrecord][txt]")
+{
+    for ( const char *line : { "Rec 1 d {a 0.8}",        // missing ':'
+                               "Rec 1 d {a: x}",         // not a number
+                               "Rec 1 d {ab: 1}",        // multi-character key
+                               "Rec 1 d {a: }",          // missing value
+                               "Rec 1 d {a: 1, a: 2}",   // duplicate key
+                               "Rec 1 d {a: 1,, e: 2}",  // doubled comma
+                               "Rec 1 d {, a: 1}" } ) {  // leading comma
+        INFO(line);
+        Dictionary d;
+        CHECK_THROWS_AS(txt(line)->giveField(d, "d"), BadFormatInputException);
+    }
+}
+
+
 #ifdef _USE_XML
 namespace {
 /// Writes an XML input whose top <oofem> element carries the given attributes and returns its top record.
@@ -267,5 +330,22 @@ TEST_CASE("xml: malformed bracketed values are rejected", "[inputrecord][xml]")
     FloatMatrix m;
     CHECK_THROWS_AS(ir->giveField(a, "a"), RuntimeException);
     CHECK_THROWS_AS(ir->giveField(m, "m"), RuntimeException);
+}
+
+
+TEST_CASE("xml: dictionary literal equals plain dictionary", "[inputrecord][xml]")
+{
+    std::shared_ptr< XMLDataReader >reader;
+    auto ir = xmlTop(reader, "d1=\"a 0.8; e 0.5\" d2=\"{a: 0.8, e: 0.5}\" d3=\" { a: 0.8 e: 0.5 } \" bad=\"{a 0.8}\"");
+    for ( const char *id : { "d1", "d2", "d3" } ) {
+        INFO(id);
+        Dictionary d;
+        ir->giveField(d, id);
+        CHECK(d.giveSize() == 2);
+        CHECK(d.at('a') == 0.8);
+        CHECK(d.at('e') == 0.5);
+    }
+    Dictionary bad;
+    CHECK_THROWS_AS(ir->giveField(bad, "bad"), RuntimeException);
 }
 #endif
