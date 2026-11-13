@@ -72,6 +72,18 @@ Tokenizer :: readStructToken(std :: size_t &pos, const std :: string &line)
 }
 
 std :: string
+Tokenizer :: readBracketToken(std :: size_t &pos, const std :: string &line)
+{
+    std :: string x = this->readToken(pos, line, ']'); // read everything up to terminating ']' (or to the end of the string)
+    if ( line [ pos ] == ']' ) {
+        pos++;            // check if terminating ']' was found
+    } else {
+        OOFEM_WARNING("Missing closing separator (]) inserted at end of line");
+    }
+    return x + ']'; // like structs, bracketed values keep their enclosing brackets
+}
+
+std :: string
 Tokenizer :: readSimpleExpressionToken(std :: size_t &pos, const std :: string &line)
 {
     pos++;
@@ -124,6 +136,9 @@ void Tokenizer :: tokenizeLine(const std :: string &currentLine)
             sList.push_back( this->readStringToken(bpos, currentLine) );
         } else if ( c == '{' ) {
             sList.push_back( this->readStructToken(bpos, currentLine) );
+        } else if ( c == '[' ) {
+            // Matlab-style array/matrix value, e.g. [1 2 3] or [1 2; 3 4]
+            sList.push_back( this->readBracketToken(bpos, currentLine) );
         } else if ( c == '$' ) {
             sList.push_back( this->readSimpleExpressionToken(bpos, currentLine) );
         } else {

@@ -85,6 +85,14 @@ protected:
      */
     std :: string readStructToken(std :: size_t &pos, const std :: string &line);
     /**
+     * Reads next bracketed token (bounded by '[' ']', not nested), used for
+     * Matlab-style array and matrix values such as [1 2 3] or [1 2; 3 4].
+     * The enclosing brackets are kept in the returned token.
+     * @param pos Starting position (should point to a '[').
+     * @param line Record from which token is parsed.
+     */
+    std :: string readBracketToken(std :: size_t &pos, const std :: string &line);
+    /**
      * Reads next string token (quoted).
      * @param pos Position (index) in token buffer.
      * @param line Record from which token is parsed.
