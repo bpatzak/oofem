@@ -35,9 +35,12 @@
 #include "inputrecord.h"
 #include "error.h"
 #include "datareader.h"
+#include "dictionary.h"
 #include <sstream>
 #include <iomanip>
 #include <set>
+#include <cctype>
+#include <cstdlib>
 
 
 namespace oofem {
@@ -223,6 +226,116 @@ ComponentInputException::ComponentInputException(ComponentType ct, int number, c
 const char* ComponentInputException::what() const noexcept
 { 
     return msg.c_str();
+}
+
+bool
+parseDictionaryLiteral(const std :: string &s, Dictionary &answer, std :: string &error)
+{
+    answer.clear();
+    const char *ws = " \t\r\n";
+    std :: size_t first = s.find_first_not_of(ws), last = s.find_last_not_of(ws);
+    if ( first == std :: string :: npos || s [ first ] != '{' ) {
+        error = "dictionary value must start with '{'";
+        return false;
+    }
+    if ( last == first || s [ last ] != '}' ) {
+        error = "missing closing '}' in dictionary value";
+        return false;
+    }
+
+    std :: size_t i = first + 1, end = last; // parse the contents between the braces
+    auto skipSpace = [ & ]() {
+        while ( i < end && isspace( ( unsigned char ) s [ i ] ) ) {
+            i++;
+        }
+    };
+    auto isDelimiter = [ & ](char c) {
+        return isspace( ( unsigned char ) c ) || c == ':' || c == ',';
+    };
+
+    bool afterComma = false; // a ',' must follow a pair and must not be doubled
+    while ( true ) {
+        skipSpace();
+        if ( i >= end ) {
+            break;
+        }
+
+        if ( s [ i ] == ',' ) {
+            if ( answer.giveSize() == 0 || afterComma ) {
+                error = "unexpected ',' in dictionary value";
+                return false;
+            }
+            afterComma = true;
+            i++;
+            continue;
+        }
+
+        // key: integer or single character, optionally quoted
+        std :: string key;
+        if ( s [ i ] == '\'' || s [ i ] == '"' ) {
+            char quote = s [ i++ ];
+            std :: size_t j = s.find(quote, i);
+            if ( j == std :: string :: npos || j >= end ) {
+                error = "unterminated quoted key in dictionary value";
+                return false;
+            }
+            key = s.substr(i, j - i);
+            i = j + 1;
+        } else {
+            std :: size_t j = i;
+            while ( j < end && !isDelimiter(s [ j ]) ) {
+                j++;
+            }
+            key = s.substr(i, j - i);
+            i = j;
+        }
+
+        int k;
+        char *endptr;
+        long lk = key.empty() ? 0 : strtol(key.c_str(), & endptr, 10);
+        if ( !key.empty() && *endptr == 0 ) {
+            k = ( int ) lk;          // integer key
+        } else if ( key.size() == 1 ) {
+            k = key [ 0 ];           // character key, stored as its code (as in the size-prefixed syntax)
+        } else {
+            error = "invalid dictionary key '" + key + "' (must be a single character or an integer)";
+            return false;
+        }
+
+        skipSpace();
+        if ( i >= end || s [ i ] != ':' ) {
+            error = "missing ':' after dictionary key '" + key + "'";
+            return false;
+        }
+        i++;
+        skipSpace();
+
+        // value: real number up to the next separator
+        std :: size_t j = i;
+        while ( j < end && !isspace( ( unsigned char ) s [ j ] ) && s [ j ] != ',' ) {
+            j++;
+        }
+        std :: string valueStr = s.substr(i, j - i);
+        if ( valueStr.empty() ) {
+            error = "missing value for dictionary key '" + key + "'";
+            return false;
+        }
+        double value = strtod(valueStr.c_str(), & endptr);
+        if ( *endptr != 0 ) {
+            error = "invalid value '" + valueStr + "' for dictionary key '" + key + "'";
+            return false;
+        }
+        i = j;
+
+        if ( answer.includes(k) ) {
+            error = "duplicate dictionary key '" + key + "'";
+            return false;
+        }
+        answer.add(k, value);
+        afterComma = false;
+    }
+
+    return true;
 }
 
 } // end namespace oofem
