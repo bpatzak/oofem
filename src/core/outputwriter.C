@@ -68,7 +68,7 @@ std :: string captureOutput(const std :: function< void(FILE *) > &printer)
 }
 
 
-JsonLinesWriter :: JsonLinesWriter(FILE *stream) : stream(stream), domain(0)
+JsonLinesWriter :: JsonLinesWriter(FILE *stream) : stream(stream), domainsOpen(false)
 { }
 
 
@@ -115,6 +115,9 @@ JsonLinesWriter :: number(double value)
 void
 JsonLinesWriter :: writeLine(const char *kind, const std :: string &members)
 {
+    if ( !isList.empty() ) {
+        OOFEM_ERROR("stand-alone line can not be written within the output of a step");
+    }
     fprintf(stream, "{\"kind\":%s%s}\n", escape(kind).c_str(), members.c_str() );
 }
 
@@ -152,44 +155,102 @@ JsonLinesWriter :: endOutput(EngngModel *emodel)
 void
 JsonLinesWriter :: beginStep(TimeStep *tStep, double time)
 {
-    stepContext = ",\"step\":" + std :: to_string( tStep->giveNumber() ) + ",\"time\":" + number(time);
-    writeLine("step", stepContext + ",\"metastep\":" + std :: to_string( tStep->giveMetaStepNumber() ) +
-              ",\"solution_time\":" + number(tStep->solutionTime) );
-}
-
-
-void
-JsonLinesWriter :: beginRecord(const char *kind, int number, int label, const char *className)
-{
-    buffer = "{\"kind\":" + escape(kind) + stepContext;
-    if ( domain ) {
-        buffer += ",\"domain\":" + std :: to_string(domain);
+    if ( !isList.empty() ) {
+        OOFEM_ERROR("output of the step already begun");
     }
-    if ( number ) {
-        buffer += ",\"number\":" + std :: to_string(number);
-    }
-    if ( label ) {
-        buffer += ",\"label\":" + std :: to_string(label);
-    }
-    if ( className ) {
-        buffer += ",\"class\":" + escape(className);
-    }
+    // the step object is the root level of the line; the "kind" member is its first member
+    put("{\"kind\":\"step\"");
     isList.assign(1, false);
     isFirst.assign(1, false);
+    domainsOpen = false;
+    this->field( "step", tStep->giveNumber() );
+    this->field("time", time);
+    this->field( "metastep", tStep->giveMetaStepNumber() );
+    this->field("solution_time", tStep->solutionTime);
 }
 
 
 void
-JsonLinesWriter :: endRecord()
+JsonLinesWriter :: endStep()
 {
-    if ( isList.size() != 1 ) {
-        OOFEM_ERROR("unbalanced record (lists or groups not closed)");
+    if ( domainsOpen ) {
+        if ( isList.size() != 2 ) {
+            OOFEM_ERROR("unbalanced output of the step (domain not closed)");
+        }
+        this->close(true);
+        domainsOpen = false;
     }
-    buffer += "}\n";
-    fputs(buffer.c_str(), stream);
-    buffer.clear();
+    if ( isList.size() != 1 ) {
+        OOFEM_ERROR("unbalanced output of the step (sections, records, lists or groups not closed)");
+    }
+    put("}\n");
     isList.clear();
     isFirst.clear();
+}
+
+
+void
+JsonLinesWriter :: beginDomain(int number)
+{
+    // domains are items of the "domains" list of the step object, the list is opened with the first domain
+    if ( !domainsOpen ) {
+        if ( isList.size() != 1 ) {
+            OOFEM_ERROR("output of the domain must be begun at the step level");
+        }
+        this->open("domains", true);
+        domainsOpen = true;
+    }
+    if ( isList.size() != 2 ) {
+        OOFEM_ERROR("output of the domain must be begun at the step level");
+    }
+    // key() refuses members of the domains list (reserved for domains), so the item is opened here
+    if ( !isFirst.back() ) {
+        put(",");
+    }
+    isFirst.back() = false;
+    put("{");
+    isList.push_back(false);
+    isFirst.push_back(true);
+    this->field("number", number);
+}
+
+
+void
+JsonLinesWriter :: endDomain()
+{
+    if ( !domainsOpen || isList.size() != 3 ) {
+        OOFEM_ERROR("endDomain without matching beginDomain");
+    }
+    this->close(false);
+}
+
+
+void
+JsonLinesWriter :: beginRecord(int number, int label, const char *className)
+{
+    if ( isList.empty() || !isList.back() ) {
+        OOFEM_ERROR("record must be reported within a section");
+    }
+    this->open(nullptr, false);
+    // zero number or label means not applicable
+    if ( number ) {
+        this->field("number", number);
+    }
+    if ( label ) {
+        this->field("label", label);
+    }
+    if ( className ) {
+        this->field("class", className);
+    }
+}
+
+
+bool
+JsonLinesWriter :: isReservedLevel() const
+{
+    // the step object (level 1), the domains list (level 2) and a domain object (level 3)
+    // are opened and closed only by beginStep/beginDomain and endDomain/endStep
+    return isList.size() < 2 || ( domainsOpen && isList.size() <= 3 );
 }
 
 
@@ -197,60 +258,80 @@ void
 JsonLinesWriter :: key(const char *name)
 {
     if ( isList.empty() ) {
-        OOFEM_ERROR("field reported outside of a record");
+        OOFEM_ERROR("field reported outside of the output of a step");
+    }
+    if ( domainsOpen && isList.size() == 2 ) {
+        OOFEM_ERROR("members of the step must be reported before the first domain");
     }
     if ( !isFirst.back() ) {
-        buffer += ',';
+        put(",");
     }
     isFirst.back() = false;
     if ( !isList.back() ) {
-        buffer += escape(name ? name : "");
-        buffer += ':';
+        put( escape(name ? name : "") );
+        put(":");
     }
+}
+
+
+void
+JsonLinesWriter :: open(const char *name, bool list)
+{
+    this->key(name);
+    put(list ? "[" : "{");
+    isList.push_back(list);
+    isFirst.push_back(true);
+}
+
+
+void
+JsonLinesWriter :: close(bool list)
+{
+    put(list ? "]" : "}");
+    isList.pop_back();
+    isFirst.pop_back();
 }
 
 
 void
 JsonLinesWriter :: beginList(const char *name)
 {
-    key(name);
-    buffer += '[';
-    isList.push_back(true);
-    isFirst.push_back(true);
+    this->open(name, true);
 }
 
 
 void
 JsonLinesWriter :: endList()
 {
-    if ( isList.size() < 2 || !isList.back() ) {
+    if ( this->isReservedLevel() || !isList.back() ) {
         OOFEM_ERROR("endList without matching beginList");
     }
-    buffer += ']';
-    isList.pop_back();
-    isFirst.pop_back();
+    this->close(true);
 }
 
 
 void
 JsonLinesWriter :: beginGroup(const char *name)
 {
-    key(name);
-    buffer += '{';
-    isList.push_back(false);
-    isFirst.push_back(true);
+    this->open(name, false);
 }
 
 
 void
 JsonLinesWriter :: endGroup()
 {
-    if ( isList.size() < 2 || isList.back() ) {
-        OOFEM_ERROR("endGroup without matching beginGroup");
+    if ( this->isReservedLevel() || isList.back() ) {
+        OOFEM_ERROR("endGroup (endRecord) without matching beginGroup (beginRecord)");
     }
-    buffer += '}';
-    isList.pop_back();
-    isFirst.pop_back();
+    this->close(false);
+}
+
+
+void
+JsonLinesWriter :: field(const char *name, bool value)
+{
+    key(name);
+    put(value ? "true" : "false");
 }
 
 
@@ -258,7 +339,7 @@ void
 JsonLinesWriter :: field(const char *name, int value)
 {
     key(name);
-    buffer += std :: to_string(value);
+    put( std :: to_string(value) );
 }
 
 
@@ -266,7 +347,7 @@ void
 JsonLinesWriter :: field(const char *name, double value)
 {
     key(name);
-    buffer += number(value);
+    put( number(value) );
 }
 
 
@@ -274,7 +355,7 @@ void
 JsonLinesWriter :: field(const char *name, const char *value)
 {
     key(name);
-    buffer += escape(value);
+    put( escape(value) );
 }
 
 
@@ -282,14 +363,15 @@ void
 JsonLinesWriter :: field(const char *name, const FloatArray &value)
 {
     key(name);
-    buffer += '[';
+    std :: string s = "[";
     for ( int i = 1; i <= value.giveSize(); ++i ) {
         if ( i > 1 ) {
-            buffer += ',';
+            s += ',';
         }
-        buffer += number( value.at(i) );
+        s += number( value.at(i) );
     }
-    buffer += ']';
+    s += ']';
+    put(s);
 }
 
 
@@ -297,14 +379,15 @@ void
 JsonLinesWriter :: field(const char *name, const IntArray &value)
 {
     key(name);
-    buffer += '[';
+    std :: string s = "[";
     for ( int i = 1; i <= value.giveSize(); ++i ) {
         if ( i > 1 ) {
-            buffer += ',';
+            s += ',';
         }
-        buffer += std :: to_string( value.at(i) );
+        s += std :: to_string( value.at(i) );
     }
-    buffer += ']';
+    s += ']';
+    put(s);
 }
 
 
@@ -312,17 +395,19 @@ void
 JsonLinesWriter :: field(const char *name, const FloatMatrix &value)
 {
     key(name);
-    buffer += '[';
+    // row-wise nested arrays
+    std :: string s = "[";
     for ( int i = 1; i <= value.giveNumberOfRows(); ++i ) {
-        buffer += ( i > 1 ) ? ",[" : "[";
+        s += ( i > 1 ) ? ",[" : "[";
         for ( int j = 1; j <= value.giveNumberOfColumns(); ++j ) {
             if ( j > 1 ) {
-                buffer += ',';
+                s += ',';
             }
-            buffer += number( value.at(i, j) );
+            s += number( value.at(i, j) );
         }
-        buffer += ']';
+        s += ']';
     }
-    buffer += ']';
+    s += ']';
+    put(s);
 }
 } // end namespace oofem

@@ -909,10 +909,11 @@ EngngModel :: reportOutputAt(OutputWriter &writer, TimeStep *tStep, const IntArr
             if ( dman->giveParallelMode() == DofManager_null ) {
                 return;
             }
-            writer.beginRecord( "dofman", dman->giveNumber(), dman->giveLabel(), dman->giveClassName() );
+            writer.beginRecord( dman->giveNumber(), dman->giveLabel(), dman->giveClassName() );
             dman->reportOutput(writer, tStep);
             writer.endRecord();
         };
+        writer.beginSection("dofmans");
         if ( nset == 0 ) {
             for ( auto &dman : domain->giveDofManagers() ) {
                 reportDofManager( dman.get() );
@@ -922,15 +923,17 @@ EngngModel :: reportOutputAt(OutputWriter &writer, TimeStep *tStep, const IntArr
                 reportDofManager( domain->giveDofManager(inode) );
             }
         }
+        writer.endSection();
 
         auto reportElement = [&writer, tStep] (Element *elem) {
             if ( elem->giveParallelMode() == Element_remote ) {
                 return;
             }
-            writer.beginRecord( "element", elem->giveNumber(), elem->giveLabel(), elem->giveClassName() );
+            writer.beginRecord( elem->giveNumber(), elem->giveLabel(), elem->giveClassName() );
             elem->reportOutput(writer, tStep);
             writer.endRecord();
         };
+        writer.beginSection("elements");
         if ( eset == 0 ) {
             for ( auto &elem : domain->giveElements() ) {
                 reportElement( elem.get() );
@@ -940,6 +943,7 @@ EngngModel :: reportOutputAt(OutputWriter &writer, TimeStep *tStep, const IntArr
                 reportElement( domain->giveElement(ielem) );
             }
         }
+        writer.endSection();
 
         writer.endDomain();
     }

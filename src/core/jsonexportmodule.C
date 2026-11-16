@@ -79,7 +79,7 @@ JsonExportModule :: exportDofManager(JsonLinesWriter &w, DofManager *dman, TimeS
     if ( dman->giveParallelMode() == DofManager_null ) {
         return;
     }
-    w.beginRecord( "dofman", dman->giveNumber(), dman->giveLabel(), dman->giveClassName() );
+    w.beginRecord( dman->giveNumber(), dman->giveLabel(), dman->giveClassName() );
     for ( int id : dofs ) {
         if ( dman->hasDofID( ( DofIDItem ) id ) ) {
             w.field( __DofIDItemToString( ( DofIDItem ) id ),
@@ -96,7 +96,7 @@ JsonExportModule :: exportElement(JsonLinesWriter &w, Element *elem, TimeStep *t
     if ( elem->giveParallelMode() == Element_remote || !elem->isActivated(tStep) ) {
         return;
     }
-    w.beginRecord( "element", elem->giveNumber(), elem->giveLabel(), elem->giveClassName() );
+    w.beginRecord( elem->giveNumber(), elem->giveLabel(), elem->giveClassName() );
     w.beginList("gps");
     FloatArray value;
     for ( auto &iRule : elem->giveIntegrationRulesArray() ) {
@@ -136,6 +136,7 @@ JsonExportModule :: doOutput(TimeStep *tStep, bool forcedOutput)
         w.beginDomain(idomain);
 
         if ( dofs.giveSize() ) {
+            w.beginSection("dofmans");
             if ( nset == 0 ) {
                 for ( auto &dman : domain->giveDofManagers() ) {
                     this->exportDofManager(w, dman.get(), tStep);
@@ -145,9 +146,11 @@ JsonExportModule :: doOutput(TimeStep *tStep, bool forcedOutput)
                     this->exportDofManager(w, domain->giveDofManager(inode), tStep);
                 }
             }
+            w.endSection();
         }
 
         if ( vars.giveSize() ) {
+            w.beginSection("elements");
             if ( eset == 0 ) {
                 for ( auto &elem : domain->giveElements() ) {
                     this->exportElement(w, elem.get(), tStep);
@@ -157,6 +160,7 @@ JsonExportModule :: doOutput(TimeStep *tStep, bool forcedOutput)
                     this->exportElement(w, domain->giveElement(ielem), tStep);
                 }
             }
+            w.endSection();
         }
         w.endDomain();
     }

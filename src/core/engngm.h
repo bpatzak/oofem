@@ -1131,7 +1131,7 @@ public:
      * Reports the output of the receiver for given time step using given writer
      * (structured output of output modules). For each domain, the dof managers
      * and elements (optionally limited to given sets) report their output as
-     * records "dofman" and "element".
+     * records of the sections "dofmans" and "elements".
      * @param writer Output writer.
      * @param tStep Solution step.
      * @param nodeSets Set of nodes to report for each domain (0 or missing value = all).

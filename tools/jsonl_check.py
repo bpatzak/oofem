@@ -1,21 +1,52 @@
 #!/usr/bin/env python3
 #
-# Checks structured output of the jsonoutput module (JSON Lines) against
+# Checks structured output of the json output/export modules (JSON Lines) against
 # the standard text output (.out file) of the same analysis:
 #  - every line of the JSON Lines file must be a valid JSON object with a "kind" member,
-#  - the file must start with a "header" record and end with a "footer" record,
+#  - the file must start with a "header" line and end with a "footer" line,
+#  - every "step" line must be nested as step -> domains[] -> sections (dofmans[], elements[],
+#    reactions[]) -> records, elements -> integration_rules[] -> gps[],
 #  - DOF values of dof managers reported in the JSON file must match the values
 #    in the "Node output" sections of the text output (for each reported step).
 #
-# Usage: jsonl_check.py output.jsonl [output.out] [--tol 1e-6] [--validate-only]
+# Usage: jsonl_check.py output.jsonl [output.out] [--tol 1e-6] [--subset] [--validate-only]
 #
-# With --validate-only (or without the text output file), only the validity of the
-# JSON Lines file is checked (e.g. for the output of the json export module).
+# By default, every DOF of the text output must be present in the JSON file
+# (output of the jsonoutput module). With --subset, only the values present in the JSON file
+# are compared (output of the json export module, reporting selected quantities).
+# With --validate-only (or without the text output file), only the validity and the structure
+# of the JSON Lines file are checked.
 #
 import argparse
 import json
 import re
 import sys
+
+
+def check_structure(name, lineno, step):
+    """Checks the nesting of a step line, exits on error."""
+    def fail(msg):
+        sys.exit(f'{name}:{lineno}: {msg}')
+    for key in ('step', 'time', 'metastep', 'solution_time'):
+        if key not in step:
+            fail(f'step without "{key}"')
+    for domain in step.get('domains', []):
+        if not isinstance(domain.get('number'), int):
+            fail('domain without number')
+        for section in ('dofmans', 'elements', 'reactions'):
+            records = domain.get(section, [])
+            if not isinstance(records, list):
+                fail(f'section {section} is not a list')
+            for rec in records:
+                if not isinstance(rec, dict) or 'number' not in rec:
+                    fail(f'record of section {section} without number')
+        for elem in domain.get('elements', []):
+            for ir in elem.get('integration_rules', []):
+                if 'number' not in ir or not isinstance(ir.get('gps'), list):
+                    fail(f'element {elem["number"]}: integration rule without number or gps')
+                for gp in ir['gps']:
+                    if 'number' not in gp:
+                        fail(f'element {elem["number"]}: integration point without number')
 
 
 def read_jsonl(name):
@@ -27,10 +58,12 @@ def read_jsonl(name):
             except json.JSONDecodeError as e:
                 sys.exit(f'{name}:{i}: invalid JSON: {e}')
             if not isinstance(rec, dict) or 'kind' not in rec:
-                sys.exit(f'{name}:{i}: record without "kind"')
+                sys.exit(f'{name}:{i}: line without "kind"')
+            if rec['kind'] == 'step':
+                check_structure(name, i, rec)
             records.append(rec)
     if not records or records[0]['kind'] != 'header' or records[-1]['kind'] != 'footer':
-        sys.exit(f'{name}: missing header or footer record')
+        sys.exit(f'{name}: missing header or footer line')
     return records
 
 
@@ -62,48 +95,54 @@ def read_out(name):
     return steps
 
 
+def json_step_values(step):
+    """Returns the DOF values of a step line, keyed as in read_out."""
+    dofs = {}
+    for domain in step.get('domains', []):
+        for rec in domain.get('dofmans', []):
+            for dof in rec.get('dofs', []):
+                dofs[(rec['number'], dof['id'])] = {k: v for k, v in dof.items() if k not in ('id', 'name')}
+    return dofs
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('jsonl')
     parser.add_argument('out', nargs='?')
     parser.add_argument('--tol', type=float, default=1.e-6)
+    parser.add_argument('--subset', action='store_true', help='compare only values present in the JSON file')
     parser.add_argument('--validate-only', action='store_true')
     args = parser.parse_args()
 
     records = read_jsonl(args.jsonl)
+    json_steps = [json_step_values(r) for r in records if r['kind'] == 'step']
     if args.validate_only or not args.out:
-        nsteps = sum(1 for r in records if r['kind'] == 'step')
-        if nsteps == 0:
-            sys.exit('no step records')
-        print(f'OK: {len(records)} valid records, {nsteps} steps')
+        if not json_steps:
+            sys.exit('no step lines')
+        print(f'OK: {len(records)} valid lines, {len(json_steps)} steps')
         return
     text_steps = read_out(args.out)
-
-    json_steps = []
-    for rec in records:
-        if rec['kind'] == 'step':
-            json_steps.append({})
-        elif rec['kind'] == 'dofman':
-            for dof in rec.get('dofs', []):
-                values = {k: v for k, v in dof.items() if k not in ('id', 'name')}
-                json_steps[-1][(rec['number'], dof['id'])] = values
 
     if len(json_steps) != len(text_steps):
         sys.exit(f'number of steps differs: json {len(json_steps)}, text {len(text_steps)}')
 
     checked = 0
-    for istep, (js, ts) in enumerate(zip(json_steps, text_steps), 1):
-        for key, tvals in ts.items():
-            if key not in js:
-                sys.exit(f'step {istep}: dofman {key[0]} dof {key[1]} missing in json output')
-            for unknown, tval in tvals.items():
-                jval = js[key].get(unknown)
+    for istep, (jdofs, tdofs) in enumerate(zip(json_steps, text_steps), 1):
+        keys = jdofs.keys() if args.subset else tdofs.keys()
+        for key in keys:
+            if key not in jdofs or key not in tdofs:
+                where = 'json' if key not in jdofs else 'text'
+                sys.exit(f'step {istep}: dofman {key[0]} dof {key[1]} missing in {where} output')
+            for unknown, tval in tdofs[key].items():
+                if args.subset and unknown not in jdofs[key]:
+                    continue
+                jval = jdofs[key].get(unknown)
                 if jval is None or abs(jval - tval) > args.tol * max(1., abs(tval)):
                     sys.exit(f'step {istep}: dofman {key[0]} dof {key[1]} {unknown}: json {jval}, text {tval}')
                 checked += 1
     if checked == 0:
         sys.exit('no values compared')
-    print(f'OK: {len(records)} records, {len(json_steps)} steps, {checked} values compared')
+    print(f'OK: {len(records)} lines, {len(json_steps)} steps, {checked} values compared')
 
 
 if __name__ == '__main__':

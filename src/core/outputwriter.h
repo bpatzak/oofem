@@ -57,11 +57,13 @@ class EngngModel;
  * format. The interface is a streaming one: the data are passed to the writer as they are
  * reported, so no intermediate containers need to be allocated by the components.
  *
- * The output is organized as follows:
+ * The output is organized hierarchically:
  * - the output of a solution step is enclosed by beginStep / endStep,
- * - the output of a domain by beginDomain / endDomain,
- * - the output of a single component (dof manager, element, ...) is a record,
- *   enclosed by beginRecord / endRecord,
+ * - within a step, the output of each domain is enclosed by beginDomain / endDomain,
+ * - within a domain, the components are reported in sections (beginSection / endSection),
+ *   e.g. "dofmans", "elements", "reactions",
+ * - within a section, the output of a single component (dof manager, element, ...)
+ *   is a record, enclosed by beginRecord / endRecord,
  * - within a record, data are reported as named fields; data can be structured
  *   using lists (beginList / endList) of groups (beginGroup / endGroup), for example
  *   a list of integration points of an element, each represented by a group of fields.
@@ -88,19 +90,25 @@ public:
     virtual void beginStep(TimeStep *tStep, double time) = 0;
     /// Ends the output of the solution step.
     virtual void endStep() = 0;
-    /// Begins the output of the domain.
+    /// Begins the output of the domain (within a step).
     virtual void beginDomain(int number) = 0;
     /// Ends the output of the domain.
     virtual void endDomain() = 0;
+    /**
+     * Begins a named section of records within the domain
+     * (e.g. "dofmans", "elements", "reactions").
+     */
+    virtual void beginSection(const char *name) = 0;
+    /// Ends the section.
+    virtual void endSection() = 0;
 
     /**
-     * Begins the record (the output of a single component).
-     * @param kind Kind of the record (e.g. "dofman", "element", "reaction").
+     * Begins the record (the output of a single component) within the current section.
      * @param number Number of the component (0 if not applicable).
      * @param label Label of the component (0 if not applicable).
      * @param className Class name of the component (may be nullptr).
      */
-    virtual void beginRecord(const char *kind, int number, int label, const char *className = nullptr) = 0;
+    virtual void beginRecord(int number, int label, const char *className = nullptr) = 0;
     /// Ends the record.
     virtual void endRecord() = 0;
 
@@ -118,6 +126,7 @@ public:
 
     ///@name Fields. The name is ignored for items of lists.
     //@{
+    virtual void field(const char *name, bool value) = 0;
     virtual void field(const char *name, int value) = 0;
     virtual void field(const char *name, double value) = 0;
     virtual void field(const char *name, const char *value) = 0;
@@ -136,29 +145,35 @@ public:
 
 
 /**
- * Writer producing JSON Lines (https://jsonlines.org): every record is written
- * as a single JSON object on a separate line. Each record contains the full context
- * (time, step, domain), so that the records can be filtered independently,
- * e.g. using jq.
+ * Writer producing JSON Lines (https://jsonlines.org).
  *
- * Besides the records reported by components, the writer produces
- * the "header" record (at the beginning), the "step" record (at the beginning of each
- * solution step) and the "footer" record (at the end).
+ * The output of every solution step is written as a single JSON object on a separate line,
+ * nested according to the structure of the output:
+ * @code
+ * {"kind":"step","step":1,"time":1.0,"metastep":1,"solution_time":1.0,
+ *  "domains":[{"number":1,
+ *              "dofmans":[{"number":1,"label":1,"class":"Node",...}, ...],
+ *              "elements":[{"number":1,"label":1,"class":"Truss1d",...}, ...]}]}
+ * @endcode
+ * Sections become arrays of the domain object, records become objects (items of the section array).
+ * Besides the step lines, the writer produces the "header" line (at the beginning)
+ * and the "footer" line (at the end). Every line is a complete JSON object, so the file can be
+ * processed step by step (e.g. using jq), and all finished steps remain readable
+ * if the analysis is interrupted.
+ *
+ * The data are written directly to the stream as they are reported (nothing is buffered
+ * by the writer), the stream is flushed by the owner (see JsonFile) at the end of each step.
  */
 class OOFEM_EXPORT JsonLinesWriter : public OutputWriter
 {
 protected:
     FILE *stream;
-    /// Context of the current step (preformatted JSON members).
-    std :: string stepContext;
-    /// Current domain number (0 = none).
-    int domain;
-    /// Buffer of the current record.
-    std :: string buffer;
-    /// Stack of nesting levels; true if the level is a list, false for an object.
+    /// Stack of nesting levels of the current step line; true if the level is a list, false for an object.
     std :: vector< bool >isList;
     /// Stack of flags indicating that no member has been written at the given level yet.
     std :: vector< bool >isFirst;
+    /// True if the "domains" list of the current step has been opened.
+    bool domainsOpen;
 
 public:
     JsonLinesWriter(FILE *stream);
@@ -167,17 +182,20 @@ public:
     void beginOutput(EngngModel *emodel) override;
     void endOutput(EngngModel *emodel) override;
     void beginStep(TimeStep *tStep, double time) override;
-    void endStep() override { stepContext.clear(); }
-    void beginDomain(int number) override { domain = number; }
-    void endDomain() override { domain = 0; }
-    void beginRecord(const char *kind, int number, int label, const char *className = nullptr) override;
-    void endRecord() override;
+    void endStep() override;
+    void beginDomain(int number) override;
+    void endDomain() override;
+    void beginSection(const char *name) override { this->beginList(name); }
+    void endSection() override { this->endList(); }
+    void beginRecord(int number, int label, const char *className = nullptr) override;
+    void endRecord() override { this->endGroup(); }
     void beginList(const char *name) override;
     void endList() override;
     void beginGroup(const char *name = nullptr) override;
     void endGroup() override;
 
     using OutputWriter :: field;
+    void field(const char *name, bool value) override;
     void field(const char *name, int value) override;
     void field(const char *name, double value) override;
     void field(const char *name, const char *value) override;
@@ -191,9 +209,17 @@ public:
     static std :: string number(double value);
 
 protected:
-    /// Writes the name of the member (if in object) and handles separators.
+    /// Writes given text to the stream.
+    void put(const std :: string &text) { fputs(text.c_str(), stream); }
+    /// Writes the separator (if needed) and the name of the member (if in object).
     void key(const char *name);
-    /// Writes a complete stand-alone record line with given kind and members.
+    /// Writes the separator and the opening bracket of a new item of the current list, and pushes the level.
+    void open(const char *name, bool list);
+    /// Writes the closing bracket of the current level and pops it.
+    void close(bool list);
+    /// Returns true if the current level is managed by the step/domain services (can not be closed by endList/endGroup).
+    bool isReservedLevel() const;
+    /// Writes a complete stand-alone line with given kind and members (header, footer).
     void writeLine(const char *kind, const std :: string &members);
 };
 

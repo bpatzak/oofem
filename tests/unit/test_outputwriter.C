@@ -38,6 +38,7 @@
 #include "floatarray.h"
 #include "floatmatrix.h"
 #include "intarray.h"
+#include "timestep.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <cstdio>
@@ -60,13 +61,18 @@ TEST_CASE("JsonLinesWriter escapes strings and numbers", "[outputwriter]")
     REQUIRE(std :: stod(JsonLinesWriter :: number(0.1)) == 0.1);
 }
 
-TEST_CASE("JsonLinesWriter writes one line per record", "[outputwriter]")
+TEST_CASE("JsonLinesWriter writes one nested line per step", "[outputwriter]")
 {
     std :: string text = captureOutput([] (FILE *f) {
         JsonLinesWriter w(f);
+        TimeStep tStep(2, nullptr, 1, 2.0, 1.0, 0);
+        tStep.solutionTime = 0.5;
+        w.beginStep(& tStep, 2.0);
         w.beginDomain(1);
-        w.beginRecord("element", 3, 7, "Truss1d");
+        w.beginSection("elements");
+        w.beginRecord(3, 7, "Truss1d");
         w.field("i", 2);
+        w.field("b", true);
         w.field("s", "x");
         FloatArray a(2);
         a.at(1) = 1.;
@@ -89,15 +95,27 @@ TEST_CASE("JsonLinesWriter writes one line per record", "[outputwriter]")
         w.beginGroup("g");
         w.endGroup();
         w.endRecord();
-        w.endDomain();
-        w.beginRecord("reaction", 0, 0);
+        w.beginRecord(0, 0);
         w.endRecord();
+        w.endSection();
+        w.beginSection("reactions");
+        w.endSection();
+        w.endDomain();
+        w.beginDomain(2);
+        w.endDomain();
+        w.endStep();
+        // a step without domains
+        w.beginStep(& tStep, 3.0);
+        w.endStep();
     });
     std :: string e = "1.0000000000000000e+00", z = "0.0000000000000000e+00", two = "2.0000000000000000e+00";
+    std :: string three = "3.0000000000000000e+00", half = "5.0000000000000000e-01";
     REQUIRE(text ==
-            "{\"kind\":\"element\",\"domain\":1,\"number\":3,\"label\":7,\"class\":\"Truss1d\","
-            "\"i\":2,\"s\":\"x\",\"a\":[" + e + "," + two + "],\"ia\":[4,5],"
+            "{\"kind\":\"step\",\"step\":2,\"time\":" + two + ",\"metastep\":1,\"solution_time\":" + half + ","
+            "\"domains\":[{\"number\":1,\"elements\":[{\"number\":3,\"label\":7,\"class\":\"Truss1d\","
+            "\"i\":2,\"b\":true,\"s\":\"x\",\"a\":[" + e + "," + two + "],\"ia\":[4,5],"
             "\"m\":[[" + e + "," + z + "],[" + z + "," + two + "]],"
-            "\"gp\":[{\"number\":1},{\"number\":2,\"text\":\"t\"}],\"g\":{}}\n"
-            "{\"kind\":\"reaction\"}\n");
+            "\"gp\":[{\"number\":1},{\"number\":2,\"text\":\"t\"}],\"g\":{}},{}],\"reactions\":[]},"
+            "{\"number\":2}]}\n"
+            "{\"kind\":\"step\",\"step\":2,\"time\":" + three + ",\"metastep\":1,\"solution_time\":" + half + "}\n");
 }
