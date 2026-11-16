@@ -338,6 +338,14 @@ public:
      * @param scale Scaling factor applied to the value.
      */
     void reportOutputAt(OutputWriter &writer, TimeStep *tStep, const char *name, ValueModeType mode, double scale = 1.0);
+    /**
+     * Reports the receiver as a group (item of the "dofs" list of a dof manager, structured output):
+     * the DOF identification ("id", "name") followed by its unknowns, as reported by the
+     * engineering model (see EngngModel::reportDofOutputAt).
+     * @param writer Output writer.
+     * @param tStep Time step.
+     */
+    void reportOutput(OutputWriter &writer, TimeStep *tStep);
     void printSingleOutputWithAdditionAt(FILE *File, TimeStep *tStep, char ch, ValueModeType mode, double addend);
     /// Prints the receiver state on stdout.
     virtual void printYourself();

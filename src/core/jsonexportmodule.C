@@ -69,12 +69,14 @@ public:
 
     void reportDofManager(OutputWriter &w, DofManager *dman, TimeStep *tStep) override
     {
+        // same structure as the full output, limited to the selected DOFs
+        w.beginList("dofs");
         for ( int id : dofs ) {
             if ( dman->hasDofID( ( DofIDItem ) id ) ) {
-                w.field( __DofIDItemToString( ( DofIDItem ) id ),
-                         dman->giveDofWithID(id)->giveUnknown(VM_Total, tStep) );
+                dman->giveDofWithID(id)->reportOutput(w, tStep);
             }
         }
+        w.endList();
     }
 
     void reportElement(OutputWriter &w, Element *elem, TimeStep *tStep) override

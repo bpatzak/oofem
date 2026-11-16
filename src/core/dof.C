@@ -35,6 +35,8 @@
 #include "dof.h"
 #include "outputwriter.h"
 #include "dofmanager.h"
+#include "domain.h"
+#include "engngm.h"
 #include "timestep.h"
 #include "boundarycondition.h"
 #include "initialcondition.h"
@@ -108,6 +110,17 @@ void Dof :: printMultipleOutputAt(FILE *File, TimeStep *tStep, char *ch,
 void Dof :: reportOutputAt(OutputWriter &writer, TimeStep *tStep, const char *name, ValueModeType mode, double scale)
 {
     writer.field(name, scale * this->giveUnknown(mode, tStep));
+}
+
+
+void Dof :: reportOutput(OutputWriter &writer, TimeStep *tStep)
+{
+    writer.beginGroup();
+    writer.field( "id", ( int ) this->giveDofID() );
+    writer.field( "name", __DofIDItemToString( this->giveDofID() ) );
+    // the engineering model decides which unknowns are reported (e.g. velocities in dynamics)
+    dofManager->giveDomain()->giveEngngModel()->reportDofOutputAt(writer, this, tStep);
+    writer.endGroup();
 }
 
 
