@@ -284,6 +284,19 @@ public:
 };
 
 
+/**
+ * Parses a dictionary value written as a Python/JSON-like literal, e.g. "{a: 0.8, e: 0.5}".
+ * Pairs are separated by commas and/or whitespace (a trailing comma is accepted), "{}" is empty.
+ * A key is an integer or a single character, optionally quoted ('a' or "a"); a character key
+ * is stored as its character code, the same as in the size-prefixed syntax "2 a 0.8 e 0.5".
+ * Shared by the text and XML input records.
+ * @param s Value to parse (surrounding whitespace is ignored).
+ * @param answer Receives the parsed pairs (cleared first).
+ * @param error Set to a short description of the problem when parsing fails.
+ * @return True on success.
+ */
+OOFEM_EXPORT bool parseDictionaryLiteral(const std::string &s, Dictionary &answer, std::string &error);
+
 class BadFormatInputException : public InputException
 {
 protected:

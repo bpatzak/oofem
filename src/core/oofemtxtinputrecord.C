@@ -47,9 +47,119 @@
 #include <cctype>
 #include <ostream>
 #include <sstream>
+#include <vector>
 
 
 namespace oofem {
+
+namespace {
+/// Strict conversion of a complete entry to int; fails on empty input or trailing characters.
+bool toNumber(const std :: string &s, int &value)
+{
+    char *endptr;
+    value = (int) strtol(s.c_str(), & endptr, 10);
+    return endptr != s.c_str() && *endptr == 0;
+}
+
+/// Strict conversion of a complete entry to double; fails on empty input or trailing characters.
+bool toNumber(const std :: string &s, double &value)
+{
+    char *endptr;
+    value = strtod(s.c_str(), & endptr);
+    return endptr != s.c_str() && *endptr == 0;
+}
+
+/**
+ * Parses a list value enclosed in a pair of brackets, e.g. "[1 2, 3; 4 5 6]" or "{1 2; 3 4}".
+ * Rows are separated by ';', entries within a row by whitespace and/or a single ','
+ * (Matlab style). A trailing ';' is accepted, "[]" yields no rows.
+ * @param tok Token to parse; it must start with @a open and end with @a close.
+ * @param rows Parsed values, one vector per row (rows may differ in length; callers check).
+ * @return False if the token is malformed (missing brackets, empty row or entry, bad number).
+ */
+template< class T >
+bool parseList(const char *tok, char open, char close, std :: vector< std :: vector< T > > &rows)
+{
+    rows.clear();
+    if ( tok == nullptr ) {
+        return false;
+    }
+
+    std :: string s(tok);
+    auto first = s.find_first_not_of(" \t\r\n");
+    auto last = s.find_last_not_of(" \t\r\n");
+    if ( first == std :: string :: npos || last == first || s [ first ] != open || s [ last ] != close ) {
+        return false;
+    }
+
+    std :: string body = s.substr(first + 1, last - first - 1);
+    auto bodyEnd = body.find_last_not_of(" \t\r\n");
+    if ( bodyEnd == std :: string :: npos ) {
+        return true; // empty list
+    }
+    if ( body [ bodyEnd ] == ';' ) {
+        bodyEnd--; // accept a single trailing row separator, as Matlab does: "[1 2; 3 4;]"
+    }
+    body.resize(bodyEnd + 1);
+
+    std :: istringstream rowStream(body);
+    std :: string rowStr;
+    while ( std :: getline(rowStream, rowStr, ';') ) {
+        std :: vector< T >row;
+        bool pendingComma = false; // a ',' must be followed by an entry
+        std :: size_t i = 0, n = rowStr.size();
+        while ( i < n ) {
+            char c = rowStr [ i ];
+            if ( isspace( ( unsigned char ) c ) ) {
+                i++;
+            } else if ( c == ',' ) {
+                if ( row.empty() || pendingComma ) {
+                    return false; // leading or doubled comma
+                }
+                pendingComma = true;
+                i++;
+            } else {
+                std :: size_t j = i;
+                while ( j < n && rowStr [ j ] != ',' && !isspace( ( unsigned char ) rowStr [ j ] ) ) {
+                    j++;
+                }
+                T value;
+                if ( !toNumber(rowStr.substr(i, j - i), value) ) {
+                    return false;
+                }
+                row.push_back(value);
+                pendingComma = false;
+                i = j;
+            }
+        }
+
+        if ( pendingComma || row.empty() ) {
+            return false; // trailing comma or empty row
+        }
+        rows.push_back(std :: move(row) );
+    }
+
+    return true;
+}
+
+/// Parses a Matlab-style array value "[v1 v2 ...]"; returns false if malformed or if it has more than one row.
+template< class T >
+bool parseBracketArray(const char *tok, std :: vector< T > &values)
+{
+    std :: vector< std :: vector< T > >rows;
+    if ( !parseList(tok, '[', ']', rows) || rows.size() > 1 ) {
+        return false;
+    }
+    values = rows.empty() ? std :: vector< T >() : std :: move(rows [ 0 ]);
+    return true;
+}
+
+/// True if the token is a Matlab-style bracketed value.
+bool isBracketValue(const char *tok)
+{
+    return tok != nullptr && tok [ 0 ] == '[';
+}
+} // end anonymous namespace
 
 OOFEMTXTInputRecord :: OOFEMTXTInputRecord() : tokenizer(), record()
 { }
@@ -240,6 +350,22 @@ OOFEMTXTInputRecord :: giveField(IntArray &answer, InputFieldType id)
     traceField(id,"IntArray");
     int indx = this->giveKeywordIndx(id);
     if ( indx ) {
+        if ( isBracketValue(tokenizer.giveToken(indx + 1) ) ) {
+            // Matlab-style "[1 2 3]", size given by the number of entries
+            std :: vector< int >values;
+            if ( !parseBracketArray(tokenizer.giveToken(indx + 1), values) ) {
+                throw BadFormatInputException(shared_from_this(), id, lineNumber);
+            }
+            answer.resize( ( int ) values.size() );
+            for ( std :: size_t i = 0; i < values.size(); i++ ) {
+                answer [ i ] = values [ i ];
+            }
+            setReadFlag(indx);
+            setReadFlag(indx + 1);
+            return;
+        }
+
+        // "size v1 v2 ... vsize"
         int size;
         setReadFlag(indx);
         auto ptr = scanInteger(tokenizer.giveToken(++indx), size);
@@ -272,6 +398,22 @@ OOFEMTXTInputRecord :: giveField(FloatArray &answer, InputFieldType id)
     traceField(id,"FloatArray");
     int indx = this->giveKeywordIndx(id);
     if ( indx ) {
+        if ( isBracketValue(tokenizer.giveToken(indx + 1) ) ) {
+            // Matlab-style "[1.0 2.0 3.0]", size given by the number of entries
+            std :: vector< double >values;
+            if ( !parseBracketArray(tokenizer.giveToken(indx + 1), values) ) {
+                throw BadFormatInputException(shared_from_this(), id, lineNumber);
+            }
+            answer.resize( ( int ) values.size() );
+            for ( std :: size_t i = 0; i < values.size(); i++ ) {
+                answer [ i ] = values [ i ];
+            }
+            setReadFlag(indx);
+            setReadFlag(indx + 1);
+            return;
+        }
+
+        // "size v1 v2 ... vsize"
         int size;
         setReadFlag(indx);
         auto ptr = scanInteger(tokenizer.giveToken(++indx), size);
@@ -321,6 +463,30 @@ OOFEMTXTInputRecord :: giveField(FloatMatrix &answer, InputFieldType id)
     traceField(id,"FloatMatrix");
     int indx = this->giveKeywordIndx(id);
     if ( indx ) {
+        if ( isBracketValue(tokenizer.giveToken(indx + 1) ) ) {
+            // Matlab-style "[a11 a12; a21 a22]", dimensions given by the contents
+            std :: vector< std :: vector< double > >rows;
+            if ( !parseList(tokenizer.giveToken(indx + 1), '[', ']', rows) ) {
+                throw BadFormatInputException(shared_from_this(), id, lineNumber);
+            }
+            int nrows = ( int ) rows.size();
+            int ncols = nrows ? ( int ) rows [ 0 ].size() : 0;
+            answer.resize(nrows, ncols);
+            for ( int i = 0; i < nrows; i++ ) {
+                if ( ( int ) rows [ i ].size() != ncols ) {
+                    OOFEM_WARNING("row %d has %d columns, expected %d", i + 1, ( int ) rows [ i ].size(), ncols);
+                    throw BadFormatInputException(shared_from_this(), id, lineNumber);
+                }
+                for ( int j = 0; j < ncols; j++ ) {
+                    answer(i, j) = rows [ i ] [ j ];
+                }
+            }
+            setReadFlag(indx);
+            setReadFlag(indx + 1);
+            return;
+        }
+
+        // "nrows ncols {a11 a12; a21 a22}"
         int nrows, ncols;
         setReadFlag(indx);
 
@@ -377,6 +543,20 @@ OOFEMTXTInputRecord :: giveField(Dictionary &answer, InputFieldType id)
     traceField(id,"Dictionary");
     int indx = this->giveKeywordIndx(id);
     if ( indx ) {
+        const char *value = tokenizer.giveToken(indx + 1);
+        if ( value != nullptr && value [ 0 ] == '{' ) {
+            // Python/JSON-like literal "{a: 0.8, e: 0.5}", number of pairs given by the contents
+            std :: string error;
+            if ( !parseDictionaryLiteral(value, answer, error) ) {
+                OOFEM_WARNING("%s", error.c_str() );
+                throw BadFormatInputException(shared_from_this(), id, lineNumber);
+            }
+            setReadFlag(indx);
+            setReadFlag(indx + 1);
+            return;
+        }
+
+        // "size key1 value1 ... keysize valuesize"
         setReadFlag(indx);
         int size;
         auto ptr = scanInteger(tokenizer.giveToken(++indx), size);
@@ -649,59 +829,33 @@ OOFEMTXTInputRecord :: readRange(const char **helpSource, int &li, int &hi)
 int
 OOFEMTXTInputRecord :: readMatrix(const char *helpSource, int r, int c, FloatMatrix &ans)
 {
-    const char *endptr = helpSource;
+    // "{a11 a12 ...; a21 a22 ...}": rows separated by ';', columns by whitespace or ','
+    std :: vector< std :: vector< double > >rows;
+    if ( !parseList(helpSource, '{', '}', rows) ) {
+        OOFEM_WARNING("malformed matrix value, expected {a11 a12 ...; a21 a22 ...}");
+        ans.clear();
+        return 0;
+    }
 
-    if ( helpSource == NULL ) {
+    if ( ( int ) rows.size() != r ) {
+        OOFEM_WARNING("matrix value has %d rows, %d declared", ( int ) rows.size(), r);
         ans.clear();
         return 0;
     }
 
     ans.resize(r, c);
-    // skip whitespaces
-    while ( isspace(* endptr) ) {
-        ( endptr )++;
-    }
-
-    if ( * endptr == '{' ) {
-        // range left parenthesis found
-        ( endptr )++;
-        // read row by row separated by semicolon
-        for ( int i = 1; i <= r; i++ ) {
-            for ( int j = 1; j <= c; j++ ) {
-                endptr = scanDouble( endptr, ans.at(i, j) );
-            }
-
-            if ( i < r ) {
-                // skip whitespaces
-                while ( isspace(* endptr) ) {
-                    ( endptr )++;
-                }
-
-                // test for row terminating semicolon
-                if ( * endptr == ';' ) {
-                    ( endptr )++;
-                } else {
-                    OOFEM_WARNING("missing row terminating semicolon");
-                    return 0;
-                }
-            }
-        }
-
-        // skip whitespaces
-        while ( isspace(* endptr) ) {
-            ( endptr )++;
-        }
-
-        // test for enclosing bracket
-        if ( * endptr == '}' ) {
-            return 1;
-        } else {
-            OOFEM_WARNING("end '}' missing while parsing matrix value");
+    for ( int i = 0; i < r; i++ ) {
+        if ( ( int ) rows [ i ].size() != c ) {
+            OOFEM_WARNING("matrix row %d has %d columns, %d declared", i + 1, ( int ) rows [ i ].size(), c);
+            ans.clear();
             return 0;
         }
-    } else {
-        return 0;
+        for ( int j = 0; j < c; j++ ) {
+            ans(i, j) = rows [ i ] [ j ];
+        }
     }
+
+    return 1;
 }
 
 #ifdef _USE_TRACE_FIELDS

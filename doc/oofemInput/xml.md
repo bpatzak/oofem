@@ -42,14 +42,14 @@ Since attributes in XML are string-only, here we describe how other types are re
   - true (`1`, `y`, `Y` and a few others), false (`0`, `n`, `N` and others)
   - unrecognized value produces error
 - - 1D arrays (ints, floats)
-  - space-separated
-  -
+  - separated by spaces and/or commas, optionally enclosed in Matlab-style brackets
+  - e.g. `1 4 23`, `[1 4 23]` or `[1.0, 2.0, 3.0]`; `[]` is an empty array
 - - 2D matrices
-  - colon-separated rows, space-separated elements
-  - e.g. `a11 a21; a12 a22`
+  - semicolon-separated rows, elements separated by spaces and/or commas, optionally enclosed in brackets
+  - e.g. `a11 a12; a21 a22` or `[a11, a12; a21, a22]`
 - - dictionaries
-  - colon-separated items, space-separated key and value
-  - e.g `key1 value; key2 value`
+  - semicolon-separated items, space-separated key and value; or a Python/JSON-like literal
+  - e.g `a 0.8; e 0.5` or `{a: 0.8, e: 0.5}`
 - - ranges
   - comma-separated items or contiguous ranges with dash (minus)
   - e.g. `1-4,7,9-11`; as alternative: `1..4,7,9..1`
