@@ -44,3 +44,28 @@ def test_qt_frontend(tmp_path, monkeypatch):
     ctl.remove_chart(1)
     assert sorted(fe.views) == [2, spec.id]
 
+
+
+def test_tk_frontend(tmp_path):
+    tkinter = pytest.importorskip("tkinter")
+    pytest.importorskip("matplotlib")
+    try:
+        root = tkinter.Tk()
+        root.destroy()
+    except tkinter.TclError:
+        pytest.skip("no display")
+    from oofemprogress.fe_tk import TkFrontend
+    fe = TkFrontend()
+    ctl = ViewerController(str(write_run(tmp_path)), fe)
+    fe.build(ctl)
+    ctl._rebuild_views()
+    ctl.update()
+    fe.flush()
+    assert fe.info_vars["job"].get() == "j.out"
+    spec = ctl.add_chart(ChartSpec(x="time", y=["u2_D_u"], logy=True))
+    fe.flush()
+    assert len(fe.figure.axes) == 3
+    ctl.remove_chart(spec.id)
+    fe.flush()
+    assert len(fe.figure.axes) == 2
+    fe.root.destroy()
