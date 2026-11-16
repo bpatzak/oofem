@@ -204,6 +204,7 @@ set (core_export
     matlabexportmodule.C
     gpexportmodule.C
     solutionstatusexportmodule.C
+    solutionprogressexportmodule.C
     vtkhdf5exportmodule.C
     )
 
