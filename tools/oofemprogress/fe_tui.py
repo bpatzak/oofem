@@ -143,8 +143,8 @@ class TuiFrontend(Frontend):
             try:
                 from .tui_plotext import render_chart
                 return render_chart
-            except ImportError:
-                self.msg = "plotext not available, using braille renderer"
+            except ImportError as e:
+                self.msg = "plotext renderer not available (%s), using braille renderer" % e
                 self.renderer = "braille"
         mode = "ascii" if self.renderer == "ascii" else "braille"
 
