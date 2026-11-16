@@ -159,12 +159,34 @@ class TkFrontend(Frontend):
         self._build_info()
         self.figure = Figure(layout="constrained")
         self.canvas = FigureCanvasTkAgg(self.figure, master=self.root)
+        self._keep_default_cursor()
         nav = NavigationToolbar2Tk(self.canvas, self.root, pack_toolbar=False)
         nav.update()
         nav.pack(side=tk.BOTTOM, fill=tk.X)
         self.status = ttk.Label(self.root, anchor="w")
         self.status.pack(side=tk.BOTTOM, fill=tk.X)
         self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+    def _keep_default_cursor(self):
+        """Keeps the inherited (system) cursor over the charts instead of matplotlib's
+        explicit 'arrow' and the 'watch' it shows while drawing.
+
+        matplotlib switches to 'watch' and back to 'arrow' for every redraw that comes more
+        than a second after the previous one, which happens on every update of a live viewer.
+        Tk creates these cursors from the X cursor font; some X servers (notably WSLg on
+        Windows) do not display them, so the cursor disappears after the first update.
+        Zoom and pan keep matplotlib's cursors.
+        """
+        from matplotlib.backend_tools import Cursors
+        widget = self.canvas.get_tk_widget()
+        set_cursor = self.canvas.set_cursor
+
+        def keep_default(cursor):
+            if cursor in (Cursors.POINTER, Cursors.WAIT):
+                widget.configure(cursor="")
+            else:
+                set_cursor(cursor)
+        self.canvas.set_cursor = keep_default
 
     def _build_toolbar(self):
         bar = ttk.Frame(self.root, padding=(6, 4))
