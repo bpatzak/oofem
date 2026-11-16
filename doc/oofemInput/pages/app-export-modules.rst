@@ -135,13 +135,14 @@ jsonoutput
 ~~~~~~~~~~
 
 Structured output of the full state of the model in the `JSON Lines
-<https://jsonlines.org>`_ format: every record is a single JSON object on a
-separate line.  The module reports the same information as the standard text
-output, in a form that can be processed by tools like ``jq`` or by a few lines
-of Python.
+<https://jsonlines.org>`_ format: the output of every solution step is a single
+JSON object on a separate line.  The module reports the same information as the
+standard text output, in a form that can be processed by tools like ``jq`` or by
+a few lines of Python.
 
 The output is written into a single file, ``<output file>.m<n>.jsonl`` by
 default, where ``<n>`` is the number of the module record (starting from 0).
+All domains are reported unless restricted by :param:`domain_mask`.
 
 .. record::
 
@@ -158,41 +159,66 @@ default, where ``<n>`` is the number of the module record (starting from 0).
 
 **Output format**
 
-Each record has the member ``kind`` giving the record type, and the members
-``step``, ``time`` and ``domain`` giving the context, so that each line can be
-filtered independently of the others:
+Every line is a JSON object with the member ``kind``:
 
 ``header``
-    The first record: program version, problem class, description and the
+    The first line: program version, problem class, description and the
     start time of the analysis.
 
 ``step``
-    Starts the output of a solution step: step number, time, metastep and the
-    time consumed by the solution of the step.
+    The output of a solution step: ``step`` number, ``time``, ``metastep``,
+    the time consumed by the solution of the step (``solution_time``) and the
+    list ``domains``.  Each domain contains its ``number`` and the sections
+    (lists of records) described below.
 
-``dofman``
-    A dof manager: ``number``, ``label``, ``class``, the coordinates
+``footer``
+    The last line: real and user time of the analysis in seconds.
+
+The step line is nested as follows (``…`` stands for further items)::
+
+   {"kind":"step","step":1,"time":1.0,"metastep":1,"solution_time":0.01,
+    "domains":[{"number":1,
+      "dofmans":[{"number":2,"label":2,"class":"Node","coords":[2.4,0,0],
+                  "dofs":[{"id":1,"name":"D_u","d":-1.37e-03}, …]}, …],
+      "elements":[{"number":1,"label":1,"class":"Truss1d","active":true,
+                   "integration_rules":[{"number":1,"class":"GaussIntegrationRule",
+                      "gps":[{"number":1,"natural_coords":[0.0],"weight":2.0,
+                              "statuses":[{"class":"…","strains":[…],"stresses":[…]}]}]}]}, …],
+      "reactions":[{"number":1,"label":1,"class":"Node",
+                    "dofs":[{"id":3,"name":"D_w","value":-8.94,"bc":1}]}, …]}]}
+
+``dofmans``
+    Dof managers: ``number``, ``label``, ``class``, the coordinates
     (``coords``, for nodes) and the list ``dofs``.  Each item of the list
     contains the DOF identification (``id``, ``name``) and the unknowns of the
     DOF, named as in the text output (``d`` for the total value of the
     primary unknown; ``v``, ``a`` for velocity and acceleration in dynamic
     problems, …).
 
-``element``
-    An element: ``number``, ``label``, ``class``, the activity flag
-    (``active``), the internal dof managers (``internal_dofmans``) and the list
-    of integration points ``gps``.  Each integration point contains the number
-    of its integration rule (``ir``), its ``number``, natural coordinates
-    (``natural_coords``) and the list of its material ``statuses``; layered
-    integration points contain the list of ``layers``.  Structural material
-    statuses report ``strains`` and ``stresses`` (or ``F`` and ``P`` for large
-    deformations) in full vector form.
+``elements``
+    Elements: ``number``, ``label``, ``class``, the activity flag
+    (``active``), the internal dof managers (``internal_dofmans``) and, for
+    active elements, the list ``integration_rules``.  Each integration rule
+    contains its ``number``, ``class`` and the list of its integration points
+    ``gps``; each integration point its ``number``, natural coordinates
+    (``natural_coords``), ``weight`` and the list of its material
+    ``statuses``; layered integration points contain the list of ``layers``.
+    Structural material statuses report ``strains`` and ``stresses`` (or ``F``
+    and ``P`` for large deformations) in full vector form.
 
-``footer``
-    The last record: real and user time of the analysis in seconds.
+``reactions``
+    Reaction forces of structural problems, one record per supported dof
+    manager (``number``, ``label``, ``class``) with the list ``dofs`` of its
+    restrained DOFs: ``id``, ``name``, reaction ``value`` and the number of the
+    boundary condition (``bc``).
 
 Components which do not report structured data yet report the text of their
 standard output in the member ``text``.
+
+Real numbers are written with 17 significant digits, so the values read from
+the file are exactly the values computed by OOFEM.  The file is flushed after
+every step, so the finished steps can be read while the analysis is running
+(the last line may be incomplete).
 
 **Example**
 
@@ -200,18 +226,11 @@ standard output in the member ``text``.
 
    jsonoutput tstep_all
 
-.. code-block:: none
-
-   {"kind":"dofman","step":1,"time":1.0000000000000000e+00,"domain":1,"number":2,"label":2,"class":"Node","coords":[2.3999999999999999e+00,0.0000000000000000e+00,0.0000000000000000e+00],"dofs":[{"id":1,"name":"D_u","d":-1.3717249464529331e-03}, ...]}
-
-Real numbers are written with 17 significant digits, so the values read from
-the file are exactly the values computed by OOFEM.
-
 The displacements of node 2 in all steps can be extracted, for example, by
 
 .. code-block:: bash
 
-   jq -c 'select(.kind=="dofman" and .number==2) | [.time, (.dofs[] | .d)]' beam2d.out.m0.jsonl
+   jq -c 'select(.kind=="step") | [.time, (.domains[0].dofmans[] | select(.number==2) | .dofs[].d)]' beam2d.out.m0.jsonl
 
 VTK export modules
 ------------------
@@ -343,14 +362,17 @@ JSON export
 -----------
 
 Exports selected quantities in the JSON Lines format (one JSON object per
-line).  In contrast to the ``jsonoutput`` output module, only the quantities
-chosen by the user are exported: values of the selected DOFs at dof managers
-and values of the selected internal state types at the integration points of
-elements.  The records have the same structure as those of ``jsonoutput``
-(``header``, ``step``, ``dofman``, ``element``, ``footer``); the DOF values are
-reported as members named by the DOF (``D_u``, ``D_v``, ``T_f``, …), the
-internal variables as members of the integration point named by the internal
-state type (``IST_StressTensor``, …).
+solution step).  In contrast to the ``jsonoutput`` output module, only the
+quantities chosen by the user are exported: the unknowns of the selected DOFs
+at dof managers, values of the selected internal state types at the
+integration points of elements and, on request, the reaction forces.  The
+output has the same structure as that of ``jsonoutput`` (step → ``domains`` →
+``dofmans`` / ``elements`` / ``reactions``, elements → ``integration_rules`` →
+``gps``), so the same scripts can process both; the records contain only the
+selected quantities.  The DOFs are listed in ``dofs`` as in ``jsonoutput``;
+the internal variables are members of the integration point named by the
+internal state type (``IST_StressTensor``, …).  Sections without selected
+quantities are left out.
 
 The output is written into a single file, ``<output file>.m<n>.jsonl`` by
 default.  All domains are exported unless restricted by :param:`domain_mask`.
@@ -358,8 +380,8 @@ default.  All domains are exported unless restricted by :param:`domain_mask`.
 .. record::
 
    :descitem:`json` :optelemparam:`dofs{ia}` :optelemparam:`vars{ia}`
-   :optelemparam:`node_sets{ia}` :optelemparam:`element_sets{ia}`
-   :optelemparam:`filename{s}`
+   :optelemparam:`reactions` :optelemparam:`node_sets{ia}`
+   :optelemparam:`element_sets{ia}` :optelemparam:`filename{s}`
 
 **Parameters**
 
@@ -371,6 +393,10 @@ default.  All domains are exported unless restricted by :param:`domain_mask`.
     Internal state types to export at integration points, as defined in
     ``src/core/internalstatetype.h``.
 
+:optparam:`reactions`
+    Exports the reaction forces (structural problems), limited to the dof
+    managers of ``node_sets``.
+
 ``node_sets``, ``element_sets``, ``filename``
     As for the ``jsonoutput`` module.
 
@@ -378,10 +404,16 @@ default.  All domains are exported unless restricted by :param:`domain_mask`.
 
 .. code-block:: none
 
-   json tstep_all dofs 2 1 2 vars 2 1 4
+   json tstep_all dofs 2 1 2 vars 2 1 4 reactions
 
-exports the displacements ``D_u`` and ``D_v`` of all nodes and the stress and
-strain tensors at all integration points in every step.
+exports the displacements ``D_u`` and ``D_v`` of all nodes, the stress and
+strain tensors at all integration points and the reaction forces in every
+step.  The stress at the first integration point of element 1 in all steps can
+be extracted by
+
+.. code-block:: bash
+
+   jq -c 'select(.kind=="step") | [.time, (.domains[0].elements[] | select(.number==1) | .integration_rules[0].gps[0].IST_StressTensor[0])]' beam.out.m0.jsonl
 
 Homogenization export
 ---------------------

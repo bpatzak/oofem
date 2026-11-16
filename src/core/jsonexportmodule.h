@@ -59,9 +59,12 @@ namespace oofem {
  * In contrast to JsonOutputModule (which reports the full state of the model),
  * this export module reports only the quantities selected by the user:
  * - dofs: list of DOF identifiers (DofIDItem values, e.g. 1 2 3 for D_u D_v D_w);
- *   their total values are reported for dof managers ("dofman" records),
+ *   their unknowns are reported for dof managers (section "dofmans"),
  * - vars: list of internal state types (InternalStateType values, as in vtkxml);
- *   their values are reported for each integration point of elements ("element" records).
+ *   their values are reported for each integration point of elements (section "elements"),
+ * - reactions: reaction forces (section "reactions", structural problems).
+ * The structure of the output is the same as of JsonOutputModule (one nested line per step,
+ * see JsonLinesWriter), the records contain only the selected quantities.
  *
  * Time steps are selected by the standard export module keywords
  * (tstep_all, tstep_step, tsteps_out, ...), nodes and elements by optional sets

@@ -124,7 +124,8 @@ at the same time:
     Lines, one JSON object per line), see :ref:`json_output`.
 
 ``json``
-    Selected DOF values and internal variables in JSON Lines format.
+    Selected DOF values, internal variables and reaction forces in JSON Lines
+    format, with the same structure as ``jsonoutput``, see :ref:`json_output`.
 
 ``errorcheck``
     Compares results against reference values embedded in the input file. This

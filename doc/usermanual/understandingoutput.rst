@@ -243,30 +243,37 @@ any other module (counted in ``nmodules`` of the analysis record):
     ...
 
 The module writes the file ``beam2d_1.out.m0.jsonl`` (the name can be set by the
-``filename`` keyword) in the `JSON Lines <https://jsonlines.org>`_ format: each
-line is a single JSON object (record). Every record carries its ``kind``
-(``header``, ``step``, ``dofman``, ``element``, ``footer``) and its full context
-(``step``, ``time``, ``domain``), so the lines can be filtered independently:
+``filename`` keyword) in the `JSON Lines <https://jsonlines.org>`_ format: the
+first line (``"kind":"header"``) describes the analysis, the last one
+(``"kind":"footer"``) gives the computational time, and each line in between
+(``"kind":"step"``) is the complete output of one solution step, nested as
+step → ``domains`` → ``dofmans`` / ``elements`` / ``reactions``:
 
 .. code-block:: none
 
-    {"kind":"step","step":1,"time":1.0000000000000000e+00,"metastep":1,"solution_time":1.1542999999999998e-02}
-    {"kind":"dofman","step":1,"time":1.0000000000000000e+00,"domain":1,"number":1,"label":1,"class":"Node","coords":[0.0000000000000000e+00,0.0000000000000000e+00,0.0000000000000000e+00],"dofs":[{"id":1,"name":"D_u","d":-1.3717249464529331e-03},{"id":3,"name":"D_w","d":0.0000000000000000e+00},{"id":5,"name":"R_v","d":-2.3878780160615039e-05}]}
+    {"kind":"step","step":1,"time":1.0000000000000000e+00,"metastep":1,"solution_time":1.1542999999999998e-02,
+     "domains":[{"number":1,
+       "dofmans":[{"number":1,"label":1,"class":"Node","coords":[0.0000000000000000e+00,0.0000000000000000e+00,0.0000000000000000e+00],
+                   "dofs":[{"id":1,"name":"D_u","d":-1.3717249464529331e-03},{"id":3,"name":"D_w","d":0.0000000000000000e+00},{"id":5,"name":"R_v","d":-2.3878780160615039e-05}]}, ...],
+       "elements":[...],
+       "reactions":[{"number":1,"label":1,"class":"Node","dofs":[{"id":3,"name":"D_w","value":-8.9375376858425002e+00,"bc":1}]}, ...]}]}
 
-Unlike the text output, real numbers are written with full precision (17
-significant digits), so the values read from the file are exactly the computed
-ones.
+(the line is broken here for readability). Unlike the text output, real numbers
+are written with full precision (17 significant digits), so the values read
+from the file are exactly the computed ones.
 
-Elements report the list of their integration points (``gps``), each with the
-list of material ``statuses``; structural statuses report ``strains`` and
-``stresses`` as numeric arrays. Components that do not support structured output
-yet report the text of their standard output in the member ``text``.
+Elements report their integration rules (``integration_rules``), each with the
+list of its integration points (``gps``: number, natural coordinates, weight)
+and every integration point the list of its material ``statuses``; structural
+statuses report ``strains`` and ``stresses`` as numeric arrays. Components that
+do not support structured output yet report the text of their standard output
+in the member ``text``.
 
-The records can be processed with ``jq``:
+The steps can be processed with ``jq``:
 
 .. code-block:: bash
 
-    $ jq -c 'select(.kind=="dofman" and .number==3) | [.step, .dofs[0].d]' beam2d_1.out.m0.jsonl
+    $ jq -c 'select(.kind=="step") | [.step, (.domains[0].dofmans[] | select(.number==3) | .dofs[0].d)]' beam2d_1.out.m0.jsonl
 
 or in Python:
 
@@ -274,12 +281,18 @@ or in Python:
 
     import json
     for line in open('beam2d_1.out.m0.jsonl'):
-        rec = json.loads(line)
-        if rec['kind'] == 'element':
-            for gp in rec['gps']:
-                print(rec['step'], rec['number'], gp['number'], gp['statuses'][0].get('stresses'))
+        step = json.loads(line)
+        if step['kind'] != 'step':
+            continue
+        for domain in step['domains']:
+            for elem in domain['elements']:
+                for ir in elem.get('integration_rules', []):
+                    for gp in ir['gps']:
+                        print(step['step'], elem['number'], ir['number'], gp['number'],
+                              gp['statuses'][0].get('stresses'))
 
 When only a few quantities are needed, the ``json`` export module writes just
-the selected DOF values and internal variables in the same format. The
-``tools/jsonl_check.py`` script checks the validity of a JSON Lines output file
-and compares its DOF values with the text output of the same analysis.
+the selected DOF values, internal variables and reaction forces with the same
+structure. The ``tools/jsonl_check.py`` script checks the validity and structure
+of a JSON Lines output file and compares its DOF values and reaction forces
+with the text output of the same analysis.

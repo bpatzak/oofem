@@ -46,22 +46,46 @@ Structured output
 -----------------
 
 Structured output is produced through the ``OutputWriter`` interface
-(``outputwriter.h``), a streaming output driver. Components report their data
-as records, named fields, lists and groups; the writer translates them into a
-particular format. ``JsonLinesWriter`` writes every record as a single JSON
-object on a separate line. Because the interface is a streaming one, no
-intermediate containers are allocated by the components.
+(``outputwriter.h``), a streaming output driver. The output is hierarchical:
+steps (``beginStep``) contain domains (``beginDomain``), domains contain
+sections of records (``beginSection``, e.g. ``dofmans``, ``elements``,
+``reactions``), a record (``beginRecord``) is the output of one component and
+contains named fields, lists and groups. The writer translates them into a
+particular format. ``JsonLinesWriter`` writes every step as a single nested
+JSON object on a separate line. Because the interface is a streaming one, no
+intermediate containers are allocated by the components or by the writer.
 
-The data are reported by the ``reportOutput(OutputWriter &, TimeStep *)``
-services:
+The JSON modules share the output file handling (``JsonFile``: file name,
+header and footer, step framing) and the traversal of the model:
 
-* ``EngngModel::reportOutputAt`` loops over domains, dof managers and elements,
-  opening a record (``dofman``, ``element``) for each of them,
+* ``EngngModel::reportOutputAt(writer, tStep, filter, content)`` loops over
+  domains, dof managers and elements, opening the domains, sections and a
+  record for each component. The ``OutputFilter`` (``outputselection.h``)
+  selects the domains, node and element sets and the sections; the
+  ``OutputContent`` reports the fields of the records. The default content
+  reports the full state of the components (``DofManager::reportOutput``,
+  ``Element::reportOutput``), used by ``JsonOutputModule``;
+  ``JsonExportModule`` uses its own content reporting only the selected DOFs
+  and internal state types, so both modules produce the same structure.
+* ``EngngModel::reportDomainOutputAt`` is called for each domain after the dof
+  managers and elements; problems report their specific sections here, e.g.
+  ``StructuralEngngModel`` reports the reaction forces
+  (``reportReactionForces``, section ``reactions``) if requested by the
+  filter.
+
+Within the records, the data are reported by the
+``reportOutput(OutputWriter &, TimeStep *)`` services:
+
 * ``FEMComponent::reportOutput`` reports the fields of a component,
+* ``Element::reportIntegrationPoints`` reports the integration rules of an
+  element and their integration points (number, natural coordinates, weight),
+  letting a given function report the data of each point; it is used by
+  ``Element::reportOutput`` and by the json export, so the structure
+  ``integration_rules`` → ``gps`` is the same,
 * ``GaussPoint::reportOutput`` and ``IntegrationPointStatus::reportOutput``
   report integration point data,
-* ``EngngModel::reportDofOutputAt`` reports the unknowns of a DOF
-  (``Dof::reportOutputAt``).
+* ``Dof::reportOutput`` reports a DOF (``id``, ``name``) and its unknowns,
+  given by ``EngngModel::reportDofOutputAt`` (``Dof::reportOutputAt``).
 
 The default implementations of ``FEMComponent::reportOutput`` and
 ``IntegrationPointStatus::reportOutput`` report the text produced by the
@@ -106,6 +130,7 @@ An example of the structured output of a material status:
         writer.field("damage", this->damage);
     }
 
-The ``tools/jsonl_check.py`` script validates the JSON Lines output and
-compares the DOF values with the text output of the same analysis; it is used
-by the regression test ``tests/regression/sm/jsonoutput01.in``.
+The ``tools/jsonl_check.py`` script validates the JSON Lines output (including
+the nesting of the step lines) and compares the DOF values and reaction forces
+with the text output of the same analysis; it is used by the regression tests
+``tests/regression/sm/jsonoutput01.in`` and ``jsonexport01.in``.
