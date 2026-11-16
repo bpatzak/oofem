@@ -41,7 +41,7 @@ A complete example is in [`examples/cyclic_tension.in`](examples/cyclic_tension.
 |---|---|---|
 | `qt` | `PySide6`, `pyqtgraph` (`requirements-qt.txt`) | fast plots, zoom/pan, crosshair, dark theme |
 | `tk` | `tkinter` (part of most Python installs), `matplotlib` (`requirements-tk.txt`) | matplotlib toolbar (zoom, pan, save image) |
-| `tui` | none (standard library) | terminal; braille charts, `--ascii` for fonts without braille, `--tui-renderer plotext` if `plotext<6` is installed (`requirements-tui.txt`) |
+| `tui` | none (standard library) | terminal; braille charts, `--ascii` for fonts without braille, `--tui-renderer plotext` if `plotext>=6` is installed (`requirements-tui.txt`; plotext has a compiled kernel: where it cannot be imported, the viewer falls back to braille) |
 
 The default `--backend auto` uses the first available one in the order qt, tk, tui.
 All frontends work on Linux and Windows 11. For the terminal frontend, use Windows

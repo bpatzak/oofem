@@ -1,2 +1,2 @@
-# optional: nicer terminal charts (--tui-renderer plotext); plotext 6 has an incompatible API
-plotext<6
+# optional: nicer terminal charts (--tui-renderer plotext); plotext 6 object API
+plotext>=6

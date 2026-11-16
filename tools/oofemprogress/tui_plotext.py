@@ -3,38 +3,53 @@
 Has the same signature as the built-in renderer, so the terminal frontend (layout, keys,
 info header) is shared; only the drawing of the chart differs.
 
-Uses the plotext 5.x API (``clf``, ``plotsize``, ``plot``, ``build``). plotext 6 is a rewrite
-with a different API; importing this module raises ImportError in that case and the
-terminal frontend falls back to the built-in renderer.
+Uses the object API of plotext 6 (``plotext.figure`` with ``signal``/``draw``/``build``).
+Importing this module raises ImportError for older plotext versions (or when plotext's
+compiled kernel is not available); the terminal frontend then falls back to the built-in
+braille renderer.
 """
 
-import plotext as plt
+import plotext
 
 from . import tui_canvas
 
-if not all(hasattr(plt, name) for name in ("clf", "plotsize", "plot", "build", "xscale", "yscale", "theme")):
-    raise ImportError("unsupported plotext version (plotext<6 is required)")
+_figure = getattr(plotext, "figure", None)
+if not all(hasattr(_figure, name) for name in ("signal", "draw", "build", "ruler", "plot_size", "line", "clear")):
+    raise ImportError("plotext>=6 is required")
 
-COLORS = ("blue", "red", "green", "magenta", "orange", "cyan", "gray", "violet", "white", "yellow")
+
+def _is_constant(values):
+    return len(values) > 0 and all(v == values[0] for v in values)
 
 
 def render_chart(curves, width, height, title, xlabel, logx, logy, use_color):
-    if not any(c.x for c in curves):
-        # plotext cannot draw an empty plot with log axes; the built-in renderer handles it
+    xs = [v for c in curves for v in c.x]
+    ys = [v for c in curves for v in c.y]
+    # plotext 6 fails on log axes without data or with a zero data range (all values equal, e.g. only
+    # the tolerance line of a converged step); the built-in renderer handles these cases
+    if not xs or (logx and min(xs) == max(xs)) or (logy and min(ys) == max(ys)):
         return tui_canvas.render_chart(curves, width, height, title, xlabel, logx, logy, "braille", use_color)
-    plt.clf()
-    plt.plotsize(width, height)
-    plt.theme("pro" if use_color else "clear")
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.xscale("log" if logx else "linear")
-    plt.yscale("log" if logy else "linear")
-    for i, c in enumerate(curves):
+    fig = plotext.figure
+    fig.clear()  # the master figure is shared: reset data, settings and size from the previous chart
+    fig.plot_size(width, height)
+    fig.title(title)
+    fig.label(xlabel, axis="x")
+    if logx:
+        fig.ruler("x").scale("log")
+    if logy:
+        fig.ruler("y").scale("log")
+    for c in curves:
         if not c.x:
             continue
-        # plotext has no dashed lines; dashed curves (tolerances) are drawn by dots
-        marker = "dot" if c.style == "dash" else "braille"
-        plt.plot(c.x, c.y, label=c.label, marker=marker, color=COLORS[i % len(COLORS)])
-    lines = plt.build().split("\n")
+        if c.style == "dash" and _is_constant(c.y) and len(c.x) >= 2:
+            # constant reference values (solver tolerances) as a row of unconnected dots; plotext's
+            # own line() is not placed correctly on logarithmic axes
+            n = max(2, width // 3)
+            x0, x1 = min(c.x), max(c.x)
+            xs = [x0 + (x1 - x0) * k / (n - 1) for k in range(n)]
+            fig.draw(fig.signal(xs, [c.y[0]] * n, marker="\u00b7").label(c.label))
+        else:
+            fig.draw(fig.signal(c.x, c.y).lines().label(c.label))
+    lines = fig.build().string(colorless=not use_color).split("\n")
     lines = [tui_canvas.pad(line, width) for line in lines[:height]]
     return lines + [" " * width] * (height - len(lines))

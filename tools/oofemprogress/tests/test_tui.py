@@ -73,3 +73,26 @@ def test_tui_frame(tmp_path, monkeypatch):
     assert "[1/2] R_D_u vs u2_D_u" in frames[0]
     assert "[2/2]" in frames[1]  # grid shows both charts
     assert all(len(f.split("\n")) <= 29 for f in frames)
+
+
+def test_plotext_renderer():
+    """plotext >= 6 renderer (skipped if plotext is missing or older)."""
+    pytest.importorskip("plotext")
+    try:
+        from oofemprogress.tui_plotext import render_chart
+    except ImportError:
+        pytest.skip("plotext>=6 not available")
+    xy = [Curve("F", [0, 1, 2, 3], [0, 50, 120, 60])]
+    conv = [Curve("F D_u", [0, 1, 2], [1e-1, 1e-4, 1e-8]),
+            Curve("rtolf", [0, 2], [1e-6, 1e-6], style="dash")]
+    only_tolerance = [Curve("rtolf", [0, 1], [1e-7, 1e-7], style="dash")]  # zero range on log axis
+    for curves, logy in ((xy, False), (conv, True), ([], True), (only_tolerance, True)):
+        for color in (True, False):
+            lines = render_chart(curves, 70, 18, "title", "x", False, logy, color)
+            assert len(lines) == 18
+            assert all(tui_canvas.visible_len(s) == 70 for s in lines)
+    plain = [ANSI.sub("", s) for s in render_chart(conv, 70, 18, "t", "it", False, True, False)]
+    dotted = [i for i, s in enumerate(plain) if s.count("\u00b7") > 5]
+    assert dotted, "tolerance line missing"
+    # 1e-6 lies at 5/7 of the log range 1e-1..1e-8 from the top, i.e. in the lower half
+    assert dotted[0] > len(plain) // 2, "tolerance line placed incorrectly on log axis"
