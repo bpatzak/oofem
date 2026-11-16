@@ -79,25 +79,20 @@ public:
 
     void reportElement(OutputWriter &w, Element *elem, TimeStep *tStep) override
     {
-        if ( !elem->isActivated(tStep) ) {
+        bool active = elem->isActivated(tStep);
+        w.field("active", active);
+        if ( !active ) {
             return;
         }
-        w.beginList("gps");
+        // same structure as the full output, the points report the selected internal state types
         FloatArray value;
-        for ( auto &iRule : elem->giveIntegrationRulesArray() ) {
-            for ( auto &gp : *iRule ) {
-                w.beginGroup();
-                w.field( "ir", iRule->giveNumber() );
-                w.field( "number", gp->giveNumber() );
-                for ( int type : vars ) {
-                    if ( elem->giveIPValue(value, gp, ( InternalStateType ) type, tStep) ) {
-                        w.field(__InternalStateTypeToString( ( InternalStateType ) type ), value);
-                    }
+        elem->reportIntegrationPoints(w, tStep, [this, &w, &value, elem, tStep] (GaussPoint *gp) {
+            for ( int type : vars ) {
+                if ( elem->giveIPValue(value, gp, ( InternalStateType ) type, tStep) ) {
+                    w.field(__InternalStateTypeToString( ( InternalStateType ) type ), value);
                 }
-                w.endGroup();
             }
-        }
-        w.endList();
+        });
     }
 };
 } // end anonymous namespace

@@ -60,6 +60,7 @@
 #include <cstdio>
 #include <vector>
 #include <memory>
+#include <functional>
 
 namespace oofem {
 class TimeStep;
@@ -1226,13 +1227,25 @@ public:
     void printOutputAt(FILE *file, TimeStep *tStep) override;
     /**
      * Reports the output of the receiver (structured output): internal dof managers
-     * ("internal_dofmans"), activity flag ("active") and the list of integration points
-     * ("gps"), each reporting the integration rule number ("ir"), its number and
-     * its statuses (see GaussPoint::reportOutput).
+     * ("internal_dofmans"), activity flag ("active") and, for active elements, the integration
+     * rules with their integration points (see reportIntegrationPoints), each integration point
+     * reporting its statuses (see GaussPoint::reportOutput).
      * Elements overriding printOutputAt should override this service as well; until they
      * report structured data, they should report the text of printOutputAt using reportLegacyOutput.
      */
     void reportOutput(OutputWriter &writer, TimeStep *tStep) override;
+    /**
+     * Reports the integration rules of the receiver and their integration points (structured output)
+     * as the list "integration_rules"; each rule reports its number, class and the list "gps"
+     * of its integration points, each point its number, natural coordinates ("natural_coords")
+     * and weight, followed by the fields reported by given function.
+     * Shared by the full output (Element::reportOutput) and by export modules reporting
+     * selected quantities, so that the structure of the output is the same.
+     * @param writer Output writer.
+     * @param tStep Time step.
+     * @param reportPoint Function reporting the data of an integration point (into its open group).
+     */
+    void reportIntegrationPoints(OutputWriter &writer, TimeStep *tStep, const std :: function< void(GaussPoint *) > &reportPoint);
 
     virtual const IntArray giveLocation() {IntArray answer(0); return answer;}
     virtual void recalculateCoordinates(int nodeNumber, FloatArray &coords){;}
