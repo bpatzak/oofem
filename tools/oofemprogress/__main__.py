@@ -14,7 +14,7 @@ SUFFIX = ".progress.jsonl"
 def resolve_progress_file(name):
     """Maps the argument to the progress file.
 
-    * ``*.progress.jsonl`` (or any existing file other than an input file) is used as is,
+    * ``*.progress.jsonl`` (or another existing ``*.jsonl`` file) is used as is,
     * ``job.out`` -> ``job.out.progress.jsonl``,
     * ``job.in``  -> the output file named on the first line of the input file + suffix
       (the default file name of the progress export module).
@@ -32,7 +32,7 @@ def resolve_progress_file(name):
             if os.path.exists(c):
                 return c
         return first.strip() + SUFFIX
-    if os.path.isfile(name):
+    if name.endswith(".jsonl") and os.path.isfile(name):
         return name
     return name + SUFFIX
 
