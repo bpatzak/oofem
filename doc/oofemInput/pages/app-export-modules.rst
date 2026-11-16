@@ -220,6 +220,17 @@ the file are exactly the values computed by OOFEM.  The file is flushed after
 every step, so the finished steps can be read while the analysis is running
 (the last line may be incomplete).
 
+The steps are written as separate lines rather than as an array of a single
+JSON document on purpose: such a document would be valid only after the
+analysis finishes (the closing brackets are written at the end), so it could
+not be read during the analysis nor after an interrupted one, and every reader
+would have to load the whole file.  When a single document is needed, the
+lines can be converted after the analysis, e.g.
+
+.. code-block:: bash
+
+   jq -s '{header: .[0], steps: map(select(.kind=="step")), footer: .[-1]}' beam2d.out.m0.jsonl > beam2d.json
+
 **Example**
 
 .. code-block:: none

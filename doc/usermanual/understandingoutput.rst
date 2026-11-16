@@ -296,3 +296,12 @@ the selected DOF values, internal variables and reaction forces with the same
 structure. The ``tools/jsonl_check.py`` script checks the validity and structure
 of a JSON Lines output file and compares its DOF values and reaction forces
 with the text output of the same analysis.
+
+Each step is a separate line (not an item of an array in a single JSON
+document), so the finished steps can be read while the analysis is running and
+remain readable if the analysis is interrupted; a reader needs only one step in
+memory at a time. All lines can still be loaded at once, e.g.
+``lines = [json.loads(line) for line in open('beam2d_1.out.m0.jsonl')]``
+(the steps are ``lines[1:-1]``), or
+converted into a single JSON document by
+``jq -s '{header: .[0], steps: map(select(.kind=="step")), footer: .[-1]}'``.
