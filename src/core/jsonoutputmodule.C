@@ -34,6 +34,7 @@
 
 #include "jsonoutputmodule.h"
 #include "outputwriter.h"
+#include "outputselection.h"
 #include "engngm.h"
 #include "timestep.h"
 #include "classfactory.h"
@@ -50,10 +51,13 @@ JsonOutputModule :: initializeFrom(const std::shared_ptr<InputRecord> &ir)
 {
     OutputModule :: initializeFrom(ir);
 
-    nodeSets.clear();
-    IR_GIVE_OPTIONAL_FIELD(ir, nodeSets, _IFT_JsonOutputModule_nodeSets);
-    elementSets.clear();
-    IR_GIVE_OPTIONAL_FIELD(ir, elementSets, _IFT_JsonOutputModule_elementSets);
+    filter = OutputFilter();
+    IR_GIVE_OPTIONAL_FIELD(ir, filter.nodeSets, _IFT_JsonOutputModule_nodeSets);
+    IR_GIVE_OPTIONAL_FIELD(ir, filter.elementSets, _IFT_JsonOutputModule_elementSets);
+    // all domains are reported unless restricted by domain_mask
+    if ( !domain_all_flag ) {
+        filter.domains = domainMask;
+    }
     std :: string fileName;
     IR_GIVE_OPTIONAL_FIELD(ir, fileName, _IFT_JsonOutputModule_fileName);
     file.setFileName(fileName);
@@ -68,7 +72,9 @@ JsonOutputModule :: doOutput(TimeStep *tStep, bool forcedOutput)
     }
 
     JsonLinesWriter &w = file.beginStep(tStep, timeScale);
-    emodel->reportOutputAt(w, tStep, nodeSets, elementSets);
+    // full state of the components (default content)
+    OutputContent content;
+    emodel->reportOutputAt(w, tStep, filter, content);
     file.endStep();
 }
 

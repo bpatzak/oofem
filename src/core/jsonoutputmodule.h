@@ -37,6 +37,7 @@
 
 #include "outputmodule.h"
 #include "jsonfile.h"
+#include "outputselection.h"
 
 ///@name Input fields for JsonOutputModule
 //@{
@@ -69,10 +70,8 @@ class OOFEM_EXPORT JsonOutputModule : public OutputModule
 protected:
     /// Output file (stream, writer, file name).
     JsonFile file;
-    /// Set which contains nodes which should be exported (one per domain).
-    IntArray nodeSets;
-    /// Set which contains elements which should be exported (one per domain).
-    IntArray elementSets;
+    /// Selection of reported domains, nodes and elements.
+    OutputFilter filter;
 
 public:
     JsonOutputModule(int n, EngngModel *e);

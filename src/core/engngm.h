@@ -110,6 +110,8 @@ class NumericalMethod;
 class InitModuleManager;
 class ExportModuleManager;
 class OutputWriter;
+class OutputFilter;
+class OutputContent;
 class FloatMatrix;
 class FloatArray;
 class LoadBalancer;
@@ -1129,15 +1131,17 @@ public:
     virtual void printOutputAt(FILE *file, TimeStep *tStep, const IntArray &nodeSets, const IntArray &elementSets);
     /**
      * Reports the output of the receiver for given time step using given writer
-     * (structured output of output modules). For each domain, the dof managers
-     * and elements (optionally limited to given sets) report their output as
-     * records of the sections "dofmans" and "elements".
+     * (structured output of output and export modules). For each domain selected by the filter,
+     * the dof managers and elements (optionally limited to the sets of the filter) are reported
+     * as records of the sections "dofmans" and "elements". The receiver opens the domains,
+     * sections and records, the fields of the records are reported by given content
+     * (the full state of the components for output modules, selected quantities for export modules).
      * @param writer Output writer.
      * @param tStep Solution step.
-     * @param nodeSets Set of nodes to report for each domain (0 or missing value = all).
-     * @param elementSets Set of elements to report for each domain (0 or missing value = all).
+     * @param filter Selection of domains, dof managers, elements and sections.
+     * @param content Content of the records.
      */
-    virtual void reportOutputAt(OutputWriter &writer, TimeStep *tStep, const IntArray &nodeSets, const IntArray &elementSets);
+    virtual void reportOutputAt(OutputWriter &writer, TimeStep *tStep, const OutputFilter &filter, OutputContent &content);
     /**
      * Outputs all nodes in the given set.
      * @param file Output stream.

@@ -66,6 +66,7 @@
 #include "exportmodulemanager.h"
 #include "textoutputmodule.h"
 #include "outputwriter.h"
+#include "outputselection.h"
 #include "initmodulemanager.h"
 #include "feinterpol3d.h"
 #include "classfactory.h"
@@ -896,54 +897,63 @@ void EngngModel :: reportDofOutputAt(OutputWriter &writer, Dof *iDof, TimeStep *
 
 
 void
-EngngModel :: reportOutputAt(OutputWriter &writer, TimeStep *tStep, const IntArray &nodeSets, const IntArray &elementSets)
+EngngModel :: reportOutputAt(OutputWriter &writer, TimeStep *tStep, const OutputFilter &filter, OutputContent &content)
 {
     for ( auto &domain: domainList ) {
         int dnum = domain->giveNumber();
-        int nset = nodeSets.giveSize() < dnum ? 0 : nodeSets.at(dnum);
-        int eset = elementSets.giveSize() < dnum ? 0 : elementSets.at(dnum);
+        if ( !filter.testDomain(dnum) ) {
+            continue;
+        }
 
         writer.beginDomain(dnum);
 
-        auto reportDofManager = [&writer, tStep] (DofManager *dman) {
-            if ( dman->giveParallelMode() == DofManager_null ) {
-                return;
+        if ( filter.dofManagers ) {
+            auto reportDofManager = [&writer, &content, tStep] (DofManager *dman) {
+                // null dof managers (parallel mode) belong to no process
+                if ( dman->giveParallelMode() == DofManager_null ) {
+                    return;
+                }
+                writer.beginRecord( dman->giveNumber(), dman->giveLabel(), dman->giveClassName() );
+                content.reportDofManager(writer, dman, tStep);
+                writer.endRecord();
+            };
+            int nset = filter.giveNodeSet(dnum);
+            writer.beginSection("dofmans");
+            if ( nset == 0 ) {
+                for ( auto &dman : domain->giveDofManagers() ) {
+                    reportDofManager( dman.get() );
+                }
+            } else {
+                for ( int inode : domain->giveSet(nset)->giveNodeList() ) {
+                    reportDofManager( domain->giveDofManager(inode) );
+                }
             }
-            writer.beginRecord( dman->giveNumber(), dman->giveLabel(), dman->giveClassName() );
-            dman->reportOutput(writer, tStep);
-            writer.endRecord();
-        };
-        writer.beginSection("dofmans");
-        if ( nset == 0 ) {
-            for ( auto &dman : domain->giveDofManagers() ) {
-                reportDofManager( dman.get() );
-            }
-        } else {
-            for ( int inode : domain->giveSet(nset)->giveNodeList() ) {
-                reportDofManager( domain->giveDofManager(inode) );
-            }
+            writer.endSection();
         }
-        writer.endSection();
 
-        auto reportElement = [&writer, tStep] (Element *elem) {
-            if ( elem->giveParallelMode() == Element_remote ) {
-                return;
+        if ( filter.elements ) {
+            auto reportElement = [&writer, &content, tStep] (Element *elem) {
+                // remote elements are reported by the process owning them
+                if ( elem->giveParallelMode() == Element_remote ) {
+                    return;
+                }
+                writer.beginRecord( elem->giveNumber(), elem->giveLabel(), elem->giveClassName() );
+                content.reportElement(writer, elem, tStep);
+                writer.endRecord();
+            };
+            int eset = filter.giveElementSet(dnum);
+            writer.beginSection("elements");
+            if ( eset == 0 ) {
+                for ( auto &elem : domain->giveElements() ) {
+                    reportElement( elem.get() );
+                }
+            } else {
+                for ( int ielem : domain->giveSet(eset)->giveElementList() ) {
+                    reportElement( domain->giveElement(ielem) );
+                }
             }
-            writer.beginRecord( elem->giveNumber(), elem->giveLabel(), elem->giveClassName() );
-            elem->reportOutput(writer, tStep);
-            writer.endRecord();
-        };
-        writer.beginSection("elements");
-        if ( eset == 0 ) {
-            for ( auto &elem : domain->giveElements() ) {
-                reportElement( elem.get() );
-            }
-        } else {
-            for ( int ielem : domain->giveSet(eset)->giveElementList() ) {
-                reportElement( domain->giveElement(ielem) );
-            }
+            writer.endSection();
         }
-        writer.endSection();
 
         writer.endDomain();
     }

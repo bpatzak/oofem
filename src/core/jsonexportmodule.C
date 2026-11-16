@@ -34,6 +34,7 @@
 
 #include "jsonexportmodule.h"
 #include "outputwriter.h"
+#include "outputselection.h"
 #include "engngm.h"
 #include "domain.h"
 #include "dofmanager.h"
@@ -50,6 +51,57 @@
 namespace oofem {
 REGISTER_ExportModule(JsonExportModule)
 
+namespace {
+/**
+ * Content of the json export: instead of the full state of the components,
+ * only the values of the selected DOFs and internal state types are reported.
+ */
+class SelectedContent : public OutputContent
+{
+protected:
+    /// DOFs to export.
+    const IntArray &dofs;
+    /// Internal state types to export.
+    const IntArray &vars;
+
+public:
+    SelectedContent(const IntArray &dofs, const IntArray &vars) : dofs(dofs), vars(vars) { }
+
+    void reportDofManager(OutputWriter &w, DofManager *dman, TimeStep *tStep) override
+    {
+        for ( int id : dofs ) {
+            if ( dman->hasDofID( ( DofIDItem ) id ) ) {
+                w.field( __DofIDItemToString( ( DofIDItem ) id ),
+                         dman->giveDofWithID(id)->giveUnknown(VM_Total, tStep) );
+            }
+        }
+    }
+
+    void reportElement(OutputWriter &w, Element *elem, TimeStep *tStep) override
+    {
+        if ( !elem->isActivated(tStep) ) {
+            return;
+        }
+        w.beginList("gps");
+        FloatArray value;
+        for ( auto &iRule : elem->giveIntegrationRulesArray() ) {
+            for ( auto &gp : *iRule ) {
+                w.beginGroup();
+                w.field( "ir", iRule->giveNumber() );
+                w.field( "number", gp->giveNumber() );
+                for ( int type : vars ) {
+                    if ( elem->giveIPValue(value, gp, ( InternalStateType ) type, tStep) ) {
+                        w.field(__InternalStateTypeToString( ( InternalStateType ) type ), value);
+                    }
+                }
+                w.endGroup();
+            }
+        }
+        w.endList();
+    }
+};
+} // end anonymous namespace
+
 JsonExportModule :: JsonExportModule(int n, EngngModel *e) : ExportModule(n, e), file(e, n)
 { }
 
@@ -63,57 +115,20 @@ JsonExportModule :: initializeFrom(const std::shared_ptr<InputRecord> &ir)
     IR_GIVE_OPTIONAL_FIELD(ir, dofs, _IFT_JsonExportModule_dofs);
     vars.clear();
     IR_GIVE_OPTIONAL_FIELD(ir, vars, _IFT_JsonExportModule_vars);
-    nodeSets.clear();
-    IR_GIVE_OPTIONAL_FIELD(ir, nodeSets, _IFT_JsonExportModule_nodeSets);
-    elementSets.clear();
-    IR_GIVE_OPTIONAL_FIELD(ir, elementSets, _IFT_JsonExportModule_elementSets);
+    filter = OutputFilter();
+    IR_GIVE_OPTIONAL_FIELD(ir, filter.nodeSets, _IFT_JsonExportModule_nodeSets);
+    IR_GIVE_OPTIONAL_FIELD(ir, filter.elementSets, _IFT_JsonExportModule_elementSets);
+    // all domains are exported unless restricted by domain_mask
+    if ( !domain_all_flag ) {
+        filter.domains = domainMask;
+    }
+    // sections without selected quantities are not exported
+    filter.dofManagers = dofs.giveSize() > 0;
+    filter.elements = vars.giveSize() > 0;
+    filter.reactions = false;
     std :: string fileName;
     IR_GIVE_OPTIONAL_FIELD(ir, fileName, _IFT_JsonExportModule_fileName);
     file.setFileName(fileName);
-}
-
-
-void
-JsonExportModule :: exportDofManager(JsonLinesWriter &w, DofManager *dman, TimeStep *tStep)
-{
-    if ( dman->giveParallelMode() == DofManager_null ) {
-        return;
-    }
-    w.beginRecord( dman->giveNumber(), dman->giveLabel(), dman->giveClassName() );
-    for ( int id : dofs ) {
-        if ( dman->hasDofID( ( DofIDItem ) id ) ) {
-            w.field( __DofIDItemToString( ( DofIDItem ) id ),
-                     dman->giveDofWithID(id)->giveUnknown(VM_Total, tStep) );
-        }
-    }
-    w.endRecord();
-}
-
-
-void
-JsonExportModule :: exportElement(JsonLinesWriter &w, Element *elem, TimeStep *tStep)
-{
-    if ( elem->giveParallelMode() == Element_remote || !elem->isActivated(tStep) ) {
-        return;
-    }
-    w.beginRecord( elem->giveNumber(), elem->giveLabel(), elem->giveClassName() );
-    w.beginList("gps");
-    FloatArray value;
-    for ( auto &iRule : elem->giveIntegrationRulesArray() ) {
-        for ( auto &gp : *iRule ) {
-            w.beginGroup();
-            w.field( "ir", iRule->giveNumber() );
-            w.field( "number", gp->giveNumber() );
-            for ( int type : vars ) {
-                if ( elem->giveIPValue(value, gp, ( InternalStateType ) type, tStep) ) {
-                    w.field(__InternalStateTypeToString( ( InternalStateType ) type ), value);
-                }
-            }
-            w.endGroup();
-        }
-    }
-    w.endList();
-    w.endRecord();
 }
 
 
@@ -125,45 +140,8 @@ JsonExportModule :: doOutput(TimeStep *tStep, bool forcedOutput)
     }
 
     JsonLinesWriter &w = file.beginStep(tStep, timeScale);
-    for ( int idomain = 1; idomain <= emodel->giveNumberOfDomains(); ++idomain ) {
-        // all domains are exported unless restricted by domain_mask
-        if ( !domainMask.isEmpty() && !testDomainOutput(idomain) ) {
-            continue;
-        }
-        Domain *domain = emodel->giveDomain(idomain);
-        int nset = nodeSets.giveSize() < idomain ? 0 : nodeSets.at(idomain);
-        int eset = elementSets.giveSize() < idomain ? 0 : elementSets.at(idomain);
-        w.beginDomain(idomain);
-
-        if ( dofs.giveSize() ) {
-            w.beginSection("dofmans");
-            if ( nset == 0 ) {
-                for ( auto &dman : domain->giveDofManagers() ) {
-                    this->exportDofManager(w, dman.get(), tStep);
-                }
-            } else {
-                for ( int inode : domain->giveSet(nset)->giveNodeList() ) {
-                    this->exportDofManager(w, domain->giveDofManager(inode), tStep);
-                }
-            }
-            w.endSection();
-        }
-
-        if ( vars.giveSize() ) {
-            w.beginSection("elements");
-            if ( eset == 0 ) {
-                for ( auto &elem : domain->giveElements() ) {
-                    this->exportElement(w, elem.get(), tStep);
-                }
-            } else {
-                for ( int ielem : domain->giveSet(eset)->giveElementList() ) {
-                    this->exportElement(w, domain->giveElement(ielem), tStep);
-                }
-            }
-            w.endSection();
-        }
-        w.endDomain();
-    }
+    SelectedContent content(dofs, vars);
+    emodel->reportOutputAt(w, tStep, filter, content);
     file.endStep();
 }
 

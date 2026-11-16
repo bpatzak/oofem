@@ -37,6 +37,7 @@
 
 #include "exportmodule.h"
 #include "jsonfile.h"
+#include "outputselection.h"
 
 ///@name Input fields for JsonExportModule
 //@{
@@ -49,9 +50,6 @@
 //@}
 
 namespace oofem {
-class JsonLinesWriter;
-class DofManager;
-class Element;
 
 /**
  * Export of selected quantities in JSON Lines format (one JSON object per line,
@@ -79,10 +77,8 @@ protected:
     IntArray dofs;
     /// Internal state types to export.
     IntArray vars;
-    /// Set which contains nodes which should be exported (one per domain).
-    IntArray nodeSets;
-    /// Set which contains elements which should be exported (one per domain).
-    IntArray elementSets;
+    /// Selection of exported domains, nodes and elements.
+    OutputFilter filter;
 
 public:
     JsonExportModule(int n, EngngModel *e);
@@ -98,12 +94,6 @@ public:
 
     const char *giveClassName() const override { return "JsonExportModule"; }
     const char *giveInputRecordName() const { return _IFT_JsonExportModule_Name; }
-
-protected:
-    /// Exports selected DOF values of given dof manager.
-    void exportDofManager(JsonLinesWriter &w, DofManager *dman, TimeStep *tStep);
-    /// Exports selected internal variables of given element.
-    void exportElement(JsonLinesWriter &w, Element *elem, TimeStep *tStep);
 };
 } // end namespace oofem
 #endif // jsonexportmodule_h_
