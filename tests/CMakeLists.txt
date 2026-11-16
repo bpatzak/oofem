@@ -128,7 +128,7 @@ if (USE_SM)
             set_tests_properties("${test_rel_dir}/jsonoutput01.in" PROPERTIES LABELS "sm")
             add_test (NAME "${test_rel_dir}/jsonexport01.in"
                       WORKING_DIRECTORY ${oofem_SOURCE_DIR}/${test_rel_dir}
-                      COMMAND bash -c "$<TARGET_FILE:oofem> -Werror -f jsonexport01.in && ${Python3_EXECUTABLE} -I ${oofem_SOURCE_DIR}/tools/jsonl_check.py --validate-only jsonexport01.out.m0.jsonl")
+                      COMMAND bash -c "$<TARGET_FILE:oofem> -Werror -f jsonexport01.in && ${Python3_EXECUTABLE} -I ${oofem_SOURCE_DIR}/tools/jsonl_check.py --subset jsonexport01.out.m0.jsonl jsonexport01.out")
             set_tests_properties("${test_rel_dir}/jsonexport01.in" PROPERTIES LABELS "sm")
         endif ()
     endif()

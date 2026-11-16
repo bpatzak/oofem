@@ -955,6 +955,9 @@ EngngModel :: reportOutputAt(OutputWriter &writer, TimeStep *tStep, const Output
             writer.endSection();
         }
 
+        // problem specific sections (e.g. reactions)
+        this->reportDomainOutputAt(writer, domain.get(), tStep, filter);
+
         writer.endDomain();
     }
 }

@@ -1,7 +1,7 @@
 jsonexport01.out
 Export of selected quantities in JSON Lines format (json export module), based on idm01
 StaticStructural nsteps 15 solverType "calm" rtolf 1e-4 MaxIter 10 psi 0.0 hpcmode 1 hpc 2 2 1 stepLength 0.05 minsteplength 0.05 nmodules 2
-json tstep_all dofs 1 1 vars 2 1 4
+json tstep_all dofs 1 1 vars 2 1 4 reactions
 errorcheck
 #vtkxml tstep_all domain_all primvars 1 1
 domain 1dtruss

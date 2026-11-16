@@ -122,7 +122,8 @@ JsonExportModule :: initializeFrom(const std::shared_ptr<InputRecord> &ir)
     // sections without selected quantities are not exported
     filter.dofManagers = dofs.giveSize() > 0;
     filter.elements = vars.giveSize() > 0;
-    filter.reactions = false;
+    // reaction forces only on request (problems computing them, e.g. structural ones)
+    filter.reactions = ir->hasField(_IFT_JsonExportModule_reactions);
     std :: string fileName;
     IR_GIVE_OPTIONAL_FIELD(ir, fileName, _IFT_JsonExportModule_fileName);
     file.setFileName(fileName);

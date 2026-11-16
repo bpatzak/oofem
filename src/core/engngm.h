@@ -1143,6 +1143,17 @@ public:
      */
     virtual void reportOutputAt(OutputWriter &writer, TimeStep *tStep, const OutputFilter &filter, OutputContent &content);
     /**
+     * Reports problem specific sections of given domain (structured output), called by reportOutputAt
+     * after the dof managers and elements of the domain have been reported. Problems adding data
+     * to the text output of a domain (e.g. reaction forces) should report them here as sections
+     * (see OutputWriter::beginSection), respecting the filter. The default implementation reports nothing.
+     * @param writer Output writer.
+     * @param domain Domain.
+     * @param tStep Solution step.
+     * @param filter Selection of reported data.
+     */
+    virtual void reportDomainOutputAt(OutputWriter &writer, Domain *domain, TimeStep *tStep, const OutputFilter &filter) { }
+    /**
      * Outputs all nodes in the given set.
      * @param file Output stream.
      * @param domain Domain.

@@ -106,6 +106,16 @@ protected:
      * @param id Domain number.
      */
     void printReactionForces(TimeStep *tStep, int id, FILE *out);
+    /**
+     * Computes and reports reaction forces (structured output, counterpart of printReactionForces)
+     * as the section "reactions": one record per supported dof manager, with the list "dofs"
+     * of its restrained DOFs ("id", "name", reaction "value" and the boundary condition "bc").
+     * @param writer Output writer.
+     * @param tStep Time step.
+     * @param di Domain number.
+     * @param nodeSet Set of reported dof managers (0 = all).
+     */
+    void reportReactionForces(OutputWriter &writer, TimeStep *tStep, int di, int nodeSet);
 
     /**
      * Computes the contribution external loading to reaction forces in given domain. Default implementations adds the
@@ -128,6 +138,9 @@ protected:
     void printOutputAt(FILE *file, TimeStep *tStep) override;
 
 public:
+    /// Reports the reaction forces of the domain (if requested by the filter), see reportReactionForces.
+    void reportDomainOutputAt(OutputWriter &writer, Domain *domain, TimeStep *tStep, const OutputFilter &filter) override;
+
     /// Creates new StructuralEngngModel with number i, associated to domain d.
     StructuralEngngModel(int i, EngngModel *master = nullptr);
     /// Destructor.

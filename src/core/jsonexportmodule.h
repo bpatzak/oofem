@@ -44,6 +44,7 @@
 #define _IFT_JsonExportModule_Name "json"
 #define _IFT_JsonExportModule_dofs "dofs"
 #define _IFT_JsonExportModule_vars "vars"
+#define _IFT_JsonExportModule_reactions "reactions"
 #define _IFT_JsonExportModule_nodeSets "node_sets"
 #define _IFT_JsonExportModule_elementSets "element_sets"
 #define _IFT_JsonExportModule_fileName "filename"
