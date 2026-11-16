@@ -35,11 +35,8 @@
 #ifndef jsonoutputmodule_h_
 #define jsonoutputmodule_h_
 
-#include <cstdio>
-#include <memory>
-#include <string>
-
 #include "outputmodule.h"
+#include "jsonfile.h"
 
 ///@name Input fields for JsonOutputModule
 //@{
@@ -70,12 +67,8 @@ class JsonLinesWriter;
 class OOFEM_EXPORT JsonOutputModule : public OutputModule
 {
 protected:
-    /// Output stream.
-    FILE *stream;
-    /// Writer.
-    std :: unique_ptr< JsonLinesWriter >writer;
-    /// User defined file name (empty = default).
-    std :: string fileName;
+    /// Output file (stream, writer, file name).
+    JsonFile file;
     /// Set which contains nodes which should be exported (one per domain).
     IntArray nodeSets;
     /// Set which contains elements which should be exported (one per domain).
@@ -83,7 +76,7 @@ protected:
 
 public:
     JsonOutputModule(int n, EngngModel *e);
-    virtual ~JsonOutputModule();
+    virtual ~JsonOutputModule() { }
 
     void initializeFrom(const std::shared_ptr<InputRecord> &ir) override;
     void initialize() override { }
@@ -91,14 +84,10 @@ public:
     void terminate() override;
 
     /// Returns the name of the output file.
-    std :: string giveOutputFileName();
+    std :: string giveOutputFileName() { return file.giveFileName(); }
 
     const char *giveClassName() const override { return "JsonOutputModule"; }
     const char *giveInputRecordName() const { return _IFT_JsonOutputModule_Name; }
-
-protected:
-    /// Returns the writer, opening the output file on first request.
-    JsonLinesWriter &giveWriter();
 };
 } // end namespace oofem
 #endif // jsonoutputmodule_h_

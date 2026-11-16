@@ -35,11 +35,8 @@
 #ifndef jsonexportmodule_h_
 #define jsonexportmodule_h_
 
-#include <cstdio>
-#include <memory>
-#include <string>
-
 #include "exportmodule.h"
+#include "jsonfile.h"
 
 ///@name Input fields for JsonExportModule
 //@{
@@ -76,12 +73,8 @@ class Element;
 class OOFEM_EXPORT JsonExportModule : public ExportModule
 {
 protected:
-    /// Output stream.
-    FILE *stream;
-    /// Writer.
-    std :: unique_ptr< JsonLinesWriter >writer;
-    /// User defined file name (empty = default).
-    std :: string fileName;
+    /// Output file (stream, writer, file name).
+    JsonFile file;
     /// DOFs to export.
     IntArray dofs;
     /// Internal state types to export.
@@ -93,7 +86,7 @@ protected:
 
 public:
     JsonExportModule(int n, EngngModel *e);
-    virtual ~JsonExportModule();
+    virtual ~JsonExportModule() { }
 
     void initializeFrom(const std::shared_ptr<InputRecord> &ir) override;
     void initialize() override { }
@@ -101,14 +94,12 @@ public:
     void terminate() override;
 
     /// Returns the name of the output file.
-    std :: string giveOutputFileName();
+    std :: string giveOutputFileName() { return file.giveFileName(); }
 
     const char *giveClassName() const override { return "JsonExportModule"; }
     const char *giveInputRecordName() const { return _IFT_JsonExportModule_Name; }
 
 protected:
-    /// Returns the writer, opening the output file on first request.
-    JsonLinesWriter &giveWriter();
     /// Exports selected DOF values of given dof manager.
     void exportDofManager(JsonLinesWriter &w, DofManager *dman, TimeStep *tStep);
     /// Exports selected internal variables of given element.

@@ -193,6 +193,7 @@ set (core_export
     exportregion.C
     textoutputmodule.C
     outputwriter.C
+    jsonfile.C
     jsonoutputmodule.C
     jsonexportmodule.C
     errorcheckingexportmodule.C

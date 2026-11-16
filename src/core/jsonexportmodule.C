@@ -50,17 +50,8 @@
 namespace oofem {
 REGISTER_ExportModule(JsonExportModule)
 
-JsonExportModule :: JsonExportModule(int n, EngngModel *e) : ExportModule(n, e), stream(nullptr)
+JsonExportModule :: JsonExportModule(int n, EngngModel *e) : ExportModule(n, e), file(e, n)
 { }
-
-
-JsonExportModule :: ~JsonExportModule()
-{
-    writer.reset();
-    if ( stream ) {
-        fclose(stream);
-    }
-}
 
 
 void
@@ -76,38 +67,9 @@ JsonExportModule :: initializeFrom(const std::shared_ptr<InputRecord> &ir)
     IR_GIVE_OPTIONAL_FIELD(ir, nodeSets, _IFT_JsonExportModule_nodeSets);
     elementSets.clear();
     IR_GIVE_OPTIONAL_FIELD(ir, elementSets, _IFT_JsonExportModule_elementSets);
-    fileName.clear();
+    std :: string fileName;
     IR_GIVE_OPTIONAL_FIELD(ir, fileName, _IFT_JsonExportModule_fileName);
-}
-
-
-std :: string
-JsonExportModule :: giveOutputFileName()
-{
-    if ( !fileName.empty() ) {
-        return fileName;
-    }
-    std :: string name = emodel->giveOutputBaseFileName() + ".m" + std :: to_string(this->number);
-    if ( emodel->isParallel() && emodel->giveNumberOfProcesses() > 1 ) {
-        name += "." + std :: to_string( emodel->giveRank() );
-    }
-    return name + ".jsonl";
-}
-
-
-JsonLinesWriter &
-JsonExportModule :: giveWriter()
-{
-    if ( !writer ) {
-        std :: string name = this->giveOutputFileName();
-        stream = fopen(name.c_str(), "w");
-        if ( !stream ) {
-            OOFEM_ERROR( "Can't open output file %s", name.c_str() );
-        }
-        writer = std :: make_unique< JsonLinesWriter >(stream);
-        writer->beginOutput(emodel);
-    }
-    return * writer;
+    file.setFileName(fileName);
 }
 
 
@@ -162,8 +124,7 @@ JsonExportModule :: doOutput(TimeStep *tStep, bool forcedOutput)
         return;
     }
 
-    JsonLinesWriter &w = this->giveWriter();
-    w.beginStep(tStep, tStep->giveTargetTime() * emodel->giveVariableScale(VST_Time) * timeScale);
+    JsonLinesWriter &w = file.beginStep(tStep, timeScale);
     for ( int idomain = 1; idomain <= emodel->giveNumberOfDomains(); ++idomain ) {
         // all domains are exported unless restricted by domain_mask
         if ( !domainMask.isEmpty() && !testDomainOutput(idomain) ) {
@@ -199,17 +160,13 @@ JsonExportModule :: doOutput(TimeStep *tStep, bool forcedOutput)
         }
         w.endDomain();
     }
-    w.endStep();
-    fflush(stream);
+    file.endStep();
 }
 
 
 void
 JsonExportModule :: terminate()
 {
-    this->giveWriter().endOutput(emodel);
-    writer.reset();
-    fclose(stream);
-    stream = nullptr;
+    file.close();
 }
 } // end namespace oofem
