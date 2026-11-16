@@ -40,6 +40,8 @@
 #include "inputrecord.h"
 #include "range.h"
 #include "set.h"
+#include "floatarray.h"
+#include "convergedreason.h"
 
 #include <list>
 
@@ -59,6 +61,30 @@
 namespace oofem {
 class EngngModel;
 class TimeStep;
+
+/**
+ * Snapshot of a single iteration of a nonlinear solver (e.g. NRSolver).
+ * Solvers pass it to export modules through ExportModuleManager::doIterationOutput,
+ * so that modules can monitor convergence while the step is being solved
+ * (e.g. live progress monitoring). The errors are relative error norms as used
+ * by the solver's convergence check, evaluated per DOF group.
+ */
+struct SolverIterationInfo {
+    /// Iteration number within the current solve (0-based, as in NRSolver).
+    int iteration = 0;
+    /// CR_UNKNOWN while iterating; final reason (converged/diverged) on the terminating iteration.
+    ConvergedReason status = CR_UNKNOWN;
+    /// DofIDs of the groups the errors refer to; empty means a single group of all DOFs.
+    IntArray dofGroups;
+    /// Relative force (residual) error per group; NaN if not evaluated.
+    FloatArray forceErr;
+    /// Relative displacement (solution increment) error per group; NaN if not evaluated.
+    FloatArray dispErr;
+    /// Relative force tolerance (<= 0 if not checked).
+    double rtolf = 0.;
+    /// Relative displacement tolerance (<= 0 if not checked).
+    double rtold = 0.;
+};
 
 /**
  * Represents export output module - a base class for all output modules. ExportModule is an abstraction
@@ -128,6 +154,14 @@ public:
      * @param forcedOutput If true, no testTimeStepOutput should be done.
      */
     virtual void doOutput(TimeStep *tStep, bool forcedOutput = false) = 0;
+    /**
+     * Notifies the module about a finished iteration of a nonlinear solver.
+     * Called once per iteration, before the solver decides to continue, stop or throw.
+     * The default implementation does nothing; modules monitoring convergence override it.
+     * @param tStep Time step being solved.
+     * @param info Iteration data (error norms, final status on the terminating iteration).
+     */
+    virtual void doIterationOutput(TimeStep *tStep, const SolverIterationInfo &info) { }
     /**
      * Writes the output. Abstract service.
      * @param tStep time step.

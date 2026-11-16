@@ -60,6 +60,12 @@ public:
      */
     void doOutput(TimeStep *tStep, bool substepFlag = false);
     /**
+     * Passes the data of a finished nonlinear solver iteration to all modules.
+     * @param tStep Time step being solved.
+     * @param info Iteration data.
+     */
+    void doIterationOutput(TimeStep *tStep, const SolverIterationInfo &info);
+    /**
      * Initializes output manager. The corresponding initialize module services are called.
      */
     void initialize();

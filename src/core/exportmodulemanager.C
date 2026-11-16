@@ -64,6 +64,14 @@ ExportModuleManager :: doOutput(TimeStep *tStep, bool substepFlag)
 }
 
 void
+ExportModuleManager :: doIterationOutput(TimeStep *tStep, const SolverIterationInfo &info)
+{
+    for ( auto &module: moduleList ) {
+        module->doIterationOutput(tStep, info);
+    }
+}
+
+void
 ExportModuleManager :: initialize()
 {
     for ( auto &module: moduleList ) {
