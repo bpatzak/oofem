@@ -45,6 +45,7 @@
 #include "floatarray.h"
 #include "linesearch.h"
 #include "convergedreason.h"
+#include "exportmodule.h"
 
 #include <memory>
 #include <map>
@@ -172,6 +173,9 @@ protected:
     std :: map< int, double >dg_forceScale;
 
     double maxIncAllowed;
+
+    /// Data of the last iteration, filled by checkConvergence and passed to export modules.
+    SolverIterationInfo iterInfo;
 public:
     NRSolver(Domain *d, EngngModel *m);
     virtual ~NRSolver();
