@@ -63,6 +63,18 @@ catch_discover_tests(test_feinterpol
 # Parsing of arrays and matrices in text and XML input records
 add_executable(test_inputrecord test_inputrecord.C)
 target_link_libraries(test_inputrecord PRIVATE Catch2::Catch2WithMain liboofem)
+if (WIN32 AND USE_SHARED_LIB)
+    # catch_discover_tests runs the executable at build time (POST_BUILD), when oofem.dll is not on PATH;
+    # copy it next to the test to avoid exit code 0xc0000135 (DLL not found)
+    add_custom_command(
+        TARGET test_inputrecord
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:liboofem>
+            $<TARGET_FILE_DIR:test_inputrecord>
+        COMMENT "Copying oofem.dll to test directory"
+    )
+endif()
 catch_discover_tests(test_inputrecord
     TEST_LIST inputrecord_tests
     PROPERTIES
