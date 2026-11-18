@@ -605,6 +605,102 @@ Creates a configurable report on the progress of the solution.
 
    solutionstatus tstep_all fmt m:s:a:nite:t:dt:st:cr
 
+.. _progress-export-module:
+
+Solution progress export module
+-------------------------------
+
+Writes the progress of the solution into a file that can be followed while the
+job runs, for example by the live viewer ``tools/oofemprogress`` (``python -m
+oofemprogress <file>``), which shows the job information, an evolving
+load-displacement diagram, or any other user defined charts and the convergence
+of the nonlinear solver.
+
+The file (``<output file>.progress.jsonl`` by default) follows the
+``oofem-progress`` protocol: JSON Lines, one record per line, flushed after
+every record.  It starts with a ``header`` record identifying the job (OOFEM
+version, input file, host, process id, start time) and describing the monitored
+quantities, followed by a ``step`` record for each selected solution step (time,
+solver status and values of the monitored quantities), optionally by ``iter``
+records for the individual iterations of the nonlinear solver, and by an ``end``
+record when the analysis terminates normally.  The protocol is described in
+``tools/oofemprogress/README.md``.
+
+The monitored quantities (channels) are scalars.  They are listed in the step
+records in the order of the parameters below: dof manager values, sums of
+reactions, load level, integration point values and aggregated values.  The
+time and the step number are always included.
+
+.. record::
+
+   :descitem:`progress` :optelemparam:`filename{s}` :optelemparam:`iterations{}`
+   :optelemparam:`dofman_ids{ia}` :optelemparam:`dofman_dofs{ia}`
+   :optelemparam:`dofman_modes{ia}` :optelemparam:`reaction_dofs{ia}`
+   :optelemparam:`reaction_sets{ia}` :optelemparam:`loadlevel{}`
+   :optelemparam:`ip_elems{ia}` :optelemparam:`ip_rules{ia}`
+   :optelemparam:`ip_gps{ia}` :optelemparam:`ip_ists{ia}`
+   :optelemparam:`ip_comps{ia}` :optelemparam:`agg_sets{ia}`
+   :optelemparam:`agg_ists{ia}` :optelemparam:`agg_comps{ia}`
+   :optelemparam:`agg_ops{ia}` :optelemparam:`labels{s}`
+   :optelemparam:`plot_x{ia}` :optelemparam:`plot_y{ia}`
+
+**Parameters**
+
+:optparam:`filename{s}`
+    Name of the progress file.  Defaults to the output file name with the
+    ``.progress.jsonl`` suffix.
+
+:optparam:`iterations{}`
+    Writes a record for every iteration of the nonlinear solver, with the
+    relative force and displacement errors per DOF group.  Supported by
+    ``nrsolver``.
+
+:optparam:`dofman_ids{ia}`, :optparam:`dofman_dofs{ia}`, :optparam:`dofman_modes{ia}`
+    Values of dof manager unknowns: dof manager numbers, DOF identifiers
+    (``1`` = ``D_u``, ``2`` = ``D_v``, ...) and optional value modes
+    (``0`` = total value, ``1`` = velocity, ``2`` = acceleration; default ``0``).
+    The arrays must have the same size.
+
+:optparam:`reaction_dofs{ia}`, :optparam:`reaction_sets{ia}`
+    Sums of the reaction forces of the given DOF identifiers over the nodes of
+    the given sets; set ``0`` (the default) means all supported nodes.
+    Structural problems only.
+
+:optparam:`loadlevel{}`
+    Adds the load level as a channel.
+
+:optparam:`ip_elems{ia}`, :optparam:`ip_rules{ia}`, :optparam:`ip_gps{ia}`, :optparam:`ip_ists{ia}`, :optparam:`ip_comps{ia}`
+    Values at individual integration points: element numbers, integration rule
+    numbers (1-based, default ``1``), integration point numbers (1-based),
+    internal state types (as defined in ``src/core/internalstatetype.h``) and
+    components (1-based, default ``1``).  Note that, unlike the integration
+    point number, the ``irule`` of the error checking rules is 0-based.
+
+:optparam:`agg_sets{ia}`, :optparam:`agg_ists{ia}`, :optparam:`agg_comps{ia}`, :optparam:`agg_ops{ia}`
+    Values aggregated over all integration points of the default integration
+    rule of the elements in the given sets: internal state types, components
+    (default ``1``) and operations (``0`` = maximum, ``1`` = minimum,
+    ``2`` = volume average; default ``0``).
+
+:optparam:`labels{s}`
+    Optional labels of the channels (a count followed by the labels), replacing
+    the generated ones such as ``u5_D_v`` or ``max(DamageTensor[1])@set3``.
+    Quote the labels (``labels 2 "u" "F"``) to preserve upper case letters.
+
+:optparam:`plot_x{ia}`, :optparam:`plot_y{ia}`
+    Charts the viewer shows by default: pairs of channel indices (1-based in the
+    channel order above, ``0`` means time).
+
+**Example**
+
+Displacement of node 2 and the sum of reactions over the nodes of set 1 in
+direction ``D_u``, the maximum damage over element set 3, solver iterations,
+and the load-displacement diagram as the default chart:
+
+.. code-block:: none
+
+   progress tstep_all iterations dofman_ids 1 2 dofman_dofs 1 1 reaction_dofs 1 1 reaction_sets 1 1 agg_sets 1 3 agg_ists 1 13 plot_x 1 1 plot_y 1 2
+
 Error checking module
 ---------------------
 

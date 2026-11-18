@@ -56,6 +56,7 @@
 #endif
 
 #include <cstdio>
+#include <limits>
 
 namespace oofem {
 #define nrsolver_ERROR_NORM_SMALL_NUM 1.e-6
@@ -291,15 +292,24 @@ NRSolver :: solve(SparseMtrx &k, FloatArray &R, FloatArray *R0,
 
         if ( errorOutOfRangeFlag ) {
             status = CR_DIVERGED_TOL;
-	    throw ConvergenceException( "Divergence reached after iterations" );
-            break;
         } else if ( converged && ( nite >= minIterations ) ) {
             status = CR_CONVERGED;
-            break;
-        } else if ( nite >= nsmax ) {	  
+        } else if ( nite >= nsmax ) {
             status = CR_DIVERGED_ITS;
-	    throw ConvergenceException( "Maximum number of iterations reached without convergence" );
+        }
 
+        // Report the iteration to export modules (e.g. live progress monitoring).
+        // This has to happen before the divergence exceptions below are thrown,
+        // otherwise the terminating iteration of a failed attempt would never be reported.
+        this->iterInfo.iteration = nite;
+        this->iterInfo.status = status;
+        engngModel->giveExportModuleManager()->doIterationOutput(tStep, this->iterInfo);
+
+        if ( status == CR_DIVERGED_TOL ) {
+            throw ConvergenceException( "Divergence reached after iterations" );
+        } else if ( status == CR_DIVERGED_ITS ) {
+            throw ConvergenceException( "Maximum number of iterations reached without convergence" );
+        } else if ( status == CR_CONVERGED ) {
             break;
         }
 
@@ -633,6 +643,13 @@ NRSolver :: checkConvergence(FloatArray &RT, FloatArray &F, FloatArray &rhs,  Fl
     answer = true;
     errorOutOfRange = false;
 
+    // Reset the iteration record passed to export modules; errors not evaluated stay NaN.
+    this->iterInfo.dofGroups.clear();
+    this->iterInfo.forceErr.clear();
+    this->iterInfo.dispErr.clear();
+    this->iterInfo.rtolf = rtolf.at(1);
+    this->iterInfo.rtold = rtold.at(1);
+
     // Store the errors associated with the dof groups
     if ( this->constrainedNRFlag ) {
         this->forceErrVecOld = this->forceErrVec; // copy the old values
@@ -770,6 +787,14 @@ NRSolver :: checkConvergence(FloatArray &RT, FloatArray &F, FloatArray &rhs,  Fl
 
             numPrintouts++;
 
+            // register the group in the iteration record (errors filled in below, if evaluated)
+            this->iterInfo.dofGroups.followedBy(dg);
+            int igroup = this->iterInfo.dofGroups.giveSize();
+            this->iterInfo.forceErr.resizeWithValues(igroup);
+            this->iterInfo.forceErr.at(igroup) = std::numeric_limits<double>::quiet_NaN();
+            this->iterInfo.dispErr.resizeWithValues(igroup);
+            this->iterInfo.dispErr.at(igroup) = std::numeric_limits<double>::quiet_NaN();
+
             if ( engngModel->giveProblemScale() == macroScale && numPrintouts <= maxNumPrintouts ) {
                 OOFEM_LOG_INFO( "  %s:", DofIDItemToString( ( DofIDItem ) dg ).c_str() );
             }
@@ -811,6 +836,7 @@ NRSolver :: checkConvergence(FloatArray &RT, FloatArray &F, FloatArray &rhs,  Fl
                 if ( this->constrainedNRFlag ) {
                     forceErrVec.at(dg) = forceErr;
                 }
+                this->iterInfo.forceErr.at(igroup) = forceErr;
             }
 
             if ( rtold.at(1) > 0.0 || atold.at(1) > 0.0 ) {
@@ -833,6 +859,7 @@ NRSolver :: checkConvergence(FloatArray &RT, FloatArray &F, FloatArray &rhs,  Fl
                 if ( engngModel->giveProblemScale() == macroScale  && numPrintouts <= maxNumPrintouts ) {
                     OOFEM_LOG_INFO(zeroDNorm ? " *%.3e" : "  %.3e", dispErr);
                 }
+                this->iterInfo.dispErr.at(igroup) = dispErr;
             }
         }
         answer = converged_force && converged_disp;
@@ -863,6 +890,10 @@ NRSolver :: checkConvergence(FloatArray &RT, FloatArray &F, FloatArray &rhs,  Fl
         double forceErr_abs = sqrt(forceErr); // Absolute force error
         double dispErr_abs = sqrt(dXdX);      // Absolute displacement error
 
+        // single group of all dofs: dofGroups stays empty, errors filled in below, if evaluated
+        this->iterInfo.forceErr = Vec1( std::numeric_limits<double>::quiet_NaN() );
+        this->iterInfo.dispErr = Vec1( std::numeric_limits<double>::quiet_NaN() );
+
         bool converged_force = false;
         if ( rtolf.at(1) > 0.0 || atolf.at(1) > 0.0 ) {
             // we compute a relative error norm
@@ -888,6 +919,7 @@ NRSolver :: checkConvergence(FloatArray &RT, FloatArray &F, FloatArray &rhs,  Fl
                 // store the errors from the current iteration for use in the next
                 forceErrVec.at(1) = forceErr;
             }
+            this->iterInfo.forceErr.at(1) = forceErr;
         }
 
         if ( rtold.at(1) > 0.0 ) {
@@ -911,6 +943,7 @@ NRSolver :: checkConvergence(FloatArray &RT, FloatArray &F, FloatArray &rhs,  Fl
                 OOFEM_LOG_INFO(" %-15e", dispErr); // Relative displacement error
                 if (atold.at(1) > 0.0) OOFEM_LOG_INFO(" %-15e", dispErr_abs); // Absolute displacement error
             }
+            this->iterInfo.dispErr.at(1) = dispErr;
             answer = converged_force && converged_disp;
         } else {
             answer = converged_force; // Only force convergence was checked

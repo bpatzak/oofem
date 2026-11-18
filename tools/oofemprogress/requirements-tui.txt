@@ -1,0 +1,4 @@
+# optional: nicer terminal charts (--tui-renderer plotext); plotext 5 and 6 are supported.
+# plotext 6 draws with a compiled C++ kernel (prebuilt wheels for common platforms); where it
+# cannot be installed or loaded, use the pure Python plotext 5: pip install "plotext<6"
+plotext

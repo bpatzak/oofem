@@ -79,6 +79,12 @@ public:
      * @param substepFlag If true, only modules requesting substep output are processed.
      */
     void doOutput(TimeStep *tStep, bool substepFlag = false);
+    /**
+     * Passes the data of a finished nonlinear solver iteration to all modules.
+     * @param tStep Time step being solved.
+     * @param info Iteration data.
+     */
+    void doIterationOutput(TimeStep *tStep, const SolverIterationInfo &info);
     /// Writes the output of output modules only.
     void doOutputModulesOutput(TimeStep *tStep, bool substepFlag = false);
     /// Writes the output of export modules only.
