@@ -135,6 +135,8 @@ public:
 
     double computeVolumeAround(GaussPoint *gp) override;
     void printOutputAt(FILE *file, TimeStep *tStep) override;
+    /// Reports the text of printOutputAt (no structured output yet).
+    void reportOutput(OutputWriter &writer, TimeStep *tStep) override { this->reportLegacyOutput(writer, tStep); }
 
     Element_Geometry_Type giveGeometryType() const override {return EGT_line_1;}
 

@@ -98,6 +98,8 @@ public:
     Interface *giveInterface(InterfaceType it) override;
     int checkConsistency() override;
     void printOutputAt(FILE *File, TimeStep *tStep) override;
+    /// Reports the text of printOutputAt (no structured output yet).
+    void reportOutput(OutputWriter &writer, TimeStep *tStep) override { this->reportLegacyOutput(writer, tStep); }
 
 protected:
     void computeGaussPoints() override;

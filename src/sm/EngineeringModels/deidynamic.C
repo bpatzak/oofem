@@ -33,6 +33,7 @@
  */
 
 #include "sm/EngineeringModels/deidynamic.h"
+#include "outputwriter.h"
 #include "timestep.h"
 #include "dofmanager.h"
 #include "element.h"
@@ -366,5 +367,14 @@ void DEIDynamic :: printDofOutputAt(FILE *stream, Dof *iDof, TimeStep *tStep)
     };
 
     iDof->printMultipleOutputAt(stream, tStep, dofchar, dofmodes, 3);
+}
+
+
+void
+DEIDynamic :: reportDofOutputAt(OutputWriter &writer, Dof *iDof, TimeStep *tStep)
+{
+    iDof->reportOutputAt(writer, tStep, "d", VM_Total);
+    iDof->reportOutputAt(writer, tStep, "v", VM_Velocity);
+    iDof->reportOutputAt(writer, tStep, "a", VM_Acceleration);
 }
 } // end namespace oofem

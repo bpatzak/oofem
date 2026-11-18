@@ -191,20 +191,7 @@ StaggeredProblem :: initializeFrom(const std::shared_ptr<InputRecord> &ir)
     if ( suppressOutput ) {
         printf("Suppressing output.\n");
     } else {
-
-        if ( ( outputStream = fopen(this->dataOutputFileName.c_str(), "w") ) == NULL ) {
-            throw ValueInputException(ir, "None", "can't open output file: " + this->dataOutputFileName);
-        }
-
-        fprintf(outputStream, "%s", PRG_HEADER);
-        fprintf(outputStream, "\nStarting analysis on: %s\n", ctime(& this->startTime) );
-        fprintf(outputStream, "%s\n", simulationDescription.c_str());
-
-#ifdef __MPI_PARALLEL_MODE
-        if ( this->isParallel() ) {
-            fprintf(outputStream, "Problem rank is %d/%d on %s\n\n", this->rank, this->numProcs, this->processor_name);
-        }
-#endif
+        this->createDefaultOutputModule();
     }
 }
 
@@ -478,7 +465,7 @@ StaggeredProblem :: solveYourself()
             OOFEM_LOG_INFO("EngngModel info: user time consumed by solution step %d: %.2fs\n",
                            sp->giveCurrentStep()->giveNumber(), _steptime);
 
-            if(!suppressOutput) {
+            if ( this->hasTextOutput() ) {
             	fprintf(this->giveOutputStream(), "\nUser time consumed by solution step %d: %.3f [s]\n\n",
                         sp->giveCurrentStep()->giveNumber(), _steptime);
             }

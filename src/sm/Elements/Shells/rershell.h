@@ -81,6 +81,8 @@ public:
     //
     void giveCharacteristicTensor(FloatMatrix &answer, CharTensor type, GaussPoint *gp, TimeStep *tStep);
     void printOutputAt(FILE *file, TimeStep *tStep) override;
+    /// Reports the text of printOutputAt (no structured output yet).
+    void reportOutput(OutputWriter &writer, TimeStep *tStep) override { this->reportLegacyOutput(writer, tStep); }
 
     const FloatMatrix *computeGtoLRotationMatrix() override { return CCTPlate3d::computeGtoLRotationMatrix(); }
     bool computeGtoLRotationMatrix(FloatMatrix &answer) override;

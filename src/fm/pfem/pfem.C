@@ -38,6 +38,7 @@
 // incompressible flows with free-surface and breaking waves
 
 #include "pfem.h"
+#include "outputwriter.h"
 #include "nummet.h"
 #include "timestep.h"
 #include "metastep.h"
@@ -766,6 +767,24 @@ PFEM :: printDofOutputAt(FILE *stream, Dof *iDof, TimeStep *atTime)
         iDof->printSingleOutputAt(stream, atTime, 'p', VM_Total);
     } else {
         OOFEM_ERROR("printDofOutputAt: unsupported dof type");
+    }
+}
+
+
+void
+PFEM :: reportDofOutputAt(OutputWriter &writer, Dof *iDof, TimeStep *atTime)
+{
+    DofIDItem type = iDof->giveDofID();
+    if ( ( type == V_u ) || ( type == V_v ) || ( type == V_w ) ) {
+        iDof->reportOutputAt(writer, atTime, "*", VM_Intermediate);
+        iDof->reportOutputAt(writer, atTime, "u", VM_Total);
+        // coordinate of the dof manager in the direction of the dof (as in printDofOutputAt)
+        int dofNumber = type == V_u ? 1 : ( type == V_v ? 2 : 3 );
+        writer.field( "c", iDof->giveDofManager()->giveCoordinate(dofNumber) );
+    } else if ( ( type == P_f ) ) {
+        iDof->reportOutputAt(writer, atTime, "p", VM_Total);
+    } else {
+        OOFEM_ERROR("reportDofOutputAt: unsupported dof type");
     }
 }
 

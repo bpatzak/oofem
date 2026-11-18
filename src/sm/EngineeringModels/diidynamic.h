@@ -53,6 +53,7 @@
 //@}
 
 namespace oofem {
+class OutputWriter;
 /**
  * This class implements Direct Implicit Integration of Dynamic problem
  *
@@ -113,6 +114,7 @@ public:
     fMode giveFormulation() override { return TL; }
 
     void printDofOutputAt(FILE *stream, Dof *iDof, TimeStep *tStep) override;
+    void reportDofOutputAt(OutputWriter &writer, Dof *iDof, TimeStep *tStep) override;
 
     void timesMtrx(FloatArray &answer, FloatArray &vec, CharType type, Domain *domain, TimeStep *tStep);
     void assembleLoadVector(FloatArray &_loadVector, Domain *domain, ValueModeType mode, TimeStep *tStep);

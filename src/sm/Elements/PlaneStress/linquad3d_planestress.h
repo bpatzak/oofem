@@ -92,6 +92,8 @@ public:
     int computeLoadGToLRotationMtrx(FloatMatrix &answer) override;
 
     void printOutputAt(FILE *file, TimeStep *tStep) override;
+    /// Reports the text of printOutputAt (no structured output yet).
+    void reportOutput(OutputWriter &writer, TimeStep *tStep) override { this->reportLegacyOutput(writer, tStep); }
     int giveIPValue(FloatArray &answer, GaussPoint *gp, InternalStateType type, TimeStep *tStep) override;
     void giveCharacteristicTensor(FloatMatrix &answer, CharTensor type, GaussPoint *gp, TimeStep *tStep);
 

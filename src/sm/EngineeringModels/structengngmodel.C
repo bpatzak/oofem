@@ -45,6 +45,9 @@
 #include "activebc.h"
 #include "assemblercallback.h"
 #include "unknownnumberingscheme.h"
+#include "outputwriter.h"
+#include "outputselection.h"
+#include "set.h"
 
 #include "sm/Materials/structuralmaterial.h"
 #include "sm/CrossSections/structuralcrosssection.h"
@@ -135,6 +138,60 @@ StructuralEngngModel :: printReactionForces(TimeStep *tStep, int di, FILE *out)
         }
     }
 }
+
+void
+StructuralEngngModel :: reportReactionForces(OutputWriter &writer, TimeStep *tStep, int di, int nodeSet)
+{
+    FloatArray reactions;
+    IntArray dofManMap, dofidMap, eqnMap;
+    Domain *domain = this->giveDomain(di);
+
+    // the table is sorted by dof manager number (and dof id), so the dofs of a dof manager are consecutive
+    this->buildReactionTable(dofManMap, dofidMap, eqnMap, tStep, di);
+    this->computeReaction(reactions, tStep, di);
+    const IntArray *nodes = nodeSet ? & domain->giveSet(nodeSet)->giveNodeList() : nullptr;
+
+    writer.beginSection("reactions");
+    int current = 0; // dof manager with open record (0 = none)
+    for ( int i = 1; i <= dofManMap.giveSize(); i++ ) {
+        int number = dofManMap.at(i);
+        if ( nodes && !nodes->contains(number) ) {
+            continue;
+        }
+        DofManager *dman = domain->giveDofManager(number);
+        if ( number != current ) {
+            if ( current ) {
+                writer.endList();
+                writer.endRecord();
+            }
+            writer.beginRecord( number, dman->giveLabel(), dman->giveClassName() );
+            writer.beginList("dofs");
+            current = number;
+        }
+        Dof *dof = dman->giveDofWithID( dofidMap.at(i) );
+        writer.beginGroup();
+        writer.field( "id", dofidMap.at(i) );
+        writer.field( "name", __DofIDItemToString( dof->giveDofID() ) );
+        writer.field( "value", reactions.at( eqnMap.at(i) ) );
+        writer.field( "bc", dof->giveBcId() );
+        writer.endGroup();
+    }
+    if ( current ) {
+        writer.endList();
+        writer.endRecord();
+    }
+    writer.endSection();
+}
+
+
+void
+StructuralEngngModel :: reportDomainOutputAt(OutputWriter &writer, Domain *domain, TimeStep *tStep, const OutputFilter &filter)
+{
+    if ( filter.reactions ) {
+        this->reportReactionForces( writer, tStep, domain->giveNumber(), filter.giveNodeSet( domain->giveNumber() ) );
+    }
+}
+
 
 void StructuralEngngModel :: terminate(TimeStep *tStep){
     EngngModel :: terminate(tStep);

@@ -206,9 +206,12 @@ them.
     post-processing.
 
 :optparam:`suppress_output`
-    A flag; when present, writing to the ``.out`` file is suppressed.  Useful
-    when the results are taken from an export module instead and the text
-    output would only cost time and disk space.
+    A flag; when present, writing to the ``.out`` file is suppressed: the
+    implicit standard text output module is not created (see
+    :ref:`OutputModulesSec`).  Useful when the results are taken from an export
+    module instead and the text output would only cost time and disk space.
+    The text output can still be produced by an ``output`` module declared
+    explicitly in the list of export modules.
 
 :optparam:`initialguess{in}`
     How the first iteration of each step is started.  ``0`` (``IG_None``)

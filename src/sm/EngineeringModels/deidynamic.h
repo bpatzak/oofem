@@ -45,6 +45,7 @@
 //@}
 
 namespace oofem {
+class OutputWriter;
 /**
  * This class implements Linear (- may be changed) solution of dynamic
  * problems using Direct Explicit Integration scheme - Central Difference
@@ -94,6 +95,7 @@ public:
     NumericalMethod *giveNumericalMethod(MetaStep *mStep) override;
 
     void printDofOutputAt(FILE *stream, Dof *iDof, TimeStep *tStep) override;
+    void reportDofOutputAt(OutputWriter &writer, Dof *iDof, TimeStep *tStep) override;
 
     // identification
     const char *giveClassName() const override { return "DEIDynamic"; }

@@ -35,6 +35,7 @@
 #include "gausspoint.h"
 #include "matstatus.h"
 #include "material.h"
+#include "outputwriter.h"
 
 #include <memory>
 #include <algorithm>
@@ -84,6 +85,45 @@ GaussPoint::~GaussPoint()
         }
 
         fprintf(file, "\t} end layers report\n");
+    }
+}
+
+
+void GaussPoint :: reportOutput(OutputWriter &writer, TimeStep *tStep)
+{
+    writer.beginList("statuses");
+    for ( auto const &[key, val] : materialStatuses ) {
+        writer.beginGroup();
+        writer.field( "class", val->giveClassName() );
+        val->reportOutput(writer, tStep);
+        writer.endGroup();
+    }
+    writer.endList();
+
+    if ( gaussPoints.size() != 0 ) { // layered material
+        writer.beginList("layers");
+        for ( auto &gp: gaussPoints ) {
+            writer.beginGroup();
+            writer.field( "number", gp->giveNumber() );
+            gp->reportOutput(writer, tStep);
+            writer.endGroup();
+        }
+        writer.endList();
+    }
+}
+
+
+void IntegrationPointStatus :: reportOutput(OutputWriter &writer, TimeStep *tStep) const
+{
+    this->reportLegacyOutput(writer, tStep);
+}
+
+
+void IntegrationPointStatus :: reportLegacyOutput(OutputWriter &writer, TimeStep *tStep) const
+{
+    std :: string text = captureOutput([this, tStep] (FILE *f) { this->printOutputAt(f, tStep); });
+    if ( !text.empty() ) {
+        writer.legacyText(text);
     }
 }
 

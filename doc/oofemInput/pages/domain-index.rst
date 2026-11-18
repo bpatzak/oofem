@@ -118,8 +118,12 @@ overridden in an individual dof manager record; see
 Output manager record
 ---------------------
 
-The output manager controls the text output.  It can filter output to specific
-solution steps and, within those steps, to specific dof managers and elements.
+The output manager controls the standard text output written by the implicit
+``output`` module (see :ref:`OutputModulesSec`).  It can filter output to
+specific solution steps and, within those steps, to specific dof managers and
+elements.  The record is not used when the output is suppressed
+(:param:`suppress_output`) or when the ``output`` module is declared
+explicitly.
 
 .. record::
 

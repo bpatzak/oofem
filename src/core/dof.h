@@ -53,6 +53,7 @@ class PrimaryField;
 class Domain;
 class DofManager;
 class TimeStep;
+class OutputWriter;
 class BoundaryCondition;
 class InitialCondition;
 class UnknownNumberingScheme;
@@ -326,6 +327,25 @@ public:
      * Called from corresponding e-model.
      */
     virtual void printMultipleOutputAt(FILE *File, TimeStep *tStep, char *ch, ValueModeType *mode, int nite);
+    /**
+     * Reports the value of the unknown related to the receiver at given time step as a field
+     * of the current group of given writer (structured output, counterpart of printSingleOutputAt).
+     * Called from EngngModel::reportDofOutputAt.
+     * @param writer Output writer.
+     * @param tStep Time step.
+     * @param name Name of the field (the unknown character used in the text output, e.g. "d", "v", "a").
+     * @param mode Mode of the unknown.
+     * @param scale Scaling factor applied to the value.
+     */
+    void reportOutputAt(OutputWriter &writer, TimeStep *tStep, const char *name, ValueModeType mode, double scale = 1.0);
+    /**
+     * Reports the receiver as a group (item of the "dofs" list of a dof manager, structured output):
+     * the DOF identification ("id", "name") followed by its unknowns, as reported by the
+     * engineering model (see EngngModel::reportDofOutputAt).
+     * @param writer Output writer.
+     * @param tStep Time step.
+     */
+    void reportOutput(OutputWriter &writer, TimeStep *tStep);
     void printSingleOutputWithAdditionAt(FILE *File, TimeStep *tStep, char ch, ValueModeType mode, double addend);
     /// Prints the receiver state on stdout.
     virtual void printYourself();

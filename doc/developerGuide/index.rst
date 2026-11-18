@@ -22,6 +22,7 @@ Version: |version|, Date: |today|
    dofmanagers.rst
    elementframe.rst
    materialframe.rst
+   outputframe.rst
    utilityclasses.rst
    xfem.rst
    iga.rst

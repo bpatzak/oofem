@@ -37,6 +37,9 @@
 #include "contextioerr.h"
 #include "sm/Elements/nlstructuralelement.h"
 #include "gausspoint.h"
+#include "outputwriter.h"
+
+#include <typeinfo>
 
 namespace oofem {
 StructuralMaterialStatus :: StructuralMaterialStatus(GaussPoint *g) :
@@ -109,6 +112,35 @@ void StructuralMaterialStatus :: printOutputAt(FILE *File, TimeStep *tStep) cons
       }
     }
     fprintf(File, "\n");
+}
+
+
+void StructuralMaterialStatus :: reportStrainsAndStresses(OutputWriter &writer, TimeStep *tStep) const
+{
+    FloatArray helpVec;
+    // see printOutputAt for the reason of dynamic cast
+    NLStructuralElement *el = dynamic_cast< NLStructuralElement * >( gp->giveElement() );
+    if ( el && el->giveGeometryMode() == 1 ) {
+        StructuralMaterial :: giveFullVectorFormF( helpVec, FVector, gp->giveMaterialMode() );
+        writer.field("F", helpVec);
+        StructuralMaterial :: giveFullVectorForm( helpVec, PVector, gp->giveMaterialMode() );
+        writer.field("P", helpVec);
+    } else {
+        StructuralMaterial :: giveFullSymVectorForm( helpVec, strainVector, gp->giveMaterialMode() );
+        writer.field("strains", helpVec);
+        StructuralMaterial :: giveFullSymVectorForm( helpVec, stressVector, gp->giveMaterialMode() );
+        writer.field("stresses", helpVec);
+    }
+}
+
+
+void StructuralMaterialStatus :: reportOutput(OutputWriter &writer, TimeStep *tStep) const
+{
+    this->reportStrainsAndStresses(writer, tStep);
+    if ( typeid( * this ) != typeid( StructuralMaterialStatus ) ) {
+        // derived status without structured output: report its full text output as well
+        this->reportLegacyOutput(writer, tStep);
+    }
 }
 
 

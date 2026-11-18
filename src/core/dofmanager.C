@@ -33,6 +33,7 @@
  */
 
 #include "dofmanager.h"
+#include "outputwriter.h"
 #include "masterdof.h"
 #include "simpleslavedof.h"
 #include "timestep.h"
@@ -512,6 +513,16 @@ void DofManager :: printOutputAt(FILE *stream, TimeStep *tStep)
     for ( Dof *dof: *this ) {
         emodel->printDofOutputAt(stream, dof, tStep);
     }
+}
+
+
+void DofManager :: reportOutput(OutputWriter &writer, TimeStep *tStep)
+{
+    writer.beginList("dofs");
+    for ( Dof *dof: *this ) {
+        dof->reportOutput(writer, tStep);
+    }
+    writer.endList();
 }
 
 

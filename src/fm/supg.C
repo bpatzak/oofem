@@ -33,6 +33,7 @@
  */
 
 #include "supg.h"
+#include "outputwriter.h"
 #include "sparsemtrx.h"
 #include "nrsolver.h"
 #include "timestep.h"
@@ -925,6 +926,22 @@ SUPG :: printDofOutputAt(FILE *stream, Dof *iDof, TimeStep *tStep)
         iDof->printSingleOutputAt(stream, tStep, 'd', VM_Total, uscale);
     } else if ( type == P_f ) {
         iDof->printSingleOutputAt(stream, tStep, 'd', VM_Total, pscale);
+    } else {
+        OOFEM_ERROR("unsupported dof type");
+    }
+}
+
+
+void
+SUPG :: reportDofOutputAt(OutputWriter &writer, Dof *iDof, TimeStep *tStep)
+{
+    double pscale = ( dscale * uscale * uscale );
+
+    DofIDItem type = iDof->giveDofID();
+    if ( type == V_u || type == V_v || type == V_w ) {
+        iDof->reportOutputAt(writer, tStep, "d", VM_Total, uscale);
+    } else if ( type == P_f ) {
+        iDof->reportOutputAt(writer, tStep, "d", VM_Total, pscale);
     } else {
         OOFEM_ERROR("unsupported dof type");
     }

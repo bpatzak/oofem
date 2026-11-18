@@ -118,15 +118,8 @@ void IncrementalLinearStatic :: initializeFrom(const std::shared_ptr<InputRecord
     	printf("Suppressing output.\n");
     }
     else {
-
-		if ( ( outputStream = fopen(this->dataOutputFileName.c_str(), "w") ) == NULL ) {
-			OOFEM_ERROR("Can't open output file %s", this->dataOutputFileName.c_str());
-		}
-
-		fprintf(outputStream, "%s", PRG_HEADER);
-		fprintf(outputStream, "\nStarting analysis on: %s\n", ctime(& this->startTime) );
-		fprintf(outputStream, "%s\n", simulationDescription.c_str());
-	}
+        this->createDefaultOutputModule();
+    }
 
     //StructuralEngngModel::initializeFrom (ir);
 }

@@ -92,6 +92,15 @@ public:
     StructuralMaterialStatus(GaussPoint * g);
 
     void printOutputAt(FILE *file, TimeStep *tStep) const override;
+    /**
+     * Reports strains and stresses (small deformations) or deformation gradient F and
+     * first Piola-Kirchhoff stress P (large deformations), in full vector form.
+     * Derived statuses which do not override this service report in addition the text
+     * of their printOutputAt (field "text"), so that no information is lost.
+     */
+    void reportOutput(OutputWriter &writer, TimeStep *tStep) const override;
+    /// Reports strain and stress measures (see reportOutput).
+    void reportStrainsAndStresses(OutputWriter &writer, TimeStep *tStep) const;
 
     void initTempStatus() override;
     void updateYourself(TimeStep *tStep) override;

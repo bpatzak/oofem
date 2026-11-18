@@ -61,6 +61,7 @@
 //@}
 
 namespace oofem {
+class OutputWriter;
 
 /// Implementation for assembling external forces vectors in standard monolithic FE-problems
 class NumberOfNodalPrescribedTractionPressureAssembler : public VectorAssembler
@@ -253,6 +254,7 @@ public:
     fMode giveFormulation() override { return TL; }
 
     void printDofOutputAt(FILE *stream, Dof *iDof, TimeStep *tStep) override;
+    void reportDofOutputAt(OutputWriter &writer, Dof *iDof, TimeStep *tStep) override;
 
     int giveNumberOfDomainEquations(int, const UnknownNumberingScheme &num) override;
 

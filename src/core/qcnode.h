@@ -103,6 +103,8 @@ public:
     virtual int giveMasterElementNumber() { return this->masterElement; }
 
     void printOutputAt(FILE *stream, TimeStep *tStep) override;
+    /// Reports the text of printOutputAt (no structured output yet).
+    void reportOutput(OutputWriter &writer, TimeStep *tStep) override { this->reportLegacyOutput(writer, tStep); }
 
     const char *giveClassName() const override { return "qcNode"; }
     const char *giveInputRecordName() const override { return _IFT_qcNode_Name; }

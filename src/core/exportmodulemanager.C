@@ -36,6 +36,8 @@
 #include "modulemanager.h"
 #include "exportmodule.h"
 #include "classfactory.h"
+#include "error.h"
+#include "textoutputmodule.h"
 
 namespace oofem {
 ExportModuleManager :: ExportModuleManager(EngngModel *emodel) : ModuleManager< ExportModule >(emodel)
@@ -50,22 +52,89 @@ std::unique_ptr<ExportModule> ExportModuleManager :: CreateModule(const char *na
 }
 
 void
+ExportModuleManager :: registerModule(std :: unique_ptr< ExportModule > &module)
+{
+    if ( dynamic_cast< OutputModule * >( module.get() ) ) {
+        if ( dynamic_cast< TextOutputModule * >( module.get() ) ) {
+            auto *existing = this->giveTextOutputModule();
+            if ( existing ) {
+                if ( !existing->isImplicit() ) {
+                    OOFEM_ERROR("Only one text output module can be defined");
+                }
+                // explicit module replaces the implicit (default) one
+                for ( auto it = outputModuleList.begin(); it != outputModuleList.end(); ++it ) {
+                    if ( it->get() == existing ) {
+                        outputModuleList.erase(it);
+                        break;
+                    }
+                }
+            }
+        }
+        outputModuleList.emplace_back( static_cast< OutputModule * >( module.release() ) );
+    } else {
+        ModuleManager< ExportModule > :: registerModule(module);
+    }
+}
+
+
+OutputModule *
+ExportModuleManager :: giveOutputModule(int i)
+{
+    if ( i < 1 || i > (int)outputModuleList.size() ) {
+        OOFEM_ERROR("No output module no. %d defined", i);
+    }
+    return outputModuleList [ i - 1 ].get();
+}
+
+
+TextOutputModule *
+ExportModuleManager :: giveTextOutputModule()
+{
+    for ( auto &module: outputModuleList ) {
+        if ( auto *tom = dynamic_cast< TextOutputModule * >( module.get() ) ) {
+            return tom;
+        }
+    }
+    return nullptr;
+}
+
+
+void
 ExportModuleManager :: doOutput(TimeStep *tStep, bool substepFlag)
 {
-    for ( auto &module: moduleList ) {
-        if ( substepFlag ) {
-            if ( module->testSubStepOutput() ) {
-                module->doOutput(tStep);
-            }
-        } else {
+    this->doOutputModulesOutput(tStep, substepFlag);
+    this->doExportModulesOutput(tStep, substepFlag);
+}
+
+
+void
+ExportModuleManager :: doOutputModulesOutput(TimeStep *tStep, bool substepFlag)
+{
+    for ( auto &module: outputModuleList ) {
+        if ( !substepFlag || module->testSubStepOutput() ) {
             module->doOutput(tStep);
         }
     }
 }
 
+
+void
+ExportModuleManager :: doExportModulesOutput(TimeStep *tStep, bool substepFlag)
+{
+    for ( auto &module: moduleList ) {
+        if ( !substepFlag || module->testSubStepOutput() ) {
+            module->doOutput(tStep);
+        }
+    }
+}
+
+
 void
 ExportModuleManager :: initialize()
 {
+    for ( auto &module: outputModuleList ) {
+        module->initialize();
+    }
     for ( auto &module: moduleList ) {
         module->initialize();
     }
@@ -75,6 +144,9 @@ ExportModuleManager :: initialize()
 void
 ExportModuleManager :: terminate()
 {
+    for ( auto &module: outputModuleList ) {
+        module->terminate();
+    }
     for ( auto &module: moduleList ) {
         module->terminate();
     }

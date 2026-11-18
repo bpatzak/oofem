@@ -64,6 +64,7 @@
 //@}
 
 namespace oofem {
+class OutputWriter;
 class SparseMtrx;
 class SparseNonLinearSystemNM;
 
@@ -182,6 +183,7 @@ public:
     fMode giveFormulation() override { return TL; }
 
     void printDofOutputAt(FILE *stream, Dof *iDof, TimeStep *tStep) override;
+    void reportDofOutputAt(OutputWriter &writer, Dof *iDof, TimeStep *tStep) override;
 
     int requiresUnknownsDictionaryUpdate() override { return renumberFlag; }
 

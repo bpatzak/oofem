@@ -62,6 +62,7 @@
 #include "parametermanager.h"
 #include "cltypes.h"
 #include "paramkey.h"
+#include "outputwriter.h"
 
 #ifdef __OOFEG
  #include "oofeggraphiccontext.h"
@@ -817,6 +818,55 @@ Element :: printOutputAt(FILE *file, TimeStep *tStep)
     } else {
         fprintf(file, "is not active in current time step\n");
     }
+}
+
+
+void
+Element :: reportOutput(OutputWriter &writer, TimeStep *tStep)
+{
+    if ( this->giveNumberOfInternalDofManagers() ) {
+        writer.beginList("internal_dofmans");
+        for ( int i = 1; i <= this->giveNumberOfInternalDofManagers(); ++i ) {
+            DofManager *dman = this->giveInternalDofManager(i);
+            writer.beginGroup();
+            writer.field( "number", dman->giveNumber() );
+            writer.field( "class", dman->giveClassName() );
+            dman->reportOutput(writer, tStep);
+            writer.endGroup();
+        }
+        writer.endList();
+    }
+
+    bool active = this->isActivated(tStep);
+    writer.field("active", active);
+    if ( active ) {
+        this->reportIntegrationPoints(writer, tStep, [&writer, tStep] (GaussPoint *gp) { gp->reportOutput(writer, tStep); });
+    }
+}
+
+
+void
+Element :: reportIntegrationPoints(OutputWriter &writer, TimeStep *tStep, const std :: function< void(GaussPoint *) > &reportPoint)
+{
+    // integration rules -> integration points, the points identified by their number within the rule
+    writer.beginList("integration_rules");
+    for ( auto &iRule: integrationRulesArray ) {
+        writer.beginGroup();
+        writer.field( "number", iRule->giveNumber() );
+        writer.field( "class", iRule->giveClassName() );
+        writer.beginList("gps");
+        for ( auto &gp: *iRule ) {
+            writer.beginGroup();
+            writer.field( "number", gp->giveNumber() );
+            writer.field( "natural_coords", gp->giveNaturalCoordinates() );
+            writer.field( "weight", gp->giveWeight() );
+            reportPoint(gp);
+            writer.endGroup();
+        }
+        writer.endList();
+        writer.endGroup();
+    }
+    writer.endList();
 }
 
 

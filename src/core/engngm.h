@@ -109,6 +109,9 @@ class SparseMtrx;
 class NumericalMethod;
 class InitModuleManager;
 class ExportModuleManager;
+class OutputWriter;
+class OutputFilter;
+class OutputContent;
 class FloatMatrix;
 class FloatArray;
 class LoadBalancer;
@@ -248,8 +251,6 @@ protected:
     std :: string dataOutputFileName;
     /// String with core output file name
     std :: string coreOutputFileName;
-    /// Output stream.
-    FILE *outputStream;
     /// String with reference file name
     std :: string referenceFileName;
     /// Domain context output mode.
@@ -377,8 +378,14 @@ public:
         domainNeqs.at(id) = neq;
     }
     // input / output
-    /// Returns file descriptor of output file.
+    /**
+     * Returns file descriptor of the standard (text) output file.
+     * The file is managed by the TextOutputModule of the receiver (see giveExportModuleManager);
+     * it is an error to request the stream when there is no text output (output suppressed).
+     */
     FILE *giveOutputStream();
+    /// Returns true if the receiver has the standard text output (a TextOutputModule is defined).
+    bool hasTextOutput();
     /**
      * Returns base output file name
      * to which extensions, like .out .vtu .osf should be added.
@@ -652,6 +659,13 @@ public:
      * belonging to receiver. Receiver may use value-name extracting functions
      * to extract particular field from record.*/
     virtual void initializeFrom(const std::shared_ptr<InputRecord> &ir);
+    /**
+     * Creates the default (implicit) standard text output module (TextOutputModule),
+     * unless a text output module already exists. Should be called from initializeFrom
+     * when the output is not suppressed. A text output module declared explicitly
+     * in the list of export modules replaces the implicit one.
+     */
+    void createDefaultOutputModule();
     /// Instanciate problem domains by calling their instanciateYourself() service
     int instanciateDomains(DataReader &dr);
     /// Instanciate problem meta steps by calling their instanciateYourself() service
@@ -1116,6 +1130,30 @@ public:
     virtual void printOutputAt(FILE *file, TimeStep *tStep);
     virtual void printOutputAt(FILE *file, TimeStep *tStep, const IntArray &nodeSets, const IntArray &elementSets);
     /**
+     * Reports the output of the receiver for given time step using given writer
+     * (structured output of output and export modules). For each domain selected by the filter,
+     * the dof managers and elements (optionally limited to the sets of the filter) are reported
+     * as records of the sections "dofmans" and "elements". The receiver opens the domains,
+     * sections and records, the fields of the records are reported by given content
+     * (the full state of the components for output modules, selected quantities for export modules).
+     * @param writer Output writer.
+     * @param tStep Solution step.
+     * @param filter Selection of domains, dof managers, elements and sections.
+     * @param content Content of the records.
+     */
+    virtual void reportOutputAt(OutputWriter &writer, TimeStep *tStep, const OutputFilter &filter, OutputContent &content);
+    /**
+     * Reports problem specific sections of given domain (structured output), called by reportOutputAt
+     * after the dof managers and elements of the domain have been reported. Problems adding data
+     * to the text output of a domain (e.g. reaction forces) should report them here as sections
+     * (see OutputWriter::beginSection), respecting the filter. The default implementation reports nothing.
+     * @param writer Output writer.
+     * @param domain Domain.
+     * @param tStep Solution step.
+     * @param filter Selection of reported data.
+     */
+    virtual void reportDomainOutputAt(OutputWriter &writer, Domain *domain, TimeStep *tStep, const OutputFilter &filter) { }
+    /**
      * Outputs all nodes in the given set.
      * @param file Output stream.
      * @param domain Domain.
@@ -1145,6 +1183,18 @@ public:
      * @param tStep solution step
      */
     virtual void printDofOutputAt(FILE *stream, Dof *iDof, TimeStep *tStep);
+    /**
+     * DOF reporting routine for structured output (output modules using OutputWriter).
+     * The receiver reports the unknowns of given DOF as fields of the current group
+     * (see Dof::reportOutputAt), named by the unknown character used in the text output
+     * (e.g. 'd', 'v', 'a'). The default implementation reports the total value ("d"),
+     * as the default printDofOutputAt does. Problems overriding printDofOutputAt must
+     * override this service as well, reporting the same unknowns under the same names.
+     * @param writer Output writer.
+     * @param iDof DOF to be processed.
+     * @param tStep Solution step.
+     */
+    virtual void reportDofOutputAt(OutputWriter &writer, Dof *iDof, TimeStep *tStep);
 
 
     // identification
@@ -1158,6 +1208,10 @@ public:
     int giveRank() const { return rank; }
     /// Returns the number of collaborating processes.
     int giveNumberOfProcesses() const { return numProcs; }
+#ifdef __MPI_PARALLEL_MODE
+    /// Returns the name of the processor the receiver runs on.
+    const char *giveProcessorName() const { return processor_name; }
+#endif
 
 
     /**

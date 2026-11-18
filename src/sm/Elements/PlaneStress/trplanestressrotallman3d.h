@@ -101,6 +101,8 @@ public:
     { return ( ( ext == Element_SurfaceLoadSupport ) ? 1 : 0 ); }
 
     void printOutputAt(FILE *file, TimeStep *tStep) override;
+    /// Reports the text of printOutputAt (no structured output yet).
+    void reportOutput(OutputWriter &writer, TimeStep *tStep) override { this->reportLegacyOutput(writer, tStep); }
 };
 } // end namespace oofem
 #endif //  trplanestressrotallman3d_h

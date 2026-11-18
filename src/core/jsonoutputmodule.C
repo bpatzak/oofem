@@ -32,54 +32,56 @@
  *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#ifndef outputexportmodule_h_
-#define outputexportmodule_h_
-
-#include <vector>
-
-#include "exportmodule.h"
-
-///@name Input fields for OutputExportModule
-//@{
-#define _IFT_OutputExportModule_Name "output"
-#define _IFT_OutputExportModule_nodeSets "node_sets"
-#define _IFT_OutputExportModule_elementSets "element_sets"
-//@}
+#include "jsonoutputmodule.h"
+#include "outputwriter.h"
+#include "outputselection.h"
+#include "engngm.h"
+#include "timestep.h"
+#include "classfactory.h"
 
 namespace oofem {
-class Domain;
-class Element;
-class DofManager;
+REGISTER_ExportModule(JsonOutputModule)
 
-/**
- * Standard output for OOFEM. Most available data is written in plain text.
- * Implementation simply relies on EngngModel::printOutputAt
- *
- * @author Mikael Öhman
- */
-class OOFEM_EXPORT OutputExportModule : public ExportModule
+JsonOutputModule :: JsonOutputModule(int n, EngngModel *e) : OutputModule(n, e), file(e, n)
+{ }
+
+
+void
+JsonOutputModule :: initializeFrom(const std::shared_ptr<InputRecord> &ir)
 {
-protected:
-    FILE *outputStream;
+    OutputModule :: initializeFrom(ir);
 
-    /// Set which contains nodes which should be exported
-    IntArray nodeSets;
+    filter = OutputFilter();
+    IR_GIVE_OPTIONAL_FIELD(ir, filter.nodeSets, _IFT_JsonOutputModule_nodeSets);
+    IR_GIVE_OPTIONAL_FIELD(ir, filter.elementSets, _IFT_JsonOutputModule_elementSets);
+    // all domains are reported unless restricted by domain_mask
+    if ( !domain_all_flag ) {
+        filter.domains = domainMask;
+    }
+    std :: string fileName;
+    IR_GIVE_OPTIONAL_FIELD(ir, fileName, _IFT_JsonOutputModule_fileName);
+    file.setFileName(fileName);
+}
 
-    /// Set which contains elements which should be exported
-    IntArray elementSets;
 
-public:
-    OutputExportModule(int n, EngngModel * e);
-    virtual ~OutputExportModule() {}
+void
+JsonOutputModule :: doOutput(TimeStep *tStep, bool forcedOutput)
+{
+    if ( !( testTimeStepOutput(tStep) || forcedOutput ) ) {
+        return;
+    }
 
-    void initializeFrom(const std::shared_ptr<InputRecord> &ir) override;
-    FILE *giveOutputStream();
+    JsonLinesWriter &w = file.beginStep(tStep, timeScale);
+    // full state of the components (default content)
+    OutputContent content;
+    emodel->reportOutputAt(w, tStep, filter, content);
+    file.endStep();
+}
 
-    void doOutput(TimeStep *tStep, bool forcedOutput = false) override;
-    void terminate() override;
 
-    const char *giveClassName() const override { return "OutputExportModule"; }
-    const char *giveInputRecordName() const { return _IFT_OutputExportModule_Name; }
-};
+void
+JsonOutputModule :: terminate()
+{
+    file.close();
+}
 } // end namespace oofem
-#endif // outputexportmodule_h_

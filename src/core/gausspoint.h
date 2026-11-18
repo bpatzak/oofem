@@ -51,6 +51,7 @@
 #include <map>
 
 namespace oofem {
+class OutputWriter;
 class Material;
 class LayeredCrossSection;
 class MicroplaneMaterial;
@@ -243,6 +244,12 @@ public:
      * slaves of receiver.
      */
     void printOutputAt(FILE *file, TimeStep *tStep, const char* indent="");
+    /**
+     * Reports the output of receiver using given writer (structured output):
+     * the list of statuses ("statuses", each reporting its own fields) and, for layered
+     * integration points, the list of layers ("layers").
+     */
+    void reportOutput(OutputWriter &writer, TimeStep *tStep);
     /**
      * Updates internal state of receiver after finishing time step.
      * Material::updateYourself (receiver, tStep) function is called to

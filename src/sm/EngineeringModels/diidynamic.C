@@ -33,6 +33,7 @@
  */
 
 #include "sm/EngineeringModels/diidynamic.h"
+#include "outputwriter.h"
 #include "sm/Elements/structuralelement.h"
 #include "sm/Elements/structuralelementevaluator.h"
 #include "timestep.h"
@@ -410,6 +411,15 @@ DIIDynamic :: printDofOutputAt(FILE *stream, Dof *iDof, TimeStep *tStep)
     };
 
     iDof->printMultipleOutputAt(stream, tStep, dofchar, dofmodes, 3);
+}
+
+
+void
+DIIDynamic :: reportDofOutputAt(OutputWriter &writer, Dof *iDof, TimeStep *tStep)
+{
+    iDof->reportOutputAt(writer, tStep, "d", VM_Total);
+    iDof->reportOutputAt(writer, tStep, "v", VM_Velocity);
+    iDof->reportOutputAt(writer, tStep, "a", VM_Acceleration);
 }
 
 

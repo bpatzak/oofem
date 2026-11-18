@@ -115,8 +115,17 @@ at the same time:
     Selected dof manager (nodal) values.
 
 ``output``
-    The standard text output file, exposed as a module so that its selectors
-    can be configured like any other module's.
+    The standard text output file. It is created automatically (unless
+    ``suppress_output`` is given); declaring it explicitly allows its
+    selectors to be configured like any other module's.
+
+``jsonoutput``
+    The full content of the text output in a machine-readable form (JSON
+    Lines, one JSON object per line), see :ref:`json_output`.
+
+``json``
+    Selected DOF values, internal variables and reaction forces in JSON Lines
+    format, with the same structure as ``jsonoutput``, see :ref:`json_output`.
 
 ``errorcheck``
     Compares results against reference values embedded in the input file. This

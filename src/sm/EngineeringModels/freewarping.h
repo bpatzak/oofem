@@ -94,6 +94,8 @@ public:
     void updateDomainLinks() override;
 
     void printOutputAt(FILE *file, TimeStep *tStep) override;
+    /// No reactions are reported (as in the text output).
+    void reportDomainOutputAt(OutputWriter &writer, Domain *domain, TimeStep *tStep, const OutputFilter &filter) override { }
 
     TimeStep *giveNextStep() override;
     NumericalMethod *giveNumericalMethod(MetaStep *mStep) override;

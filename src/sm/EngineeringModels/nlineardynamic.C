@@ -36,6 +36,7 @@
 using namespace std;
 
 #include "sm/EngineeringModels/nlineardynamic.h"
+#include "outputwriter.h"
 #include "sm/Elements/nlstructuralelement.h"
 #include "sm/Elements/structuralelementevaluator.h"
 #include "nummet.h"
@@ -727,6 +728,15 @@ NonLinearDynamic :: printDofOutputAt(FILE *stream, Dof *iDof, TimeStep *tStep)
     };
 
     iDof->printMultipleOutputAt(stream, tStep, dofchar, dofmodes, 3);
+}
+
+
+void
+NonLinearDynamic :: reportDofOutputAt(OutputWriter &writer, Dof *iDof, TimeStep *tStep)
+{
+    iDof->reportOutputAt(writer, tStep, "d", VM_Total);
+    iDof->reportOutputAt(writer, tStep, "v", VM_Velocity);
+    iDof->reportOutputAt(writer, tStep, "a", VM_Acceleration);
 }
 
 void NonLinearDynamic :: saveContext(DataStream &stream, ContextMode mode)

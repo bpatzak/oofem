@@ -41,6 +41,7 @@
 #include "contextmode.h"
 
 namespace oofem {
+class OutputWriter;
 class GaussPoint;
 class TimeStep;
 class DataStream;
@@ -80,6 +81,14 @@ public:
     virtual ~IntegrationPointStatus() = default;
     /// Print receiver's output to given stream.
     virtual void printOutputAt(FILE *file, TimeStep *tStep) const { }
+    /**
+     * Reports the output of the receiver using given writer (structured output).
+     * The default implementation reports the text produced by printOutputAt
+     * (see reportLegacyOutput); derived classes should report structured data.
+     */
+    virtual void reportOutput(OutputWriter &writer, TimeStep *tStep) const;
+    /// Reports the text produced by printOutputAt (fallback for classes without structured output).
+    void reportLegacyOutput(OutputWriter &writer, TimeStep *tStep) const;
     /**
      * Update equilibrium history variables according to temp-variables.
      * Invoked, after new equilibrium state has been reached.

@@ -104,7 +104,7 @@ endfunction()
 
 # Sequential test cases
 if (USE_SM)
-    oofem_regression_ctest(sm "sm" BARE_CMD "adapt02.in")
+    oofem_regression_ctest(sm "sm" BARE_CMD "adapt02.in" EXCLUDE "jsonoutput01.in" "jsonexport01.in")
     oofem_regression_ctest(sm/NAFEMS "sm")
     if (USE_PETSC)
         # PETSc-only inputs live below the general SM directory so builds
@@ -122,6 +122,20 @@ if (USE_SM)
             add_test (NAME "${test_rel_dir}/${case}" WORKING_DIRECTORY ${oofem_SOURCE_DIR}/${test_rel_dir} COMMAND bash ${case} ${oofem_cmd})
             set_tests_properties("${test_rel_dir}/${case}" PROPERTIES LABELS "workflow")
         endforeach (case)
+
+        # Structured output (jsonoutput module): run the analysis (checked by errorcheck as usual)
+        # and compare the JSON Lines output with the standard text output
+        find_package(Python3 COMPONENTS Interpreter QUIET)
+        if (Python3_Interpreter_FOUND)
+            add_test (NAME "${test_rel_dir}/jsonoutput01.in"
+                      WORKING_DIRECTORY ${oofem_SOURCE_DIR}/${test_rel_dir}
+                      COMMAND bash -c "$<TARGET_FILE:oofem> -Werror -f jsonoutput01.in && ${Python3_EXECUTABLE} -I ${oofem_SOURCE_DIR}/tools/jsonl_check.py jsonoutput01.out.m0.jsonl jsonoutput01.out")
+            set_tests_properties("${test_rel_dir}/jsonoutput01.in" PROPERTIES LABELS "sm")
+            add_test (NAME "${test_rel_dir}/jsonexport01.in"
+                      WORKING_DIRECTORY ${oofem_SOURCE_DIR}/${test_rel_dir}
+                      COMMAND bash -c "$<TARGET_FILE:oofem> -Werror -f jsonexport01.in && ${Python3_EXECUTABLE} -I ${oofem_SOURCE_DIR}/tools/jsonl_check.py --subset jsonexport01.out.m0.jsonl jsonexport01.out")
+            set_tests_properties("${test_rel_dir}/jsonexport01.in" PROPERTIES LABELS "sm")
+        endif ()
     endif()
 endif ()
 

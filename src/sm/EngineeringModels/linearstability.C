@@ -125,13 +125,7 @@ LinearStability :: initializeFrom(const std::shared_ptr<InputRecord> &ir)
     if (suppressOutput) {
         printf("Suppressing output.\n");
     } else {
-        if ( ( outputStream = fopen(this->dataOutputFileName.c_str(), "w") ) == NULL ) {
-            OOFEM_ERROR("Can't open output file %s", this->dataOutputFileName.c_str());
-        }
-
-        fprintf(outputStream, "%s", PRG_HEADER);
-        fprintf(outputStream, "\nStarting analysis on: %s\n", ctime(& this->startTime) );
-        fprintf(outputStream, "%s\n", simulationDescription.c_str());
+        this->createDefaultOutputModule();
     }
 }
 
@@ -296,10 +290,8 @@ LinearStability :: terminateLinStatic(TimeStep *tStep)
 
 void LinearStability :: doStepOutput(TimeStep *tStep)
 {
-    if ( !suppressOutput ) {
-        this->printOutputAt(this->giveOutputStream(), tStep);
-        fflush( this->giveOutputStream() );
-    }
+    // output modules report the linear solution and all eigen modes at once
+    exportModuleManager.doOutputModulesOutput(tStep);
 
     Domain *domain = this->giveDomain(1);
     // i = 0  represents the linear solution, which is followed by the eigen vectors starting at i = 1
@@ -312,7 +304,7 @@ void LinearStability :: doStepOutput(TimeStep *tStep)
             dman->updateYourself(&step);
         }
 
-        exportModuleManager.doOutput(&step);
+        exportModuleManager.doExportModulesOutput(&step);
     }
 }
 

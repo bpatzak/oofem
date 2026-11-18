@@ -116,13 +116,7 @@ EigenValueDynamic :: initializeFrom(const std::shared_ptr<InputRecord> &ir)
     if ( suppressOutput ) {
         printf("Suppressing output.\n");
     } else {
-        if ( ( outputStream = fopen(this->dataOutputFileName.c_str(), "w") ) == NULL ) {
-            OOFEM_ERROR("Can't open output file %s", this->dataOutputFileName.c_str());
-        }
-
-        fprintf(outputStream, "%s", PRG_HEADER);
-        fprintf(outputStream, "\nStarting analysis on: %s\n", ctime(& this->startTime) );
-        fprintf(outputStream, "%s\n", simulationDescription.c_str());
+        this->createDefaultOutputModule();
     }
 }
 
@@ -215,16 +209,14 @@ void EigenValueDynamic :: updateYourself(TimeStep *tStep)
 
 void EigenValueDynamic :: doStepOutput(TimeStep *tStep)
 {
-    if ( !suppressOutput ) {
-        this->printOutputAt(this->giveOutputStream(), tStep);
-        fflush( this->giveOutputStream() );
-    }
+    // output modules report all eigen modes at once
+    exportModuleManager.doOutputModulesOutput(tStep);
 
     for ( int i = 1; i <= numberOfRequiredEigenValues; i++ ) {
-        // export using export manager
+        // export using export modules, one eigen mode at a time
         tStep->setTime( ( double ) i ); // we use time as intrinsic eigen value index
         tStep->setNumber(i);
-        exportModuleManager.doOutput(tStep);
+        exportModuleManager.doExportModulesOutput(tStep);
     }
 }
 

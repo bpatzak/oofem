@@ -64,6 +64,7 @@
 //@}
 
 namespace oofem {
+class OutputWriter;
 /**
  * Implementation of callback class for assembling right-hand side of pressure equations
  */
@@ -253,6 +254,7 @@ public:
      *  @param atTime solution step
      */
     void printDofOutputAt(FILE *stream, Dof *iDof, TimeStep *atTime) override;
+    void reportDofOutputAt(OutputWriter &writer, Dof *iDof, TimeStep *tStep) override;
 
     int giveNumberOfDomainEquations(int, const UnknownNumberingScheme &num) override;
 
