@@ -197,13 +197,21 @@ void test (oofem::Element& e) {
     #define floatarrayF32numpy(a) a
 #else
     #if 1
-      // the py::cast(s) uses the parent object for determining array lifetime: https://github.com/pybind/pybind11/issues/2271#issuecomment-650565098
+      // lvalue overloads: view on the data of an object already owned by Python (e.g. asNumpyArray);
+      // py::cast(s) returns the existing Python wrapper of s, which is used as the array base and keeps
+      // the data alive: https://github.com/pybind/pybind11/issues/2271#issuecomment-650565098
       py::array_t<double> floatarray2numpy(const FloatArray& s){ return py::array_t<double> (s.giveSize(), s.givePointer(), py::cast(s)); }
       py::array_t<int> intarray2numpy(const IntArray& s){ return py::array_t<int> (s.giveSize(), s.givePointer(), py::cast(s)); }
+      // rvalue overloads: temporaries returned by value (e.g. ExportRegion::getCellConnectivity()).
+      // Such an object has no Python wrapper, so py::cast(s) would create a *copy* of it as the base,
+      // while the array would still point into the temporary, destroyed when the binding lambda
+      // returns (dangling view, garbage values). Copy the data into the numpy array instead
+      // (no base given => pybind11 allocates and copies).
+      py::array_t<double> floatarray2numpy(FloatArray&& s){ return py::array_t<double> (s.giveSize(), s.givePointer()); }
+      py::array_t<int> intarray2numpy(IntArray&& s){ return py::array_t<int> (s.giveSize(), s.givePointer()); }
       /* say reference=true to create view on existing data inside the object (bound lifetime); copy data by default. */
       py::array_t<double,py::array::f_style> floatmatrix2numpy(const FloatMatrix& s, bool reference=false){
         // for(int i=0; i<s.giveNumberOfRows()*s.giveNumberOfColumns(); i++) std::cerr<<"["<<i<<"] → "<<*(double*)(((char*)s.givePointer())+i*sizeof(double))<<std::endl;
-        std::cerr<<std::endl;
         auto ret=py::array_t<double,py::array::f_style> ({s.giveNumberOfRows(), s.giveNumberOfColumns()}, {sizeof(double), sizeof(double)*s.giveNumberOfRows()}, s.givePointer(), /* base */ reference ? py::cast(s) : py::handle());
         // for(int r=0; r<s.giveNumberOfRows(); r++) for(int c=0; c<s.giveNumberOfColumns(); c++) std::cerr<<"["<<r<<","<<c<<"]="<<ret.at(r,c)<<std::endl;
         // std::cerr<<std::endl;
@@ -1095,7 +1103,8 @@ PYBIND11_MODULE(oofempy, m) {
             .def("zero", &oofem::FloatArrayF<3>::zero)
             .def("add", &oofem::FloatArrayF<3>::add)
             // enable conversion to numpy representation
-            .def("asNumpyArray", [](const oofem::FloatArrayF<3> &s) { return floatarray2numpy(s); })
+            // (floatarray2numpy would bind via an implicit conversion to a temporary FloatArray)
+            .def("asNumpyArray", [](const oofem::FloatArrayF<3> &s) { return floatarrayF32numpy(s); })
             // expose FloatArray operators
             #ifdef _USE_EIGEN
                 .def("__add__",[](const FloatArrayF<3>& a, const FloatArrayF<3>& b)->FloatArrayF<3>{ return a+b; },py::is_operator())

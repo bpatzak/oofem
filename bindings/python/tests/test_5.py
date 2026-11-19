@@ -93,8 +93,13 @@ def test_5():
         for p in vtkPy.getExportRegions():
                 print ("Piece:", p)
                 print("Vertices:", p.getVertices())
-                print("Cells:", p.getCellConnectivity())
-                print("CellTypes:", p.getCellTypes())
+                cells = p.getCellConnectivity()
+                cellTypes = p.getCellTypes()
+                print("Cells:", cells)
+                print("CellTypes:", cellTypes)
+                # one triangle with nodes 1,2,3: flat VTK format [n, i0, ..., in-1], 0-based
+                assert [int(v) for v in cells] == [3, 0, 1, 2], "Export of cell connectivity failed"
+                assert [int(v) for v in cellTypes] == [5], "Export of cell types failed"  # VTK_TRIANGLE
                 temperature = p.getPrimaryVertexValues(oofempy.UnknownType.Temperature);
                 print ("Temperature:", temperature)
 
