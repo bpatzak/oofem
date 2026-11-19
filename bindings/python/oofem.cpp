@@ -212,7 +212,6 @@ void test (oofem::Element& e) {
       /* say reference=true to create view on existing data inside the object (bound lifetime); copy data by default. */
       py::array_t<double,py::array::f_style> floatmatrix2numpy(const FloatMatrix& s, bool reference=false){
         // for(int i=0; i<s.giveNumberOfRows()*s.giveNumberOfColumns(); i++) std::cerr<<"["<<i<<"] → "<<*(double*)(((char*)s.givePointer())+i*sizeof(double))<<std::endl;
-        std::cerr<<std::endl;
         auto ret=py::array_t<double,py::array::f_style> ({s.giveNumberOfRows(), s.giveNumberOfColumns()}, {sizeof(double), sizeof(double)*s.giveNumberOfRows()}, s.givePointer(), /* base */ reference ? py::cast(s) : py::handle());
         // for(int r=0; r<s.giveNumberOfRows(); r++) for(int c=0; c<s.giveNumberOfColumns(); c++) std::cerr<<"["<<r<<","<<c<<"]="<<ret.at(r,c)<<std::endl;
         // std::cerr<<std::endl;
