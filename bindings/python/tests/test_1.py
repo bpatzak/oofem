@@ -65,5 +65,19 @@ def test_arrays():
     assert a1[0,2]==a0[0,2]
     assert a0[0,2]==99
 
+    # ... the same for FloatArray
+    v0 = oofempy.FloatArray((1.0, 2.0, 3.0))
+    v1 = v0.asNumpyArray()
+    assert list(v1) == [1.0, 2.0, 3.0]
+    v1[1] = 99
+    assert v0[1] == 99
+
+    # ... and for FloatArrayF<3> (e.g. node coordinates)
+    f0 = getattr(oofempy, "FloatArrayF<3>")((4.0, 5.0, 6.0))
+    f1 = f0.asNumpyArray()
+    assert list(f1) == [4.0, 5.0, 6.0]
+    f1[2] = 99
+    assert f0[2] == 99
+
 if __name__ == "__main__":
     test_arrays()
