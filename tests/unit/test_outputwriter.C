@@ -42,6 +42,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <cstdio>
+#include <limits>
 #include <string>
 
 using namespace oofem;
@@ -56,7 +57,9 @@ TEST_CASE("captureOutput returns the text written to the stream", "[outputwriter
 TEST_CASE("JsonLinesWriter escapes strings and numbers", "[outputwriter]")
 {
     REQUIRE(JsonLinesWriter :: escape("a\"b\\c\nd\t") == "\"a\\\"b\\\\c\\nd\\t\"");
-    REQUIRE(JsonLinesWriter :: number(1.0 / 0.0) == "null");
+    // Use numeric_limits rather than 1.0/0.0: MSVC rejects constant division by zero (C2124)
+    REQUIRE(JsonLinesWriter :: number(std :: numeric_limits< double > :: infinity()) == "null");
+    REQUIRE(JsonLinesWriter :: number(std :: numeric_limits< double > :: quiet_NaN()) == "null");
     REQUIRE(JsonLinesWriter :: number(-2.5) == "-2.5000000000000000e+00");
     REQUIRE(std :: stod(JsonLinesWriter :: number(0.1)) == 0.1);
 }
